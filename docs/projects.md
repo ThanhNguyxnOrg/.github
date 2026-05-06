@@ -4,7 +4,7 @@
 
 # 📚 Projects Overview
 
-This document explains the kinds of repositories that may appear in **ThanhNguyxn-Org**.
+This document explains the kinds of repositories that may appear in ThanhNguyxn's project workspace.
 
 ---
 
@@ -51,13 +51,13 @@ These might include:
 ---
 
 ## ♻️ Rebuilt / Migrated Repositories
-A special category in this organization.
+A special category in this workspace.
 
 These repos may represent:
 - restored work
 - updated rewrites
 - cleaned-up versions
-- migrated projects from older accounts
+- migrated projects from earlier accounts or workspaces
 
 ---
 

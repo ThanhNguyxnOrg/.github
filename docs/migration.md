@@ -4,7 +4,7 @@
 
 # ♻️ Migration & Legacy Note
 
-A meaningful part of **ThanhNguyxn-Org** is dedicated to restoring and continuing work from earlier stages of my GitHub journey.
+A meaningful part of ThanhNguyxn's workspace is dedicated to restoring and continuing work from earlier stages of my GitHub journey.
 
 ---
 
@@ -17,7 +17,7 @@ Some projects deserve:
 - a second life
 - a better future
 
-This org gives them that chance.
+This workspace gives them that chance.
 
 ---
 
@@ -39,7 +39,7 @@ Because repositories come from different learning phases, the code style and str
 
 That is expected.
 
-This org reflects:
+This workspace reflects:
 - where I started
 - what I rebuilt
 - what I'm becoming
@@ -50,4 +50,4 @@ This org reflects:
 
 The goal is not only to preserve old code.
 
-The goal is to preserve growth — and build forward from it.
+The goal is to preserve growth and build forward from it.

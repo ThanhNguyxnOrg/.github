@@ -4,7 +4,7 @@
 
 # 💭 Philosophy
 
-**ThanhNguyxn-Org** is built on one simple belief:
+ThanhNguyxn's project workspace is built on one simple belief:
 
 > real growth should be visible, organized, and honest.
 
@@ -22,7 +22,7 @@ Some projects should simply be:
 - unfinished but valuable 🧱
 - part of a longer journey 🚶
 
-This org is not here to fake perfection.  
+This workspace is not here to fake perfection.
 It is here to reflect **real learning** and **real building**.
 
 ---
@@ -48,7 +48,7 @@ Messy beginnings can still lead to strong outcomes.
 
 ## ✨ Final thought
 
-This organization is both:
+This workspace is both:
 
 - an archive of effort
 - and a workshop for what comes next

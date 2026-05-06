@@ -53,4 +53,4 @@ There is no single strict stack across the entire organization, but these are th
 I care less about using every trendy tool  
 and more about understanding how systems fit together.
 
-So this stack will evolve — and that's part of the journey.
+So this stack will evolve, and that's part of the journey.
