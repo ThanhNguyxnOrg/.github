@@ -12,8 +12,8 @@
 
 # 🆘 Support
 
-Need help with a repository in **ThanhNguyxn-Org**?  
-You're in the right place.
+Need help with a repository in ThanhNguyxn's workspace?
+Open an issue in the relevant repository with clear context.
 
 ---
 
@@ -47,7 +47,7 @@ The clearer the report, the easier it is to help.
 
 ## ⚠️ Support expectations
 
-This is a **personal organization**, so support is provided on a:
+This is a **personal workspace**, so support is provided on a:
 
 ### ⭐ best-effort basis
 
@@ -77,5 +77,5 @@ Please include:
 Thanks for trying the projects here and for taking the time to report issues properly.
 
 <div align="center">
-  <img src="https://img.shields.io/badge/Support-Community%20Friendly-14B8A6?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Support-Friendly%20Best%20Effort-14B8A6?style=for-the-badge" />
 </div>

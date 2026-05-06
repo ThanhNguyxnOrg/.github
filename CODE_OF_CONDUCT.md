@@ -12,7 +12,7 @@
 
 # 🌱 Code of Conduct
 
-This organization values a respectful, constructive, and curiosity-driven environment.
+This workspace values a respectful, constructive, and curiosity-driven environment.
 
 Whether you're opening an issue, discussing ideas, or contributing code, please help keep interactions healthy and useful.
 
@@ -56,7 +56,7 @@ This includes:
 
 ## 🛠️ Enforcement
 
-As the maintainer of this personal organization, I reserve the right to moderate, remove, or ignore interactions that harm the space.
+As the maintainer of this personal workspace, I reserve the right to moderate, remove, or ignore interactions that harm the space.
 
 ---
 

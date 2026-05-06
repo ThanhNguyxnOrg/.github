@@ -12,13 +12,13 @@
 
 # 🔐 Security Policy
 
-Thanks for helping keep projects in **ThanhNguyxn-Org** safer.
+Thanks for helping keep ThanhNguyxn's projects safer.
 
 ---
 
 ## 📌 Scope
 
-This organization contains a mix of:
+This workspace contains a mix of:
 
 - active projects
 - experiments
@@ -55,7 +55,7 @@ A useful report should include:
 
 ## ⏳ Response expectations
 
-Since this is a personal organization:
+Since this is a personal workspace:
 
 - response time may vary
 - actively maintained repos will be prioritized

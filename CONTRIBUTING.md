@@ -12,9 +12,9 @@
 
 # 🤝 Contributing
 
-Thanks for your interest in contributing to **ThanhNguyxn-Org**.
+Thanks for your interest in contributing to projects in the ThanhNguyxn workspace.
 
-This organization is primarily a **personal GitHub workspace**, so contribution rules may differ across repositories.
+This organization is a **personal GitHub workspace**, so contribution rules may differ across repositories.
 
 ---
 
@@ -32,11 +32,11 @@ Please try to:
 
 ## 🧪 Important context
 
-Some repositories in this organization are:
+Some repositories in this workspace are:
 
 - experiments
 - learning projects
-- rebuilt legacy repos
+- rebuilt older repos
 - archived references
 - active long-term builds
 
@@ -78,7 +78,7 @@ If you're unsure whether something is worth contributing:
 
 ## 💖 Final note
 
-Even though this is a personal organization, thoughtful contributions are always appreciated.
+Even though this is a personal workspace, thoughtful issues, fixes, and suggestions are appreciated when they fit the project.
 
 Thanks for stopping by and helping make things better ✨
 
