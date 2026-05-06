@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=170&section=header&text=ThanhNguyxn-Org%20Meta%20Repo&fontSize=34&animation=fadeIn&fontAlignY=38" width="100%"/>
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=170&section=header&text=ThanhNguyxn%20Workspace%20Meta%20Repo&fontSize=34&animation=fadeIn&fontAlignY=38" width="100%"/>
 </div>
 
 <div align="center">
@@ -12,10 +12,10 @@
 
 # 🌌 Welcome to the `.github` repository
 
-This repository contains the **organization-level profile and shared community files** for **ThanhNguyxn-Org**.
+This repository contains the **organization profile and shared community files** for the ThanhNguyxn project workspace.
 
-Think of this as the **core control room** of the organization.  
-It keeps the public-facing presentation and default documentation clean, organized, and consistent.
+Think of this as a small control room for the workspace.
+It keeps the public-facing profile and default documentation clean, organized, and consistent.
 
 ---
 
@@ -28,21 +28,21 @@ It keeps the public-facing presentation and default documentation clean, organiz
 - `CODE_OF_CONDUCT.md` → behavior expectations
 - `PULL_REQUEST_TEMPLATE.md` → default pull request template
 - `ISSUE_TEMPLATE/` → default issue templates
-- `docs/` → extra documentation about this org
+- `docs/` → extra documentation about this workspace
 
 ---
 
 ## ✨ Purpose
 
-This org is personal, but I still want it to feel:
+This workspace is personal, but I still want it to feel:
 
 - clean 🧼
 - structured 🧱
 - documented 📝
 - maintainable 🛠️
-- future-ready 🚀
+- ready to grow 🚀
 
-So this repo acts as the **foundation layer** for the whole organization.
+So this repo acts as the **foundation layer** for the workspace.
 
 ---
 
