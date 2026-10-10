@@ -1,152 +1,90 @@
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=200&section=header&text=Hi%20there,%20I'm%20Thanh!%20%F0%9F%91%8B&fontSize=40&animation=fadeIn&fontAlignY=38" width="100%"/>
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=200&section=header&text=ThanhNguyxnOrg&fontSize=42&animation=fadeIn&fontAlignY=38&desc=An%20independent%20technology%20practice&descSize=18&descAlignY=55" width="100%" alt="ThanhNguyxnOrg header" />
 </div>
 
 <div align="center">
-  <img src="https://komarev.com/ghpvc/?username=ThanhNguyxnOrg&label=Profile%20Views&color=0e75b6&style=flat-square" alt="ThanhNguyxn workspace views" />
-  <img src="https://img.shields.io/badge/Personal-Organization-8A2BE2?style=flat-square" />
-  <img src="https://img.shields.io/badge/Rebuilding-Legacy%20Projects-1E90FF?style=flat-square" />
-  <img src="https://img.shields.io/badge/Student-Builder-00C853?style=flat-square" />
+  <img src="https://komarev.com/ghpvc/?username=ThanhNguyxnOrg&label=Profile%20Views&color=0e75b6&style=flat-square" alt="ThanhNguyxnOrg views" />
+  <img src="https://img.shields.io/badge/16-Repositories-8A2BE2?style=flat-square" alt="16 repositories" />
+  <img src="https://img.shields.io/badge/Top-TS%20%C2%B7%20JS%20%C2%B7%20Py%20%C2%B7%20Go-1E90FF?style=flat-square" alt="Top languages" />
+  <img src="https://img.shields.io/badge/Focus-developer--tools%20%C2%B7%20ai--agents-00C853?style=flat-square" alt="Focus areas" />
+</div>
+
+<div align="center">
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=18&pause=1000&color=22C55E&center=true&vCenter=true&width=600&lines=Build.+Explore.+Evolve.;An+independent+technology+practice." alt="Build. Explore. Evolve." />
 </div>
 
 ---
 
-### 🚀 About This Personal Workspace
-Hello world 👋! Welcome to the GitHub workspace for **ThanhNguyxn** 👨‍💻.
+### About
 
-I use this organization to keep my projects, experiments, restored repositories, and learning work in one structured place. Every repository here is part of my coding journey.
+An independent technology practice focused on building, exploring, and evolving ideas — all work lives at [github.com/ThanhNguyxnOrg](https://github.com/ThanhNguyxnOrg).
 
-- 🔭 **I'm currently building my knowledge across:** software development, systems, tools, and project design
-- 🌱 **I'm always learning:** fundamentals, frameworks, workflows, and better ways to build
-- 👯 **This workspace is open to:** interesting ideas, useful discussions, and meaningful collaborations when relevant
-- 💬 **Ask me about:** the projects here, or open an issue if something needs attention
-- 📫 **How to reach me:** use GitHub issues or discussions in the relevant repository
-- ⚡ **Focus:** learning deeply, building steadily, and keeping progress visible
+- Building practical developer tools, AI workflows, and open-source utilities
+- Learning in public: fundamentals first, systems over hype
+- Documenting everything worth keeping
+- Preserving older work and giving good projects a second life
+- Open to useful discussions and meaningful collaboration — start with an issue
 
 ---
 
-### ♻️ Why This Workspace Exists
-This organization is a personal workspace, not a company or team brand.
+### Tech Stack
 
-It is my:
-
-- 🗃️ **project archive**
-- 🛠️ **rebuild workspace**
-- 📚 **learning lab**
-- 🚀 **long-term development base**
-
-Some repositories may be restored, migrated, or rebuilt from earlier stages of my GitHub journey, especially projects that still matter to me and deserve a cleaner home.
-
-So if some repositories feel older, rougher, or different in style, that's normal.
-This workspace reflects both **where I started** and **where I'm going**.
-
----
-
-### 🌌 What You'll Find Here
-Inside this workspace, you'll usually find a mix of:
-
-- 💻 personal projects
-- 🧪 experiments and prototypes
-- 🛠️ tools and utilities
-- 📘 learning repositories
-- ♻️ migrated or rebuilt older projects
-- 🧱 starter templates
-- 🗂️ archived code kept for reference
-
-Some repos are polished.  
-Some are still growing.  
-Some are simply part of the process.
-
-And honestly, that's the point. ✨
-
----
-
-### 🛠 Tech Stack & Tools
+<p align="center">
+  <a href="https://skillicons.dev">
+    <img src="https://skillicons.dev/icons?i=ts,js,py,go,rust,powershell,vue,svelte,tauri,docker,nodejs,express,git,githubactions,vscode&perline=8" alt="Tech stack icons" />
+  </a>
+</p>
 
 <div align="center">
-  <img src="https://img.shields.io/badge/C%2B%2B-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white" alt="C++" />
-  <img src="https://img.shields.io/badge/C-00599C?style=for-the-badge&logo=c&logoColor=white" alt="C" />
-  <img src="https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java" />
-  <img src="https://img.shields.io/badge/C%23-239120?style=for-the-badge&logo=c-sharp&logoColor=white" alt="C#" />
-  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black" alt="JavaScript" />
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black" alt="JavaScript" />
   <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
-  <img src="https://img.shields.io/badge/GIT-E44C30?style=for-the-badge&logo=git&logoColor=white" alt="Git" />
-  <img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" />
-  <img src="https://img.shields.io/badge/VS_Code-0078D4?style=for-the-badge&logo=visual%20studio%20code&logoColor=white" alt="VS Code" />
-  <img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows" />
-  <img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux" />
+  <img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go" />
+  <img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust" />
+  <img src="https://img.shields.io/badge/PowerShell-5391FE?style=for-the-badge&logo=powershell&logoColor=white" alt="PowerShell" />
+  <img src="https://img.shields.io/badge/Vue-4FC08D?style=for-the-badge&logo=vuedotjs&logoColor=white" alt="Vue" />
+  <img src="https://img.shields.io/badge/Tauri-24C8DB?style=for-the-badge&logo=tauri&logoColor=white" alt="Tauri" />
 </div>
 
 ---
 
-### 💭 Building Philosophy
-I like projects that are:
+### Showcase
 
-- practical 🛠️
-- understandable 📘
-- reusable ♻️
-- well-documented 📝
-- built step by step 🧱
+<!-- AUTO-TOP6-START -->
+| Project | What it is | Stack | Stars |
+|---|---|---|---|
+| [blendops](https://github.com/ThanhNguyxnOrg/blendops) | AI-native Blender workflow and skill pack for non-Blender users | JavaScript | ★ 3 |
+| [lumeo](https://github.com/ThanhNguyxnOrg/lumeo) | Bilingual captions and live AI dubbing for YouTube | JavaScript | ★ 2 |
+| [apidex-hub](https://github.com/ThanhNguyxnOrg/apidex-hub) | Curated collection of free APIs for developers | TypeScript | ★ 1 |
+| [awesome-cert-sherpa](https://github.com/ThanhNguyxnOrg/awesome-cert-sherpa) | IT certification prep with 1,590+ original practice questions | TypeScript | ★ 1 |
+| [PurgeKit](https://github.com/ThanhNguyxnOrg/PurgeKit) | Developer-focused system uninstaller and deep cleaner for Windows | Rust | ★ 1 |
+| [SkillGauge](https://github.com/ThanhNguyxnOrg/SkillGauge) | Static auditing engine for agentic instructions with a 100-criteria matrix | TypeScript | ★ 0 |
+<!-- AUTO-TOP6-END -->
 
-I don't just want to use technology.  
-I want to understand it deeply.
-
-From fundamentals to full systems.  
-From small scripts to complete applications.  
-From low-level concepts to higher-level abstractions. ⚡
-
----
-
-### 📦 Migration Note
-A special part of this organization is dedicated to:
-
-- restored repositories
-- migrated older projects
-- improved rewrites
-- cleaned-up second versions
-- archive copies for progress tracking
-
-This is my way of preserving work that still matters and giving it a better foundation.
+Full auto-updated list of all repositories: [docs/projects.md](https://github.com/ThanhNguyxnOrg/.github/blob/main/docs/projects.md)
 
 ---
 
-### 📌 Pinned Repositories
-The pinned repositories on this workspace will usually represent one of these:
+### Philosophy
 
-- ⭐ my most important current projects
-- ♻️ rebuilt older repos
-- 🧱 foundational repositories for future work
-- 🧪 experiments worth following
-- 🛠️ useful tools / scripts
+> Real growth should be visible, organized, and honest.
+
+Practical, understandable, reusable, documented — built step by step. More: [docs/philosophy.md](https://github.com/ThanhNguyxnOrg/.github/blob/main/docs/philosophy.md)
 
 ---
 
-### ❤️ Support My Journey
-If you find something here interesting, useful, or inspiring:
+### Pinned Strategy
 
-- leave a ⭐ on repositories you like
-- watch projects you want to follow
-- open an issue if something is broken
-- check back later, this workspace is always evolving
+Six pinned repositories cover the practice at a glance: AI workflows, AI media, curated APIs, certification prep, systems tooling, and agent auditing. Pinned directly on the organization page.
 
 ---
-
-### 🌠 Final Note
-This workspace is basically my **digital workshop**.
-
-Some shelves are clean.  
-Some are messy.  
-Some things are still half-built.
-
-But everything here is part of the journey. 💫
 
 <div align="center">
-  <img src="https://img.shields.io/badge/Made%20with-%F0%9F%92%9C-ff69b4?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Built%20by-Thanh-00bfff?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Status-Always%20Learning-22c55e?style=for-the-badge" />
+  <a href="https://github.com/ThanhNguyxnOrg/.github"><img src="https://img.shields.io/badge/Docs-Community%20Files-3B82F6?style=for-the-badge" alt="Docs" /></a>
+  <a href="https://github.com/ThanhNguyxnOrg/.github/blob/main/SUPPORT.md"><img src="https://img.shields.io/badge/Support-Best%20Effort-0EA5E9?style=for-the-badge" alt="Support" /></a>
+  <a href="https://github.com/ThanhNguyxnOrg/.github/blob/main/SECURITY.md"><img src="https://img.shields.io/badge/Security-Report%20Responsibly-DC2626?style=for-the-badge" alt="Security" /></a>
 </div>
 
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=100&section=footer" width="100%"/>
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=100&section=footer" width="100%" alt="Footer" />
 </div>
