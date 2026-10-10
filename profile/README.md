@@ -53,12 +53,12 @@ An independent technology practice focused on building, exploring, and evolving 
 <!-- AUTO-TOP6-START -->
 | Project | What it is | Stack | Stars |
 |---|---|---|---|
-| [blendops](https://github.com/ThanhNguyxnOrg/blendops) | AI-native Blender workflow and skill pack for non-Blender users | JavaScript | ★ 3 |
-| [lumeo](https://github.com/ThanhNguyxnOrg/lumeo) | Bilingual captions and live AI dubbing for YouTube | JavaScript | ★ 2 |
-| [apidex-hub](https://github.com/ThanhNguyxnOrg/apidex-hub) | Curated collection of free APIs for developers | TypeScript | ★ 1 |
-| [awesome-cert-sherpa](https://github.com/ThanhNguyxnOrg/awesome-cert-sherpa) | IT certification prep with 1,590+ original practice questions | TypeScript | ★ 1 |
-| [PurgeKit](https://github.com/ThanhNguyxnOrg/PurgeKit) | Developer-focused system uninstaller and deep cleaner for Windows | Rust | ★ 1 |
-| [SkillGauge](https://github.com/ThanhNguyxnOrg/SkillGauge) | Static auditing engine for agentic instructions with a 100-criteria matrix | TypeScript | ★ 0 |
+| [blendops](https://github.com/ThanhNguyxnOrg/blendops) | AI-native Blender workflow and skill pack for non-Blender users, built around official Blender MCP,... | JavaScript | ★ 3 |
+| [lumeo](https://github.com/ThanhNguyxnOrg/lumeo) | Bilingual captions and live AI dubbing for YouTube. Three tiers, one click: free caption... | JavaScript | ★ 2 |
+| [apidex-hub](https://github.com/ThanhNguyxnOrg/apidex-hub) | 🌐 A curated collection of awesome free APIs for developers. Categorized, tested daily, and... | TypeScript | ★ 1 |
+| [awesome-cert-sherpa](https://github.com/ThanhNguyxnOrg/awesome-cert-sherpa) | Community-driven IT certification prep — curated resources, 1,590+ original practice questions,... | TypeScript | ★ 1 |
+| [PurgeKit](https://github.com/ThanhNguyxnOrg/PurgeKit) | Ultimate developer-focused system uninstaller and deep cleaner for Windows. | Rust | ★ 1 |
+| [Snapbooth](https://github.com/ThanhNguyxnOrg/Snapbooth) | Browser photobooth with count-in capture, filters, frames, GIF export, and GitHub Pages | TypeScript | ★ 1 |
 <!-- AUTO-TOP6-END -->
 
 Full auto-updated list of all repositories: [docs/projects.md](https://github.com/ThanhNguyxnOrg/.github/blob/main/docs/projects.md)

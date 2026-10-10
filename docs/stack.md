@@ -9,14 +9,9 @@ The stack reflects what the organization actually ships. Language counts update 
 <!-- AUTO-STACK-START -->
 ## By the numbers (live)
 
-- Core languages: TypeScript, JavaScript, Python, Go, Rust, PowerShell
-- UI frameworks: Vue, Svelte, React
-- Desktop: Tauri v2
-- Backend and runtime: Node.js, Express, Django, Channels, Celery
-- Data and infra: PostgreSQL, Redis, MongoDB, Docker
-- AI surface: Claude Code, MCP servers, Gemini, speech-to-text and text-to-speech
-- Browser: Chrome Extensions (Manifest V3)
-- Tooling: Git, GitHub Actions, VS Code, Windows, Linux
+- Repositories tracked: 16
+- TypeScript: 6 · JavaScript: 3 · Python: 2 · Go: 1 · Other: 1 · PowerShell: 1 · Rust: 1 · Vue: 1
+- Top topics: developer-tools, ai-agents, typescript, python, rest-api
 <!-- AUTO-STACK-END -->
 
 ---

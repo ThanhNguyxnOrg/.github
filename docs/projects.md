@@ -9,22 +9,22 @@ Every repository in the organization, auto-updated. The profile page shows the T
 <!-- AUTO-FULL-START -->
 | Project | Description | Stack | Topics |
 |---|---|---|---|
-| [blendops](https://github.com/ThanhNguyxnOrg/blendops) | AI-native Blender workflow and skill pack for non-Blender users | JavaScript | ai-agents, blender, mcp |
-| [lumeo](https://github.com/ThanhNguyxnOrg/lumeo) | Bilingual captions and live AI dubbing for YouTube | JavaScript | chrome-extension, ai-dubbing, youtube |
-| [apidex-hub](https://github.com/ThanhNguyxnOrg/apidex-hub) | Curated collection of free APIs for developers | TypeScript | api, awesome-list, developer-tools |
-| [awesome-cert-sherpa](https://github.com/ThanhNguyxnOrg/awesome-cert-sherpa) | IT certification prep with 1,590+ original practice questions | TypeScript | certification, aws, azure |
-| [Snapbooth](https://github.com/ThanhNguyxnOrg/Snapbooth) | Browser photobooth with filters, frames, and GIF export | TypeScript | react, browser, github-pages |
-| [PurgeKit](https://github.com/ThanhNguyxnOrg/PurgeKit) | Developer-focused system uninstaller and deep cleaner for Windows | Rust | windows, tauri, uninstaller |
-| [SkillGauge](https://github.com/ThanhNguyxnOrg/SkillGauge) | Static auditing engine for agentic instructions with a 100-criteria matrix | TypeScript | ai-agents, static-analysis, developer-tools |
-| [lagvex](https://github.com/ThanhNguyxnOrg/lagvex) | Game latency reducer and ping booster via WinTun and Go relay | Go | vpn, game-booster, latency-reducer |
-| [LayoutLingua](https://github.com/ThanhNguyxnOrg/LayoutLingua) | Layout-preserving PDF translator with math formula support | Python | pdf, translation, ocr |
-| [Locsight](https://github.com/ThanhNguyxnOrg/Locsight) | Codebase health, security, and refactoring hotspot analyzer | TypeScript | rust, tauri, static-analysis |
-| [git-account-switcher](https://github.com/ThanhNguyxnOrg/git-account-switcher) | Fast multi-account Git identity and GitHub CLI switcher | PowerShell | git, developer-tools, cross-platform |
-| [cogmint](https://github.com/ThanhNguyxnOrg/cogmint) | Dark-first control plane for Claude Code orchestration | Vue | claude, ai-agents, dashboard |
-| [judgeloom-core](https://github.com/ThanhNguyxnOrg/judgeloom-core) | Competitive programming online judge with Django, Channels, Celery | Python | django, docker, competitive-programming |
-| [StepDSA](https://github.com/ThanhNguyxnOrg/StepDSA) | Interactive DSA learning platform and visualizer | TypeScript | dsa, learning, visualizer |
-| [ForgeHelm](https://github.com/ThanhNguyxnOrg/ForgeHelm) | Chrome extension for bulk GitHub repository management | JavaScript | chrome-extension, github-api, productivity |
-| [.github](https://github.com/ThanhNguyxnOrg/.github) | Organization profile and community health files | Markdown | docs, community-health |
+| [blendops](https://github.com/ThanhNguyxnOrg/blendops) | AI-native Blender workflow and skill pack for non-Blender users, built around official Blender MCP,... | JavaScript | agent-skills, ai-agents, blender |
+| [lumeo](https://github.com/ThanhNguyxnOrg/lumeo) | Bilingual captions and live AI dubbing for YouTube. Three tiers, one click: free caption... | JavaScript | ai-dubbing, chrome-extension, javascript |
+| [apidex-hub](https://github.com/ThanhNguyxnOrg/apidex-hub) | 🌐 A curated collection of awesome free APIs for developers. Categorized, tested daily, and... | TypeScript | api, api-collection, api-directory |
+| [awesome-cert-sherpa](https://github.com/ThanhNguyxnOrg/awesome-cert-sherpa) | Community-driven IT certification prep — curated resources, 1,590+ original practice questions,... | TypeScript | awesome-list, aws, azure |
+| [PurgeKit](https://github.com/ThanhNguyxnOrg/PurgeKit) | Ultimate developer-focused system uninstaller and deep cleaner for Windows. | Rust | cleaner, developer-tools, power-user |
+| [Snapbooth](https://github.com/ThanhNguyxnOrg/Snapbooth) | Browser photobooth with count-in capture, filters, frames, GIF export, and GitHub Pages | TypeScript | boomerang, browser, browser-only |
+| [StepDSA](https://github.com/ThanhNguyxnOrg/StepDSA) | Interactive DSA learning platform & visualizer with deterministic time-travel engine and playground. | TypeScript | - |
+| [.github](https://github.com/ThanhNguyxnOrg/.github) | Organization profile and community health files for ThanhNguyxnOrg | - | - |
+| [cogmint](https://github.com/ThanhNguyxnOrg/cogmint) | Dark-first control plane for Claude Code orchestration. Visual ops surface for agents, skills,... | Vue | agent-orchestration, ai-agents, anthropic |
+| [ForgeHelm](https://github.com/ThanhNguyxnOrg/ForgeHelm) | ⚒️ ForgeHelm — A powerful Chrome Extension for bulk GitHub repository management. Archive, delete,... | JavaScript | bulk-operations, chrome-extension, developer-tools |
+| [git-account-switcher](https://github.com/ThanhNguyxnOrg/git-account-switcher) | ⚡ Fast multi-account Git identity & GitHub CLI switcher. Switch accounts, tokens, commit authors,... | PowerShell | account-switcher, cross-platform, developer-tools |
+| [judgeloom-core](https://github.com/ThanhNguyxnOrg/judgeloom-core) | A modern, high-performance competitive programming online judge platform built with Django,... | Python | atcoder, celery, competitive-programming |
+| [lagvex](https://github.com/ThanhNguyxnOrg/lagvex) | Open-source game latency reducer & ping booster via WinTun and Go VPS Relay | Go | cs2, game-booster, golang |
+| [LayoutLingua](https://github.com/ThanhNguyxnOrg/LayoutLingua) | Preserve-layout and math formula PDF translator for academic research and global literature. | Python | academic-paper, android, cross-platform |
+| [Locsight](https://github.com/ThanhNguyxnOrg/Locsight) | Blazing-fast codebase health, security, and refactoring hotspot analyzer built with Rust and Tauri... | TypeScript | code-analysis, developer-tools, metrics |
+| [SkillGauge](https://github.com/ThanhNguyxnOrg/SkillGauge) | 🏆 Static auditing engine and leaderboard platform for agentic process instructions using a strict... | TypeScript | agent-skills, ai-agents, developer-tools |
 <!-- AUTO-FULL-END -->
 
 ---
