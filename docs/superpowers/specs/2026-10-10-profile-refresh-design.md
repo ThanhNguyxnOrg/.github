@@ -1,69 +1,74 @@
 # ThanhNguyxnOrg Profile Refresh — Design Spec (2026-10-10)
 
-Status: draft — chờ duyệt. Không đụng profile cho tới khi spec này được duyệt.
+Status: draft — awaiting review. No profile files change until this spec is approved.
 
-## 1. Hiểu chung (đã chốt với bạn)
+## 1. Shared understanding (agreed with owner)
 
-- Bạn nói: giữ `stack.md` + `projects.md` vì thấy ok; muốn auto-update khi có repo mới (nhắc tới `ThanhNguyxnAgent`); thích màu mè, nhiều sticker động càng tốt; deploy lên GitHub thoải mái, có cách hay hơn cứ làm.
-- Giả định của mình (cần bạn sửa nếu sai): hướng lai — ngoài pro như practice thật, trong giữ 1 dòng journey; khung chung chung để sau làm thêm mảng không phải đập cấu trúc; `ThanhNguyxnAgent` chưa tìm thấy ở local lẫn web nên thiết kế bất khả tri với agent (Actions + script mà bot nào cũng gọi được).
-- Thành công: profile khớp live 16 repos + tagline practice; stack đúng Top langs live; sticker nhiều nhưng không vỡ; `stack.md`/`projects.md` tự cập nhật; fix 404 P0.
+- Owner said: keep `stack.md` + `projects.md` (they look good); want auto-update when new repos appear (a bot named `ThanhNguyxnAgent` will own it); wants colorful, as many dynamic stickers as possible; free to deploy on GitHub or use any better approach; sticker/markdown effects should look premium; final user-facing output must be 100% English.
+- My assumptions (correct me if wrong): hybrid direction — professional practice on the outside, one line of journey on the inside; generic frame so future domains fit without restructuring; `ThanhNguyxnAgent` was not found in the local repo or on the web, so the design is agent-agnostic (Actions + script any bot can trigger).
+- Success: profile matches live org (16 repos + practice tagline); stack matches live Top languages; many stickers but nothing broken; `stack.md`/`projects.md` self-update; P0 404 fixed; everything user-facing in English.
 
-## 2. Hướng đã cân nhắc
+## 2. Options considered
 
-- A — Chỉ Actions inline (workflow gọi API + viết file trực tiếp, khỏi script): gọn nhưng khó test local, logic chôn trong YAML.
-- B — Chỉ script local (`scripts/sync-org.py`, chạy tay khi nhớ): đơn giản nhất nhưng hay quên, không tự động.
-- C — Hybrid, được chọn: script là source of truth + workflow `sync-org.yml` chạy cron daily + `workflow_dispatch`. Không host gì thêm (API + runner đều của GitHub). Bot sau này chỉ cần bấm Run hoặc chạy script.
+- A — Actions-only (workflow calls the API and writes files inline, no script): lean but hard to test locally, logic buried in YAML.
+- B — Local script only (`scripts/sync-org.py`, run by hand when remembered): simplest but forgettable, not automatic.
+- C — Hybrid, selected: script is the source of truth + `sync-org.yml` workflow on daily cron + `workflow_dispatch`. Zero extra hosting (GitHub hosts both the API and the runner). Any bot just presses Run or executes the script.
 
 ## 3. Design
 
-### 3.1 Architecture — files chạm
+### 3.1 Architecture — files touched
 
-- Rewrite `profile/README.md` theo layout mục 3.2.
-- Sync `docs/stack.md` (bỏ C/C++/Java/C#/Bootstrap/MySQL/MongoDB, thay bằng TS/JS/Python/Go/Rust/PowerShell + Vue/Svelte/Tauri/Node/Express/Docker/Actions).
-- Sync `docs/projects.md` (thêm Showcase table 16 repos: Name | Desc từ GitHub | Lang badge | Topics).
-- Sửa `README.md` repo meta (capsule text + tagline live + liệt kê `docs/research/`).
+- Rewrite `profile/README.md` per the layout in 3.2.
+- Sync `docs/stack.md` (drop C/C++/Java/C#/Bootstrap/MySQL/MongoDB; replace with TS/JS/Python/Go/Rust/PowerShell + Vue/Svelte/Tauri/Node/Express/Docker/Actions).
+- Sync `docs/projects.md` (add a 16-repo Showcase table: Name | one-line desc from GitHub | language badge | topics).
+- Update repo-meta `README.md` (capsule text + live tagline + list `docs/research/`).
 - Fix P0 `ISSUE_TEMPLATE/config.yml:4`: `ThanhNguyxn-Org` → `ThanhNguyxnOrg`.
-- Thêm mới: `scripts/sync-org.py`, `.github/workflows/sync-org.yml` (lưu ý: workflow nằm trong chính repo `.github`, chạy cho repo này, không phải org-wide runner).
-- Không làm lúc này: `LICENSE` default (docs cấm), `CITATION.cff` trong `.github` (không lan tỏa), `github-readme-stats` card (repo gốc archived), `ACCESSIBILITY.md`/`VULNERABILITY_REPORT.yml`.
+- Add: `scripts/sync-org.py`, `.github/workflows/sync-org.yml` (runs inside this `.github` repo for this repo — not an org-wide runner).
+- Explicitly not now: default `LICENSE` (docs forbid it), `CITATION.cff` inside `.github` (does not propagate), `github-readme-stats` cards (upstream repo archived), `ACCESSIBILITY.md` / `VULNERABILITY_REPORT.yml`.
+- Language policy: all profile/docs output 100% English. No Vietnamese in user-facing markdown.
 
-### 3.2 Components — layout profile + sticker system
+### 3.2 Components — profile layout + sticker system
 
-Thứ tự: header capsule `waving` (`text=ThanhNguyxnOrg`, `desc=` tagline live) → komarev views (giữ nguyên URL, `username=ThanhNguyxnOrg`) → typing-svg 1 dòng → About 5 bullets + link org → skillicons strip 1 dòng (`i=ts,js,py,go,rust,powershell,vue,svelte,tauri,docker,nodejs,express,git,githubactions,vscode`, `perline=8`) → 6–8 shields `for-the-badge` core (TypeScript `3178C6`/`logo=typescript`, JavaScript `F7DF1E`/`logo=javascript`, Python `3776AB`, Go `00ADD8`, Rust `000000`, PowerShell `5391FE`, Vue `4FC08D`/`logo=vuedotjs`, Tauri `24C8DB`) → shields github dynamic (stars/forks/issues — tự nhảy, đây là sticker động an toàn) → Showcase table (data thật, là sticker giá trị nhất) → Philosophy 3 dòng + link `docs/philosophy.md` (giữ quote visible/organized/honest) → Pinned strategy 2 dòng (pin thật 6 repos trên UI: blendops, lumeo, apidex-hub, awesome-cert-sherpa, PurgeKit, SkillGauge) → footer capsule + 3 badges link Docs/Support/Security.
-Bỏ khỏi profile, chuyển thành link `docs/`: Why Exists, What You'll Find Here, Migration Note dài.
+Order: header capsule `waving` (`text=ThanhNguyxnOrg`, `desc=` = live tagline) → komarev views (keep URL, `username=ThanhNguyxnOrg`) → typing-svg one-liner → About, 5 bullets + org link → skillicons strip, one line (`i=ts,js,py,go,rust,powershell,vue,svelte,tauri,docker,nodejs,express,git,githubactions,vscode`, `perline=8`) → 6–8 core shields `for-the-badge` (TypeScript `3178C6`/`logo=typescript`, JavaScript `F7DF1E`/`logo=javascript`, Python `3776AB`, Go `00ADD8`, Rust `000000`, PowerShell `5391FE`, Vue `4FC08D`/`logo=vuedotjs`, Tauri `24C8DB`) → dynamic GitHub shields (stars/forks/issues per flagship repo — they update themselves, the safe kind of dynamic) → Showcase table (real data, the highest-value sticker) → Philosophy, 3 lines + link to `docs/philosophy.md` (keep the visible/organized/honest quote) → Pinned strategy, 2 lines (real pinning of 6 repos happens in the UI: blendops, lumeo, apidex-hub, awesome-cert-sherpa, PurgeKit, SkillGauge) → footer capsule + 3 link badges (Docs / Support / Security).
+Remove from the profile, keep as `docs/` links: Why Exists, What You'll Find Here, long Migration Note.
 
-### 3.3 Data flow — auto-update
+### 3.3 Data flow — auto-update (owns the "new repo → stack updates" requirement)
 
-`sync-org.yml` (cron daily + `workflow_dispatch`, `permissions: contents:write`) → checkout → chạy `python scripts/sync-org.py` với `GITHUB_TOKEN` → GET `/orgs/ThanhNguyxnOrg/repos?per_page=100&type=public` (+ optional `/repos/{repo}/languages` khi cần đếm lang) → render 2 khối (Showcase table + stack counts) → ghi vào giữa markers `<!-- AUTO-START -->` / `<!-- AUTO-END -->` trong `profile/README.md`, `docs/projects.md`, `docs/stack.md` (phần tay nằm ngoài markers, không bị ghi đè) → `git diff --quiet` rồi commit nếu đổi. Không server, không PAT riêng, 16 repos không đụng rate limit.
+`sync-org.yml` (daily cron off-peak + `workflow_dispatch`, `permissions: contents:write`) → checkout → run `python scripts/sync-org.py` with `GITHUB_TOKEN` → GET `/orgs/ThanhNguyxnOrg/repos?per_page=100&type=public` (plus optional `/repos/{repo}/languages` per repo when language counts are needed) → render two blocks (Showcase table + stack counts) → write between `<!-- AUTO-START -->` / `<!-- AUTO-END -->` markers in `profile/README.md`, `docs/projects.md`, `docs/stack.md` (hand-written content lives outside the markers, never overwritten) → commit only on diff. No server, no extra PAT, 16 repos stay far below rate limits. `ThanhNguyxnAgent` integrates by (a) dispatching the workflow, (b) running the script itself, or (c) owning the commit identity — all three keep working without design changes.
 
 ### 3.4 Error handling
 
-- 404 `config.yml` fix 1 dòng, verify 200 sau sửa.
-- Capsule best-effort (README gốc cảnh báo traffic spikes): giữ ≤5 ảnh động/page, luôn `width="100%"`, encode `%20`/`-nl-`, không dùng `# & /` thô.
-- Shields slug chuẩn SimpleIcons (`vuedotjs` không phải `vue`, `nodedotjs`, `cplusplus`); sai slug = logo mất, badge vẫn hiện.
-- Template labels `bug`/`enhancement` phải tồn tại ở cả 16 repos, không thì template lỗi thầm.
-- Repo override rule: repo nào tự có `ISSUE_TEMPLATE/` riêng thì default của `.github` bị bỏ qua toàn bộ.
+- Fix the `config.yml` 404 with a one-line change, verify HTTP 200 after.
+- Capsule-render is best-effort (upstream warns about traffic spikes): max ~5 dynamic images per page, always `width="100%"`, encode spaces as `%20`, never raw `# & /`.
+- Shields logo slugs must be exact SimpleIcons slugs (`vuedotjs` not `vue`, `nodedotjs`, `cplusplus`); a wrong slug drops the logo but the badge still renders.
+- Template labels `bug` / `enhancement` must exist in all 16 repos or templates fail silently — verify once.
+- Override rule: any repo with its own `ISSUE_TEMPLATE/` ignores the `.github` default entirely.
 
-### 3.5 Testing / verify
+### 3.5 Testing / verification
 
-- Preview markdown (VS Code hoặc branch preview) check layout mobile (không quá ~20 badges/dòng).
-- Link check toàn bộ URL sau sửa (đặc biệt `config.yml` + footer links).
-- Dry-run script local (`python scripts/sync-org.py --check`) trước khi bật cron; rerun workflow tay 1 lần, xem diff commit.
-- Không claim komarev là unique visitors (nó đếm hits qua Camo proxy, reload cũng +1).
+- Preview markdown (VS Code or branch preview), check mobile layout (no more than ~20 badges per row).
+- Link-check every URL after edits (especially `config.yml` + footer links).
+- Dry-run the script locally (`python scripts/sync-org.py --check`) before enabling cron; trigger one manual workflow run and inspect the diff commit.
+- Never present komarev counts as unique visitors (it counts hits via the Camo proxy; reloads count too).
 
-## 4. Áp dụng ui-ux-pro-max (đã search, có match)
+## 4. Applied ui-ux-pro-max guidance (searched, matched)
 
-- Pattern: Hero + Features + CTA → header capsule + About + Showcase + Pinned/CTA footer.
-- Style: Flat Design, dark slate (`#0F172A`/`#020617`), accent gold `#A16207` + run green `#22C55E` cho badges dynamic; icon-heavy, không gradients/shadows.
-- Type: Inter mood (GitHub render font hệ thống, giữ hierarchy bằng size/weight thay vì font lạ).
-- UX rules: badges nói state, không mã hóa status chỉ bằng màu; giữ slot đếm ổn định để badge dynamic không đẩy layout (content-jumping rule).
-- Pre-delivery: alt text cho mọi ảnh, tương phản text trên badge, tôn trọng reduced-motion (capsule `fadeIn` nhẹ, không blink).
+- Pattern: Hero + Features + CTA → header capsule + About + Showcase + pinned/CTA footer.
+- Style: Flat Design, dark slate (`#0F172A` / `#020617`), gold accent `#A16207` + run green `#22C55E` for dynamic badges; icon-heavy, no gradients/shadows.
+- Type: Inter mood (GitHub renders system fonts, so hierarchy comes from size/weight, not exotic fonts).
+- UX rules: badges communicate state, never encode status by color alone; keep count slots stable so dynamic badges never shift layout (content-jumping rule).
+- Pre-delivery: alt text on every image, badge text contrast, reduced-motion respected (gentle capsule `fadeIn`, no blink).
 
 ## 5. Scope
 
-- Trong spec: các files mục 3.1 + script/workflow + sticker URLs trên.
-- Ngoài spec: ảnh brandkit, `FUNDING.yml`, `CITATION.cff` từng repo flagship, self-host capsule Vercel (optional sau).
-- Research nền: `docs/research/2026-10-10-profile-refresh-research.md` (primary sources, đã xong).
+- In: files in 3.1 + script/workflow + sticker URLs above, all output 100% English.
+- Out: brandkit image, `FUNDING.yml`, per-flagship `CITATION.cff`, self-hosted capsule on Vercel (optional later).
+- Prior research: `docs/research/2026-10-10-profile-refresh-research.md` (primary sources, working notes).
 
-## 6. Nguồn chính
+## 6. Cost note (daily cron)
 
-GitHub Docs org profile + community health + issue/PR templates + CITATION; shields.io static-badges + logos; capsule-render README; komarev GHPVC README; skillicons README; github-readme-stats (archived, cấm dùng); live `github.com/ThanhNguyxnOrg`; SimpleIcons slugs.
+Public repos get free Actions minutes; this job runs ~30–60s/day (≈15–30 min/month). No resource concern. If it ever matters, drop to weekly with one line change.
+
+## 7. Primary sources
+
+GitHub Docs (org profile, community health, issue/PR templates, CITATION); shields.io (static badges, logos); capsule-render README; komarev GHPVC README; skillicons README; github-readme-stats (archived — banned); live `github.com/ThanhNguyxnOrg`; SimpleIcons slugs.
