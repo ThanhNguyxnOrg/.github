@@ -33,6 +33,7 @@ Because of that, security support may vary between repositories.
 
 If you discover a security issue:
 
+- for sensitive reports, open a private security advisory: https://github.com/ThanhNguyxnOrg/.github/security/advisories/new
 - please avoid publishing exploit details immediately
 - provide a clear summary of the issue
 - mention the affected repository

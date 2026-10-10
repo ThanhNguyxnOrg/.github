@@ -58,6 +58,12 @@ That means:
 - some repos are experimental by design
 - some archived repos may not receive further updates
 
+| Status | Examples | Expectation |
+|---|---|---|
+| Active | blendops, lumeo, apidex-hub, SkillGauge | Issues reviewed, fixes prioritized |
+| Maintained | PurgeKit, Locsight, cogmint, ForgeHelm | Best effort, slower responses |
+| Reference / archive | Older snapshots as labeled | May not receive updates |
+
 ---
 
 ## 🛠️ For bug reports

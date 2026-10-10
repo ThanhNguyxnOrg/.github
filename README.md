@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=170&section=header&text=ThanhNguyxn%20Workspace%20Meta%20Repo&fontSize=34&animation=fadeIn&fontAlignY=38" width="100%"/>
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=170&section=header&text=ThanhNguyxnOrg%20.github&fontSize=34&animation=fadeIn&fontAlignY=38" width="100%"/>
 </div>
 
 <div align="center">
@@ -11,6 +11,8 @@
 ---
 
 # 🌌 Welcome to the `.github` repository
+
+> An independent technology practice focused on building, exploring, and evolving ideas.
 
 This repository contains the **organization profile and shared community files** for the ThanhNguyxn project workspace.
 
