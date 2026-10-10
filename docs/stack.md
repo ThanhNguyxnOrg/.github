@@ -1,56 +1,42 @@
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=soft&color=gradient&height=140&section=header&text=Tech%20Stack&fontSize=34&animation=fadeIn" width="100%"/>
+  <img src="https://capsule-render.vercel.app/api?type=soft&color=gradient&height=140&section=header&text=Tech%20Stack&fontSize=34&animation=fadeIn" width="100%" alt="Tech Stack header" />
 </div>
 
-# 🧰 Tech Stack
+# Tech Stack
 
-There is no single strict stack across the entire organization, but these are the tools and technologies I commonly use, learn, or explore.
+The stack reflects what the organization actually ships. Language counts update automatically.
 
----
+<!-- AUTO-STACK-START -->
+## By the numbers (live)
 
-## 💻 Languages
-- C
-- C++
-- Java
-- C#
-- JavaScript
-- TypeScript
-- Python
-
----
-
-## 🎨 Frontend
-- HTML
-- CSS
-- React
-- Next.js
-- Tailwind CSS
-- Bootstrap
+- Core languages: TypeScript, JavaScript, Python, Go, Rust, PowerShell
+- UI frameworks: Vue, Svelte, React
+- Desktop: Tauri v2
+- Backend and runtime: Node.js, Express, Django, Channels, Celery
+- Data and infra: PostgreSQL, Redis, MongoDB, Docker
+- AI surface: Claude Code, MCP servers, Gemini, speech-to-text and text-to-speech
+- Browser: Chrome Extensions (Manifest V3)
+- Tooling: Git, GitHub Actions, VS Code, Windows, Linux
+<!-- AUTO-STACK-END -->
 
 ---
 
-## ⚙️ Backend / Runtime / Data
-- Node.js
-- Express
-- MySQL
-- MongoDB
+## Core
 
----
+TypeScript and JavaScript carry most repositories. Python powers research and platform work. Go and Rust power systems tooling. PowerShell powers Windows-first utilities.
 
-## 🛠️ Tooling
-- Git
-- GitHub
-- VS Code
-- Linux
-- Windows
-- GitHub Actions
-- Markdown
+## Frontend
 
----
+React, Vue (Nuxt), and Svelte depending on the project. Tailwind CSS for styling.
 
-## 📘 Mindset
+## Backend, Data, and Infra
 
-I care less about using every trendy tool  
-and more about understanding how systems fit together.
+Node.js with Express, Django with Channels and Celery, PostgreSQL, Redis, MongoDB, Docker.
 
-So this stack will evolve, and that's part of the journey.
+## AI and Automation
+
+Claude Code orchestration, MCP servers, agent skills, Gemini APIs, speech pipelines, GitHub Actions.
+
+## Mindset
+
+Fewer trends, deeper understanding. The stack evolves with the work, and this page follows it.
