@@ -10,6 +10,7 @@ Stdlib only: no third-party dependencies.
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.request
 from collections import Counter
@@ -113,6 +114,17 @@ def update_file(path, start, end, block):
     return True
 
 
+def update_count_badges(path, count):
+    with open(path, encoding="utf-8") as f:
+        content = f.read()
+    new_content, n = re.subn(r"badge/\d+-Repositories", f"badge/{count}-Repositories", content)
+    if n == 0 or new_content == content:
+        return False
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write(new_content)
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--org", default="ThanhNguyxnOrg")
@@ -121,18 +133,24 @@ def main():
 
     token = os.environ.get("GITHUB_TOKEN", "")
     repos = fetch_repos(args.org, token)
+    count = len(repos)
     targets = [
         ("profile/README.md", TOP6_START, TOP6_END, render_top6(repos)),
         ("docs/projects.md", FULL_START, FULL_END, render_full(repos)),
         ("docs/stack.md", STACK_START, STACK_END, render_stack(repos)),
     ]
+    badge_targets = ["profile/README.md", "docs/projects.md"]
 
     if args.check:
         changed = [p for p, s, e, b in targets if would_change(p, s, e, b)]
+        changed += [p for p in badge_targets if would_change_badges(p, count)]
+        changed = sorted(set(changed))
         print("would update: " + (", ".join(changed) if changed else "nothing"))
         return 1 if changed else 0
 
     changed = [p for p, s, e, b in targets if update_file(p, s, e, b)]
+    changed += [p for p in badge_targets if update_count_badges(p, count)]
+    changed = sorted(set(changed))
     print("updated: " + (", ".join(changed) if changed else "nothing"))
 
 
@@ -141,6 +159,13 @@ def would_change(path, start, end, block):
         content = f.read()
     old_start, old_end = content.index(start), content.index(end) + len(end)
     return content[old_start:old_end] != f"{start}\n{block}\n{end}"
+
+
+def would_change_badges(path, count):
+    with open(path, encoding="utf-8") as f:
+        content = f.read()
+    new_content, n = re.subn(r"badge/\d+-Repositories", f"badge/{count}-Repositories", content)
+    return n > 0 and new_content != content
 
 
 if __name__ == "__main__":
