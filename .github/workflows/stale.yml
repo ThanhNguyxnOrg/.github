@@ -1,0 +1,25 @@
+name: Mark stale issues
+
+on:
+  schedule:
+    - cron: "25 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v11
+        with:
+          days-before-stale: 14
+          days-before-close: 5
+          exempt-issue-labels: keep-me
+          exempt-pr-labels: keep-me
+          stale-issue-message: "This issue has been quiet for 14 days and was marked stale. Comment or add the `keep-me` label to keep it open."
+          close-issue-message: "Closing after 5 more quiet days. Reopen anytime with a new comment."
+          stale-pr-message: "This pull request has been quiet for 14 days and was marked stale. Push a commit or comment to keep it alive."
+          operations-per-run: 30
