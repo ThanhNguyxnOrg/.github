@@ -25,8 +25,8 @@ Every repository in the organization, auto-updated. The profile page shows the T
 | [awesome-cert-sherpa](https://github.com/ThanhNguyxnOrg/awesome-cert-sherpa) | Community-driven IT certification prep — curated resources, 1,590+ original practice questions,... | TypeScript | awesome-list, aws, azure |
 | [PurgeKit](https://github.com/ThanhNguyxnOrg/PurgeKit) | Ultimate developer-focused system uninstaller and deep cleaner for Windows. | Rust | cleaner, developer-tools, power-user |
 | [Snapbooth](https://github.com/ThanhNguyxnOrg/Snapbooth) | Browser photobooth with count-in capture, filters, frames, GIF export, and GitHub Pages | TypeScript | boomerang, browser, browser-only |
-| [StepDSA](https://github.com/ThanhNguyxnOrg/StepDSA) | Interactive DSA learning platform & visualizer with deterministic time-travel engine and playground. | TypeScript | - |
-| [.github](https://github.com/ThanhNguyxnOrg/.github) | Organization profile and community health files for ThanhNguyxnOrg | Python | - |
+| [StepDSA](https://github.com/ThanhNguyxnOrg/StepDSA) | Interactive DSA learning platform & visualizer with deterministic time-travel engine and playground. | TypeScript | algorithms, data-structures, dsa |
+| [.github](https://github.com/ThanhNguyxnOrg/.github) | Organization profile and community health files for ThanhNguyxnOrg | Python | community-health, docs, github |
 | [cogmint](https://github.com/ThanhNguyxnOrg/cogmint) | Dark-first control plane for Claude Code orchestration. Visual ops surface for agents, skills,... | Vue | agent-orchestration, ai-agents, anthropic |
 | [ForgeHelm](https://github.com/ThanhNguyxnOrg/ForgeHelm) | ⚒️ ForgeHelm — A powerful Chrome Extension for bulk GitHub repository management. Archive, delete,... | JavaScript | bulk-operations, chrome-extension, developer-tools |
 | [git-account-switcher](https://github.com/ThanhNguyxnOrg/git-account-switcher) | ⚡ Fast multi-account Git identity & GitHub CLI switcher. Switch accounts, tokens, commit authors,... | PowerShell | account-switcher, cross-platform, developer-tools |
