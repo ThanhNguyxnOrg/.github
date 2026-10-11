@@ -22,7 +22,7 @@ An independent technology practice focused on building, exploring, and evolving 
 - Building practical developer tools, AI workflows, and open-source utilities
 - Learning in public: fundamentals first, systems over hype
 - Documenting everything worth keeping
-- Preserving older work and giving good projects a second life
+- Preserving older work and giving good projects a second life ([migration note](https://github.com/ThanhNguyxnOrg/.github/blob/main/docs/migration.md))
 - Open to useful discussions and meaningful collaboration — start with an issue
 
 ---
@@ -66,7 +66,7 @@ Practical, understandable, reusable, documented — built step by step. More: [d
 
 ### Pinned Strategy
 
-Six pinned repositories cover the practice at a glance: AI workflows, AI media, curated APIs, certification prep, systems tooling, and agent auditing. Pinned directly on the organization page.
+No manual pins — GitHub's popular list and the Showcase above already surface what matters most.
 
 ---
 

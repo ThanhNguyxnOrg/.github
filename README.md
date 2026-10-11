@@ -53,7 +53,7 @@ So this repo acts as the **foundation layer** for the workspace.
 ## 💫 Note
 
 This is **not** a corporate workspace.  
-It is a **personal workshop**, a **rebuild space**, and a **long-term archive** for projects that matter to me.
+It is an **independent technology practice**: a **working base** and a **long-term archive** for projects that matter to me.
 
 <div align="center">
   <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=100&section=footer" width="100%"/>
