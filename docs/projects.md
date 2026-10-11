@@ -4,6 +4,16 @@
 
 # Projects Overview
 
+<div align="center">
+  <img src="https://img.shields.io/github/followers/ThanhNguyxnOrg?label=Followers&style=flat-square" alt="Followers" />
+  <img src="https://img.shields.io/badge/16-Repositories-8A2BE2?style=flat-square" alt="16 repositories" />
+  <img src="https://img.shields.io/badge/developer--tools-00C853?style=flat-square" alt="developer-tools" />
+  <img src="https://img.shields.io/badge/ai--agents-1E90FF?style=flat-square" alt="ai-agents" />
+  <img src="https://img.shields.io/github/stars/ThanhNguyxnOrg/blendops?style=flat-square&label=blendops" alt="blendops stars" />
+  <img src="https://img.shields.io/github/stars/ThanhNguyxnOrg/lumeo?style=flat-square&label=lumeo" alt="lumeo stars" />
+  <img src="https://img.shields.io/github/stars/ThanhNguyxnOrg/apidex-hub?style=flat-square&label=apidex-hub" alt="apidex-hub stars" />
+</div>
+
 Every repository in the organization, auto-updated. The profile page shows the Top 6; this is the complete list.
 
 <!-- AUTO-FULL-START -->
