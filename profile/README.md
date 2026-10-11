@@ -27,8 +27,7 @@ An independent technology practice focused on building, exploring, and evolving 
 
 ---
 
-<details>
-<summary><b>Tech Stack</b> — click to expand</summary>
+### Tech Stack
 
 <p align="center">
   <a href="https://skillicons.dev">
@@ -37,8 +36,6 @@ An independent technology practice focused on building, exploring, and evolving 
 </p>
 
 Details: [docs/stack.md](https://github.com/ThanhNguyxnOrg/.github/blob/main/docs/stack.md)
-
-</details>
 
 ---
 
