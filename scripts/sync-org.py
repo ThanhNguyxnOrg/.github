@@ -24,6 +24,16 @@ STACK_START = "<!-- AUTO-STACK-START -->"
 STACK_END = "<!-- AUTO-STACK-END -->"
 SKIP_NAMES = {".github"}
 MAX_DESC = 100
+LANG_SHORT = {
+    "TypeScript": "TS",
+    "JavaScript": "JS",
+    "Python": "Py",
+    "Go": "Go",
+    "Rust": "Rust",
+    "PowerShell": "PS",
+    "Vue": "Vue",
+    "Markdown": "Md",
+}
 
 
 def api_get(url, token):
@@ -134,6 +144,7 @@ def main():
     token = os.environ.get("GITHUB_TOKEN", "")
     repos = fetch_repos(args.org, token)
     count = len(repos)
+    langs, topics = count_langs_topics(repos)
     targets = [
         ("profile/README.md", TOP6_START, TOP6_END, render_top6(repos)),
         ("docs/projects.md", FULL_START, FULL_END, render_full(repos)),
@@ -144,12 +155,16 @@ def main():
     if args.check:
         changed = [p for p, s, e, b in targets if would_change(p, s, e, b)]
         changed += [p for p in badge_targets if would_change_badges(p, count)]
+        if would_change_top("profile/README.md", langs, topics):
+            changed.append("profile/README.md (badges)")
         changed = sorted(set(changed))
         print("would update: " + (", ".join(changed) if changed else "nothing"))
         return 1 if changed else 0
 
     changed = [p for p, s, e, b in targets if update_file(p, s, e, b)]
     changed += [p for p in badge_targets if update_count_badges(p, count)]
+    if update_top_badges("profile/README.md", langs, topics):
+        changed.append("profile/README.md (badges)")
     changed = sorted(set(changed))
     print("updated: " + (", ".join(changed) if changed else "nothing"))
 
@@ -166,6 +181,38 @@ def would_change_badges(path, count):
         content = f.read()
     new_content, n = re.subn(r"badge/\d+-Repositories", f"badge/{count}-Repositories", content)
     return n > 0 and new_content != content
+
+
+def count_langs_topics(repos):
+    langs = Counter(r.get("language") or "Other" for r in repos)
+    topics = Counter(t for r in repos for t in (r.get("topics") or []))
+    return langs, topics
+
+
+def update_top_badges(path, langs, topics):
+    with open(path, encoding="utf-8") as f:
+        content = f.read()
+    top4 = [LANG_SHORT.get(l, l) for l in sorted(langs, key=lambda l: (-langs[l], l))[:4]]
+    content, n1 = re.subn(r"badge/Top-[^\"?]+", "badge/Top-" + "%20%C2%B7%20".join(top4), content)
+    top2 = sorted(topics, key=lambda t: (-topics[t], t))[:2]
+    focus = "%20%C2%B7%20".join(t.replace("-", "--") for t in top2)
+    content, n2 = re.subn(r"badge/Focus-[^\"?]+", f"badge/Focus-{focus}", content)
+    if n1 + n2 == 0:
+        return False
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write(content)
+    return True
+
+
+def would_change_top(path, langs, topics):
+    with open(path, encoding="utf-8") as f:
+        content = f.read()
+    top4 = [LANG_SHORT.get(l, l) for l in sorted(langs, key=lambda l: (-langs[l], l))[:4]]
+    new_content, n1 = re.subn(r"badge/Top-[^\"?]+", "badge/Top-" + "%20%C2%B7%20".join(top4), content)
+    top2 = sorted(topics, key=lambda t: (-topics[t], t))[:2]
+    focus = "%20%C2%B7%20".join(t.replace("-", "--") for t in top2)
+    new_content, n2 = re.subn(r"badge/Focus-[^\"?]+", f"badge/Focus-{focus}", new_content)
+    return n1 + n2 > 0 and new_content != content
 
 
 if __name__ == "__main__":
