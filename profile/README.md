@@ -46,6 +46,8 @@ An independent technology practice focused on building, exploring, and evolving 
   <img src="https://img.shields.io/badge/Tauri-24C8DB?style=for-the-badge&logo=tauri&logoColor=white" alt="Tauri" />
 </div>
 
+Details: [docs/stack.md](https://github.com/ThanhNguyxnOrg/.github/blob/main/docs/stack.md)
+
 ---
 
 ### Showcase

@@ -31,6 +31,8 @@ It keeps the public-facing profile and default documentation clean, organized, a
 - `PULL_REQUEST_TEMPLATE.md` → default pull request template
 - `ISSUE_TEMPLATE/` → default issue templates
 - `docs/` → extra documentation about this workspace
+- `scripts/sync-org.py` → auto-syncs showcase tables from live org data
+- `.github/workflows/sync-org.yml` → daily sync job (cron + manual dispatch)
 
 ---
 
