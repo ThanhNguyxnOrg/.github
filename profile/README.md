@@ -5,8 +5,8 @@
 <div align="center">
   <img src="https://komarev.com/ghpvc/?username=ThanhNguyxnOrg&label=Profile%20Views&color=0e75b6&style=flat-square" alt="ThanhNguyxnOrg views" />
   <img src="https://img.shields.io/badge/16-Repositories-8A2BE2?style=flat-square" alt="16 repositories" />
-  <img src="https://img.shields.io/badge/Top-TS%20%C2%B7%20JS%20%C2%B7%20Py%20%C2%B7%20Go-1E90FF?style=flat-square" alt="Top languages" />
-  <img src="https://img.shields.io/badge/Focus-developer--tools%20%C2%B7%20ai--agents-00C853?style=flat-square" alt="Focus areas" />
+  <img src="https://img.shields.io/badge/Top-TS%20%C2%B7%20JS%20%C2%B7%20Py%20%C2%B7%20Go?style=flat-square" alt="Top languages" />
+  <img src="https://img.shields.io/badge/Focus-developer--tools%20%C2%B7%20typescript?style=flat-square" alt="Focus areas" />
 </div>
 
 <div align="center">
