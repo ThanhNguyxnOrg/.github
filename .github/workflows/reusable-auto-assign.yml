@@ -1,0 +1,25 @@
+name: Reusable auto-assign human-only
+
+on:
+  workflow_call:
+    inputs:
+      assignees:
+        description: "Comma-separated logins to assign"
+        required: false
+        type: string
+        default: ThanhNguyxn07,RealThanhNguyxn
+
+jobs:
+  auto-assign:
+    if: github.event.sender.type != 'Bot' && !endsWith(github.actor, '[bot]')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Auto-assign issue/PR
+        uses: pozil/auto-assign-issue@v4
+        with:
+          assignees: ${{ inputs.assignees }}
+          allowSelfAssign: true
+          abortIfPreviousAssignees: true
