@@ -4,7 +4,7 @@
 
 <div align="center">
   <img src="https://komarev.com/ghpvc/?username=ThanhNguyxnOrg&label=Profile%20Views&color=0e75b6&style=flat-square" alt="ThanhNguyxnOrg views" />
-  <img src="https://img.shields.io/badge/16-Repositories-8A2BE2?style=flat-square" alt="16 repositories" />
+  <img src="https://img.shields.io/badge/17-Repositories-8A2BE2?style=flat-square" alt="17 repositories" />
   <img src="https://img.shields.io/badge/Top-TS%20%C2%B7%20JS%20%C2%B7%20Py%20%C2%B7%20Go?style=flat-square" alt="Top languages" />
   <img src="https://img.shields.io/badge/Focus-developer--tools%20%C2%B7%20typescript?style=flat-square" alt="Focus areas" />
 </div>
@@ -24,6 +24,7 @@ An independent technology practice focused on building, exploring, and evolving 
 - Documenting everything worth keeping
 - Preserving older work and giving good projects a second life ([migration note](https://github.com/ThanhNguyxnOrg/.github/blob/main/docs/migration.md))
 - Open to useful discussions and meaningful collaboration — start with an issue
+- Explore everything on the live site: [thanhnguyxnorg.github.io](https://thanhnguyxnorg.github.io) — principles, journey, live stack and the full project index
 
 ---
 
@@ -71,6 +72,7 @@ No manual pins — GitHub's popular list and the Showcase above already surface 
 ---
 
 <div align="center">
+  <a href="https://thanhnguyxnorg.github.io"><img src="https://img.shields.io/badge/Website-thanhnguyxnorg.github.io-F59E0B?style=for-the-badge" alt="Website" /></a>
   <a href="https://github.com/ThanhNguyxnOrg/.github"><img src="https://img.shields.io/badge/Docs-Community%20Files-3B82F6?style=for-the-badge" alt="Docs" /></a>
   <a href="https://github.com/ThanhNguyxnOrg/.github/blob/main/SUPPORT.md"><img src="https://img.shields.io/badge/Support-Best%20Effort-0EA5E9?style=for-the-badge" alt="Support" /></a>
   <a href="https://github.com/ThanhNguyxnOrg/.github/blob/main/SECURITY.md"><img src="https://img.shields.io/badge/Security-Report%20Responsibly-DC2626?style=for-the-badge" alt="Security" /></a>
