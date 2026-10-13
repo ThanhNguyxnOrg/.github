@@ -33,8 +33,8 @@ jobs:
         run: python scripts/sync-org.py
       - name: Commit on diff
         run: |
-          git config user.name "ThanhNguyxnAgent"
-          git config user.email "4125740+thanhnguyxnagent[bot]@users.noreply.github.com"
+          git config user.name "thanhnguyxnagent[bot]"
+          git config user.email "296222857+thanhnguyxnagent[bot]@users.noreply.github.com"
           git add profile/README.md docs/projects.md docs/stack.md
           git diff --cached --quiet || git commit -m "chore: sync org showcase tables [skip ci]"
       - name: Push
