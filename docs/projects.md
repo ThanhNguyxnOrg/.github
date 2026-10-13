@@ -6,7 +6,7 @@
 
 <div align="center">
   <img src="https://img.shields.io/github/followers/ThanhNguyxnOrg?label=Followers&style=flat-square" alt="Followers" />
-  <img src="https://img.shields.io/badge/16-Repositories-8A2BE2?style=flat-square" alt="16 repositories" />
+  <img src="https://img.shields.io/badge/17-Repositories-8A2BE2?style=flat-square" alt="16 repositories" />
   <img src="https://img.shields.io/badge/developer--tools-00C853?style=flat-square" alt="developer-tools" />
   <img src="https://img.shields.io/badge/ai--agents-1E90FF?style=flat-square" alt="ai-agents" />
   <img src="https://img.shields.io/github/stars/ThanhNguyxnOrg/blendops?style=flat-square&label=blendops" alt="blendops stars" />
@@ -35,6 +35,7 @@ Every repository in the organization, auto-updated. The profile page shows the T
 | [LayoutLingua](https://github.com/ThanhNguyxnOrg/LayoutLingua) | Preserve-layout and math formula PDF translator for academic research and global literature. | Python | academic-paper, android, cross-platform |
 | [Locsight](https://github.com/ThanhNguyxnOrg/Locsight) | Blazing-fast codebase health, security, and refactoring hotspot analyzer built with Rust and Tauri... | TypeScript | code-analysis, developer-tools, metrics |
 | [SkillGauge](https://github.com/ThanhNguyxnOrg/SkillGauge) | 🏆 Static auditing engine and leaderboard platform for agentic process instructions using a strict... | TypeScript | agent-skills, ai-agents, developer-tools |
+| [ThanhNguyxnOrg.github.io](https://github.com/ThanhNguyxnOrg/ThanhNguyxnOrg.github.io) | Org site: build, explore, evolve. | TypeScript | - |
 <!-- AUTO-FULL-END -->
 
 ---
