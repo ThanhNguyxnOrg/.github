@@ -20,10 +20,10 @@ Every repository in the organization, auto-updated. The profile page shows the T
 | Project | Description | Stack | Topics |
 |---|---|---|---|
 | [blendops](https://github.com/ThanhNguyxnOrg/blendops) | AI-native Blender workflow and skill pack for non-Blender users, built around official Blender MCP,... | JavaScript | agent-skills, ai-agents, blender |
+| [lagvex](https://github.com/ThanhNguyxnOrg/lagvex) | Open-source game latency reducer & ping booster via WinTun and Go VPS Relay | Go | cs2, game-booster, golang |
 | [lumeo](https://github.com/ThanhNguyxnOrg/lumeo) | Bilingual captions and live AI dubbing for YouTube. Three tiers, one click: free caption... | JavaScript | ai-dubbing, chrome-extension, javascript |
 | [apidex-hub](https://github.com/ThanhNguyxnOrg/apidex-hub) | 🌐 A curated collection of awesome free APIs for developers. Categorized, tested daily, and... | TypeScript | api, api-collection, api-directory |
 | [awesome-cert-sherpa](https://github.com/ThanhNguyxnOrg/awesome-cert-sherpa) | Community-driven IT certification prep — curated resources, 1,590+ original practice questions,... | TypeScript | awesome-list, aws, azure |
-| [lagvex](https://github.com/ThanhNguyxnOrg/lagvex) | Open-source game latency reducer & ping booster via WinTun and Go VPS Relay | Go | cs2, game-booster, golang |
 | [PurgeKit](https://github.com/ThanhNguyxnOrg/PurgeKit) | Ultimate developer-focused system uninstaller and deep cleaner for Windows. | Rust | cleaner, developer-tools, power-user |
 | [Snapbooth](https://github.com/ThanhNguyxnOrg/Snapbooth) | Browser photobooth with count-in capture, filters, frames, GIF export, and GitHub Pages | TypeScript | boomerang, browser, browser-only |
 | [StepDSA](https://github.com/ThanhNguyxnOrg/StepDSA) | Interactive DSA learning platform & visualizer with deterministic time-travel engine and playground. | TypeScript | algorithms, data-structures, dsa |
