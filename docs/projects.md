@@ -37,7 +37,7 @@ Every repository in the organization, auto-updated. The profile page shows the T
 | [Locsight](https://github.com/ThanhNguyxnOrg/Locsight) | Blazing-fast codebase health, security, and refactoring hotspot analyzer built with Rust and Tauri... | TypeScript | code-analysis, developer-tools, metrics |
 | [SkillGauge](https://github.com/ThanhNguyxnOrg/SkillGauge) | 🏆 Static auditing engine and leaderboard platform for agentic process instructions using a strict... | TypeScript | agent-skills, ai-agents, developer-tools |
 | [ThanhNguyxnOrg.github.io](https://github.com/ThanhNguyxnOrg/ThanhNguyxnOrg.github.io) | Org site: build, explore, evolve. | TypeScript | - |
-| [WriteCanvas](https://github.com/ThanhNguyxnOrg/WriteCanvas) |  | JavaScript | - |
+| [WriteCanvas](https://github.com/ThanhNguyxnOrg/WriteCanvas) | Cross-platform desktop handwriting and note-taking app with pressure-sensitive inking, multi-page... | JavaScript | canvas, digital-inking, handwriting |
 <!-- AUTO-FULL-END -->
 
 ---
