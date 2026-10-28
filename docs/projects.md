@@ -6,7 +6,7 @@
 
 <div align="center">
   <img src="https://img.shields.io/github/followers/ThanhNguyxnOrg?label=Followers&style=flat-square" alt="Followers" />
-  <img src="https://img.shields.io/badge/19-Repositories-8A2BE2?style=flat-square" alt="16 repositories" />
+  <img src="https://img.shields.io/badge/20-Repositories-8A2BE2?style=flat-square" alt="16 repositories" />
   <img src="https://img.shields.io/badge/developer--tools-00C853?style=flat-square" alt="developer-tools" />
   <img src="https://img.shields.io/badge/ai--agents-1E90FF?style=flat-square" alt="ai-agents" />
   <img src="https://img.shields.io/github/stars/ThanhNguyxnOrg/blendops?style=flat-square&label=blendops" alt="blendops stars" />
@@ -28,6 +28,7 @@ Every repository in the organization, auto-updated. The profile page shows the T
 | [Snapbooth](https://github.com/ThanhNguyxnOrg/Snapbooth) | Browser photobooth with count-in capture, filters, frames, GIF export, and GitHub Pages | TypeScript | boomerang, browser, browser-only |
 | [StepDSA](https://github.com/ThanhNguyxnOrg/StepDSA) | Interactive DSA learning platform & visualizer with deterministic time-travel engine and playground. | TypeScript | algorithms, data-structures, dsa |
 | [.github](https://github.com/ThanhNguyxnOrg/.github) | Organization profile and community health files for ThanhNguyxnOrg | Python | community-health, docs, github |
+| [AFTERFRAME-THE-LAST-LOOP](https://github.com/ThanhNguyxnOrg/AFTERFRAME-THE-LAST-LOOP) | A cinematic sci-fi action RPG about fractured timelines, temporal technology, and the mystery of... | TypeScript | action-rpg, afterframe, boss-fight |
 | [ClipForge](https://github.com/ThanhNguyxnOrg/ClipForge) | Offline audio inspection and batch-processing toolkit (C++23, NASM x86-64 SSE2, CMake, CLI) | C++ | audio, audio-processing, batch-processing |
 | [cogmint](https://github.com/ThanhNguyxnOrg/cogmint) | Dark-first control plane for Claude Code orchestration. Visual ops surface for agents, skills,... | Vue | agent-orchestration, ai-agents, anthropic |
 | [ForgeHelm](https://github.com/ThanhNguyxnOrg/ForgeHelm) | ⚒️ ForgeHelm — A powerful Chrome Extension for bulk GitHub repository management. Archive, delete,... | JavaScript | bulk-operations, chrome-extension, developer-tools |
