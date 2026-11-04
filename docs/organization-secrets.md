@@ -9,6 +9,8 @@ Quick reference for the GitHub Actions secrets configured in [ThanhNguyxnOrg](ht
 | `CHOCO_API_KEY` | Chocolatey publishing credential used by the `git-account-switcher` release workflow to publish the `gswitch` package. |
 | `AMO_API_KEY` | Firefox Add-ons (AMO) JWT issuer used to authenticate extension signing and publishing requests. |
 | `AMO_API_SECRET` | Matching AMO JWT secret used with `AMO_API_KEY` to authenticate with the AMO API. |
+| `EDGE_API_KEY` | Microsoft Edge Partner Center Publish API key used by extension release workflows. |
+| `EDGE_CLIENT_ID` | Partner Center client ID paired with `EDGE_API_KEY` for Microsoft Edge publishing. |
 
 ## GitHub App
 
@@ -26,7 +28,7 @@ Example: [blendops auto-merge workflow](https://github.com/ThanhNguyxnOrg/blendo
 
 ## Microsoft Edge Add-ons
 
-`EDGE_PRODUCT_ID` is specific to the Lumeo repository, not an organization-wide value. Its actual ID is intentionally kept out of this public note; manage it in the Lumeo repository settings.
+`EDGE_API_KEY` and `EDGE_CLIENT_ID` are account-level Partner Center Publish API credentials. Extension release workflows use them to authenticate when submitting updates to Microsoft Edge Add-ons.
 
 ## Security
 
