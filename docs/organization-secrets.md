@@ -24,6 +24,10 @@ Example: [blendops auto-merge workflow](https://github.com/ThanhNguyxnOrg/blendo
 
 `AMO_API_KEY` (JWT issuer) and `AMO_API_SECRET` (JWT secret) are paired credentials for Firefox Add-ons. They are intended for extension workflows that authenticate with AMO to sign or publish extensions. Grant access to all repositories only when all of them need AMO publishing; otherwise, select the extension repositories that use these credentials.
 
+## Microsoft Edge Add-ons
+
+`EDGE_PRODUCT_ID` is specific to the Lumeo repository, not an organization-wide value. Its actual ID is intentionally kept out of this public note; manage it in the Lumeo repository settings.
+
 ## Security
 
 This repository is public. Never put secret values, private keys, API keys, or tokens in this file or in workflow source. Manage values under GitHub Organization → Settings → Secrets and variables → Actions.
