@@ -1,0 +1,25 @@
+# Organization Secrets
+
+Quick reference for the GitHub Actions secrets configured in [ThanhNguyxnOrg](https://github.com/ThanhNguyxnOrg). This file documents purpose only; secret values must stay in GitHub settings.
+
+| Secret | Purpose |
+|---|---|
+| `BOT_APP_ID` | Identifies the `ThanhNguyxnAgent[bot]` GitHub App used by organization workflows. |
+| `BOT_PRIVATE_KEY` | The GitHub App private key paired with the App ID. Workflows use it to authenticate the App and generate an installation access token. |
+| `CHOCO_API_KEY` | Chocolatey publishing credential used by the `git-account-switcher` release workflow to publish the `gswitch` package. |
+
+## GitHub App
+
+`BOT_APP_ID` and `BOT_PRIVATE_KEY` are used together by `actions/create-github-app-token`. The action creates a temporary installation token; later workflow steps use that token for bot operations.
+
+Example: [blendops auto-merge workflow](https://github.com/ThanhNguyxnOrg/blendops/blob/main/.github/workflows/auto-merge-dependabot.yml).
+
+## Chocolatey
+
+`CHOCO_API_KEY` is passed to the Chocolatey publishing job in [git-account-switcher release.yml](https://github.com/ThanhNguyxnOrg/git-account-switcher/blob/master/.github/workflows/release.yml), where `choco push` publishes `gswitch`.
+
+## Security
+
+This repository is public. Never put secret values, private keys, API keys, or tokens in this file or in workflow source. Manage values under GitHub Organization → Settings → Secrets and variables → Actions.
+
+**Last reviewed:** November 4, 2026
