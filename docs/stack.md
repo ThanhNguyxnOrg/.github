@@ -23,7 +23,7 @@ The stack reflects what the organization actually ships. Language counts update 
 
 - Repositories tracked: 21
 - TypeScript: 8 · JavaScript: 5 · Python: 3 · C++: 1 · Go: 1 · PowerShell: 1 · Rust: 1 · Vue: 1
-- Top topics: developer-tools, typescript, ai-agents, github, react
+- Top topics: developer-tools, typescript, react, ai-agents, github
 <!-- AUTO-STACK-END -->
 
 ---
