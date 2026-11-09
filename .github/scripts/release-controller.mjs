@@ -428,6 +428,7 @@ async function reconcileRepository(repoName, rule) {
       await createAnnotatedTag(fullName, tag, pending.sha);
     }
     await ensureDraftRelease(fullName, repoName, tag, version, pending.sha, rule);
+    if (!rule.releaseWorkflowName) await publishReadyDrafts(repoName, rule);
     return;
   }
 
