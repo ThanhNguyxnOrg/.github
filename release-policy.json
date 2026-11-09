@@ -36,7 +36,8 @@
         }
       ],
       "changelogPath": "CHANGELOG.md",
-      "requireSuccessfulChecks": true
+      "requireSuccessfulChecks": true,
+      "releaseWorkflowName": "release-cogmint"
     },
     "lagvex": {
       "branch": "main",
@@ -45,7 +46,8 @@
       "initialVersion": "1.1.0",
       "versionFiles": [],
       "changelogPath": "CHANGELOG.md",
-      "requireSuccessfulChecks": true
+      "requireSuccessfulChecks": true,
+      "releaseWorkflowName": "🚀 Build & Publish Release 📦"
     },
     "ClipForge": {
       "branch": "main",
@@ -61,7 +63,8 @@
         }
       ],
       "changelogPath": "CHANGELOG.md",
-      "requireSuccessfulChecks": true
+      "requireSuccessfulChecks": true,
+      "releaseWorkflowName": "Release 📦"
     },
     "LayoutLingua": {
       "branch": "main",
@@ -83,17 +86,43 @@
         }
       ],
       "changelogPath": "CHANGELOG.md",
-      "requireSuccessfulChecks": true
+      "requireSuccessfulChecks": true,
+      "releaseWorkflowName": "Release 3 Desktop Platforms"
     },
     "Locsight": {
       "branch": "main",
       "mode": "commit",
       "baselineSha": "614195b514507dccfc5b34486092dd9bccf9f714",
       "initialVersion": "2.2.0",
-      "versionFiles": [],
+      "versionFiles": [
+        {
+          "path": "package.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": "src-tauri/tauri.conf.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": "src-tauri/Cargo.toml",
+          "kind": "regex",
+          "pattern": "^(version\\s*=\\s*\")[^\"]+(\\\")",
+          "replacement": "$1{{version}}$2"
+        }
+      ],
       "changelogPath": "CHANGELOG.md",
       "requireSuccessfulChecks": true,
-      "versionBumpHandledByLocalReleaseWorkflow": true
+      "releaseWorkflowName": "Release"
     },
     "PurgeKit": {
       "branch": "main",
@@ -127,7 +156,8 @@
         }
       ],
       "changelogPath": "CHANGELOG.md",
-      "requireSuccessfulChecks": true
+      "requireSuccessfulChecks": true,
+      "releaseWorkflowName": "Release Windows App"
     },
     "WriteCanvas": {
       "branch": "master",
@@ -160,7 +190,8 @@
         }
       ],
       "changelogPath": "CHANGELOG.md",
-      "requireSuccessfulChecks": true
+      "requireSuccessfulChecks": true,
+      "releaseWorkflowName": "Release"
     },
     "git-account-switcher": {
       "branch": "master",
@@ -182,7 +213,8 @@
         }
       ],
       "changelogPath": "CHANGELOG.md",
-      "requireSuccessfulChecks": true
+      "requireSuccessfulChecks": true,
+      "releaseWorkflowName": "Release"
     }
   },
   "excluded": {
