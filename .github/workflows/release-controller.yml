@@ -38,6 +38,7 @@ jobs:
           permission-checks: read
           permission-statuses: read
           permission-contents: write
+          permission-actions: read
 
       - name: Test release policy helpers
         run: node --test .github/scripts/release-controller.test.mjs
