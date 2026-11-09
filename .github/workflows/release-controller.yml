@@ -1,6 +1,13 @@
 name: Release Controller — Conventional Commits
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/release-controller.mjs'
+      - '.github/scripts/release-controller.test.mjs'
+      - 'release-policy.json'
+      - '.github/workflows/release-controller.yml'
   schedule:
     - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
