@@ -7,8 +7,6 @@ const API = process.env.GITHUB_API_URL || 'https://api.github.com';
 const API_VERSION = '2022-11-28';
 const config = JSON.parse(fs.readFileSync(new URL('../../agent-policy.json', import.meta.url), 'utf8'));
 
-if (!TOKEN) throw new Error('GH_TOKEN is required');
-
 class GitHubError extends Error {
   constructor(status, message, path) {
     super(message);
@@ -18,6 +16,7 @@ class GitHubError extends Error {
 }
 
 async function request(path, options = {}) {
+  if (!TOKEN) throw new Error('GH_TOKEN is required');
   const response = await fetch(API + path, {
     method: options.method || 'GET',
     headers: {
