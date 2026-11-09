@@ -16,7 +16,18 @@ test('Conventional Commit types map to the configured SemVer levels', () => {
 
 
 test('release notes are extracted from the exact generated changelog section', () => {
-  const changelog = '# Changelog\\n\\n## [1.2.0] - 2026-11-09\\n\\n### Features\\n\\n- Add a new view.\\n\\n## [1.1.0] - 2026-10-01\\n\\nOld release.\\n';
+  const changelog = \`# Changelog
+
+## [1.2.0] - 2026-11-09
+
+### Features
+
+- Add a new view.
+
+## [1.1.0] - 2026-10-01
+
+Old release.
+\`;
   const notes = releaseNotesFromChangelog(changelog, '1.2.0');
   assert.match(notes, /### Features/);
   assert.match(notes, /Add a new view/);
