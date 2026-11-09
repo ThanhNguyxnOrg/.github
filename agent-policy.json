@@ -1,71 +1,154 @@
 {
+  "schemaVersion": 1,
+  "organization": "ThanhNguyxnOrg",
+  "pollIntervalMinutes": 10,
   "reviewers": [
     "RealThanhNguyxn",
     "ThanhNguyxn07"
   ],
   "labels": {
-    "needsReview": "needs-review",
-    "triageNeeded": "triage-needed",
-    "security": "security",
-    "bug": "bug",
-    "enhancement": "enhancement",
-    "documentation": "documentation",
-    "question": "question",
-    "agentAutoMerge": "agent-auto-merge",
-    "ciFailed": "ci-failed",
-    "ciPending": "ci-pending",
-    "ciMissing": "ci-missing",
-    "mergeConflict": "merge-conflict"
+    "triageNeeded": {
+      "color": "D4C5F9",
+      "description": "Needs initial triage by a repository maintainer."
+    },
+    "needsReview": {
+      "color": "D93F0B",
+      "description": "ThanhNguyxnAgent held this item for human review."
+    },
+    "agentAutoMerge": {
+      "color": "0E8A16",
+      "description": "Eligible for Agent-managed merge after successful checks."
+    },
+    "majorUpdate": {
+      "color": "FBCA04",
+      "description": "Major dependency update; human review required."
+    },
+    "workflowUpdate": {
+      "color": "5319E7",
+      "description": "GitHub Actions or repository workflow change; human review required."
+    },
+    "ciFailed": {
+      "color": "B60205",
+      "description": "One or more required checks failed."
+    },
+    "ciPending": {
+      "color": "FBCA04",
+      "description": "Checks have not completed successfully."
+    },
+    "ciMissing": {
+      "color": "C5DEF5",
+      "description": "No successful check evidence was found."
+    },
+    "mergeConflict": {
+      "color": "B60205",
+      "description": "Pull request has merge conflicts."
+    },
+    "security": {
+      "color": "D73A4A",
+      "description": "Security-sensitive issue or change; human review required."
+    },
+    "bug": {
+      "color": "D73A4A",
+      "description": "Bug report."
+    },
+    "enhancement": {
+      "color": "A2EEEF",
+      "description": "Feature request or enhancement."
+    },
+    "documentation": {
+      "color": "0075CA",
+      "description": "Documentation issue or change."
+    },
+    "question": {
+      "color": "D876E3",
+      "description": "Question requiring maintainer response."
+    }
   },
-  "blockLabels": [
+  "blockingLabels": [
     "needs-review",
     "do-not-merge",
     "breaking",
+    "breaking-change",
     "security",
     "wip",
     "major-update",
     "ci-failed",
     "merge-conflict"
   ],
-  "ignoreIssueLabels": [
+  "ignoredIssueLabels": [
     "automated",
     "incident",
-    "dependencies",
-    "renovate",
-    "keep-me"
+    "keep-me",
+    "stale",
+    "wontfix"
+  ],
+  "ignoredRepositories": [
+    ".github"
+  ],
+  "defaultAutoMergeLabels": [
+    "automerge",
+    "safe-update"
   ],
   "repositories": {
     "WriteCanvas": {
       "autoMergeDefault": true,
       "sensitivePaths": [
         "main/**",
-        "preload.js"
+        "preload.js",
+        ".github/workflows/**"
       ],
       "allowedBaseBranches": [
         "master"
-      ],
-      "workflowPinOnly": true
+      ]
     },
     "Techstack-Studio": {
       "autoMergeDefault": true,
       "sensitivePaths": [
         "scripts/buildCatalogManifest*",
-        "scripts/generateStandaloneSvgLibrary*"
+        "scripts/generateStandaloneSvgLibrary*",
+        ".github/workflows/**"
       ],
       "allowedBaseBranches": [
         "main"
-      ],
-      "workflowPinOnly": true
+      ]
     },
     "LayoutLingua": {
       "autoMergeLabels": [
         "safe-update",
         "automerge"
       ],
+      "sensitivePaths": [
+        "layoutlingua/**",
+        ".github/workflows/**"
+      ],
       "allowedBaseBranches": [
         "main"
+      ]
+    },
+    "apidex-hub": {
+      "autoMergeLabels": [
+        "safe-update",
+        "automerge"
       ],
-      "workflowPinOnly": true
+      "sensitivePaths": [
+        "apis/**",
+        "scripts/remove_dead_links.py",
+        "scripts/check_links.py",
+        "scripts/verify_links_playwright.py",
+        ".github/workflows/link-checker.yml",
+        ".github/ai-instructions.md",
+        "site/src/data/apis.json"
+      ],
+      "ignoredIssueLabels": [
+        "automated",
+        "incident",
+        "keep-me",
+        "stale",
+        "wontfix"
+      ],
+      "allowedBaseBranches": [
+        "main"
+      ]
     }
   }
 }
