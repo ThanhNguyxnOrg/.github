@@ -33,6 +33,9 @@ jobs:
           permission-issues: write
           permission-pull-requests: write
 
+      - name: Test central policy helpers
+        run: node --test .github/scripts/agent-controller.test.mjs
+
       - name: Reconcile open pull requests and issues
         env:
           GH_TOKEN: ${{ steps.agent.outputs.token }}
