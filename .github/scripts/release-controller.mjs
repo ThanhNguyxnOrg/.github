@@ -226,6 +226,113 @@ function makeTagName(version) {
   return 'v' + version;
 }
 
+export function releaseNotesFromChangelog(changelog, version) {
+  const escaped = String(version).replace(/[.*+?^${}()|[\]\\]/g, '\\function makeTagName(version) {
+  return 'v' + version;
+}
+');
+  const pattern = new RegExp('^##\\s+\\[?' + escaped + '\\]?(?:\\s+-[^\\n]*)?\\s*\\n([\\s\\S]*?)(?=^##\\s+|$)', 'm');
+  const match = String(changelog || '').replace(/\\r/g, '').match(pattern);
+  return match ? match[1].trim() : '';
+}
+
+async function getTagCommitSha(fullName, tag) {
+  const ref = await api('/repos/' + fullName + '/git/ref/tags/' + encodeURIComponent(tag));
+  if (ref.object.type === 'commit') return ref.object.sha;
+  if (ref.object.type === 'tag') {
+    const annotated = await api('/repos/' + fullName + '/git/tags/' + ref.object.sha);
+    return annotated.object.sha;
+  }
+  throw new Error('Unsupported tag object type for ' + fullName + ':' + tag);
+}
+
+async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, rule) {
+  let changelog = await getFile(fullName, rule.changelogPath || 'CHANGELOG.md', targetSha);
+  let body = releaseNotesFromChangelog(changelog, version);
+  if (!body) {
+    body = 'Release ' + repoName + ' ' + tag + '\\n\\n' +
+      'See the repository changelog for details.';
+  }
+
+  const prerelease = Boolean(parseSemver(version)?.prerelease);
+  const name = repoName + ' ' + tag;
+  let release;
+  try {
+    release = await api('/repos/' + fullName + '/releases/tags/' + encodeURIComponent(tag));
+  } catch (error) {
+    if (!(error instanceof GitHubError) || error.status !== 404) throw error;
+    release = await api('/repos/' + fullName + '/releases', {
+      method: 'POST',
+      body: {
+        tag_name: tag,
+        target_commitish: targetSha,
+        name,
+        body,
+        draft: true,
+        prerelease,
+        generate_release_notes: false
+      }
+    });
+    console.log('[release-draft-created]', fullName, tag, release.html_url);
+    return release;
+  }
+
+  if (!release.draft) {
+    console.log('[release-already-published]', fullName, tag, release.html_url);
+    return release;
+  }
+
+  release = await api('/repos/' + fullName + '/releases/' + release.id, {
+    method: 'PATCH',
+    body: { name, body, draft: true, prerelease }
+  });
+  console.log('[release-draft-updated]', fullName, tag, release.html_url);
+  return release;
+}
+
+async function publishReadyDrafts(repoName, rule) {
+  const fullName = ORG + '/' + repoName;
+  const releases = await api('/repos/' + fullName + '/releases?per_page=100');
+  for (const release of releases) {
+    if (!release.draft || !/^v\\d+\\.\\d+\\.\\d+/.test(release.tag_name || '')) continue;
+    const tag = release.tag_name;
+    if (!rule.releaseWorkflowName) {
+      await api('/repos/' + fullName + '/releases/' + release.id, {
+        method: 'PATCH',
+        body: { draft: false }
+      });
+      console.log('[release-published]', fullName, tag, 'no build workflow required');
+      continue;
+    }
+
+    const headSha = await getTagCommitSha(fullName, tag);
+    const runs = await api('/repos/' + fullName + '/actions/runs?head_sha=' + encodeURIComponent(headSha) + '&per_page=100');
+    const matching = (runs.workflow_runs || [])
+      .filter(run => run.name === rule.releaseWorkflowName)
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    if (!matching.length) {
+      console.log('[release-await-build]', fullName, tag, 'workflow has not started:', rule.releaseWorkflowName);
+      continue;
+    }
+
+    const latest = matching[0];
+    if (latest.status !== 'completed') {
+      console.log('[release-await-build]', fullName, tag, 'workflow status:', latest.status);
+      continue;
+    }
+    if (latest.conclusion !== 'success') {
+      console.warn('[release-build-failed]', fullName, tag, 'workflow conclusion:', latest.conclusion, '— draft kept unpublished');
+      continue;
+    }
+
+    await api('/repos/' + fullName + '/releases/' + release.id, {
+      method: 'PATCH',
+      body: { draft: false }
+    });
+    console.log('[release-published]', fullName, tag, 'after successful build workflow');
+  }
+}
+
 async function createCommit(fullName, branch, headSha, changes, message) {
   const parent = await api('/repos/' + fullName + '/git/commits/' + headSha);
   const treeEntries = [];
@@ -315,17 +422,15 @@ async function reconcileRepository(repoName, rule) {
   if (pending) {
     const version = releaseIntent(pending.commit.message, rule.mode);
     const tag = makeTagName(version);
-    if (refs.some(item => item.ref === 'refs/tags/' + tag)) return;
-    if (rule.mode === 'commit') {
-      console.log('[release-delegated]', fullName, tag, '— repository build/release workflow owns this release commit');
-      return;
-    }
     const state = await checkState(fullName, pending.sha);
     if (state !== 'success') {
       console.log('[release-wait]', fullName, tag, '— CI state is ' + state);
       return;
     }
-    await createAnnotatedTag(fullName, tag, pending.sha);
+    if (!refs.some(item => item.ref === 'refs/tags/' + tag)) {
+      await createAnnotatedTag(fullName, tag, pending.sha);
+    }
+    await ensureDraftRelease(fullName, repoName, tag, version, pending.sha, rule);
     return;
   }
 
@@ -383,6 +488,7 @@ async function run() {
   console.log('[release] evaluating ' + entries.length + ' configured repositories');
   for (const [repoName, rule] of entries) {
     try {
+      await publishReadyDrafts(repoName, rule);
       await reconcileRepository(repoName, rule);
     } catch (error) {
       failures.push(repoName + ': ' + error.message);
