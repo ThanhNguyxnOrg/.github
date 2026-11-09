@@ -1,0 +1,386 @@
+import fs from 'node:fs';
+
+const TOKEN = process.env.GH_TOKEN;
+const ORG = process.env.ORG || 'ThanhNguyxnOrg';
+const API = process.env.GITHUB_API_URL || 'https://api.github.com';
+const VERSION_EMAIL = '296222857+thanhnguyxnagent[bot]@users.noreply.github.com';
+const VERSION_NAME = 'ThanhNguyxnAgent[bot]';
+const config = JSON.parse(fs.readFileSync(new URL('../release-policy.json', import.meta.url), 'utf8'));
+
+if (!TOKEN) throw new Error('GH_TOKEN is required');
+
+class GitHubError extends Error {
+  constructor(status, message, path) {
+    super(message);
+    this.status = status;
+    this.path = path;
+  }
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(API + path, {
+    method: options.method || 'GET',
+    headers: {
+      Authorization: 'Bearer ' + TOKEN,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28'
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+  });
+  const raw = await response.text();
+  let data = null;
+  if (raw) {
+    try { data = JSON.parse(raw); } catch { data = raw; }
+  }
+  if (!response.ok) {
+    throw new GitHubError(response.status, (data && data.message) || response.statusText, path);
+  }
+  return data;
+}
+
+function parseSemver(value) {
+  const match = String(value || '').replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/);
+  if (!match) return null;
+  return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]), prerelease: match[4] || '' };
+}
+
+function compareVersions(a, b) {
+  const av = parseSemver(a);
+  const bv = parseSemver(b);
+  if (!av || !bv) return 0;
+  for (const key of ['major', 'minor', 'patch']) {
+    if (av[key] !== bv[key]) return av[key] - bv[key];
+  }
+  if (!av.prerelease && bv.prerelease) return 1;
+  if (av.prerelease && !bv.prerelease) return -1;
+  return av.prerelease.localeCompare(bv.prerelease);
+}
+
+export function bumpSemver(current, level) {
+  const parsed = parseSemver(current);
+  if (!parsed) throw new Error('Unsupported current version: ' + current);
+  if (level === 'major') return (parsed.major + 1) + '.0.0';
+  if (level === 'minor') return parsed.major + '.' + (parsed.minor + 1) + '.0';
+  if (level === 'patch') return parsed.major + '.' + parsed.minor + '.' + (parsed.patch + 1);
+  throw new Error('Unsupported release level: ' + level);
+}
+
+export function classifyConventionalCommit(message) {
+  const full = String(message || '').replace(/\r/g, '');
+  const lines = full.split('\n');
+  const subject = (lines.shift() || '').trim();
+  const match = subject.match(/^([a-zA-Z][a-zA-Z0-9-]*)(?:\(([^)]+)\))?(!)?:\s+(.+)$/);
+  if (!match) return null;
+  const type = match[1].toLowerCase();
+  const isBreaking = Boolean(match[3]) || /^\s*BREAKING CHANGE:\s*.+/im.test(lines.join('\n')) || /^\s*BREAKING-CHANGE:\s*.+/im.test(lines.join('\n'));
+  let level = null;
+  if (isBreaking) level = 'major';
+  else if (type === 'feat') level = 'minor';
+  else if (['fix', 'perf', 'revert'].includes(type)) level = 'patch';
+  if (!level) return null;
+  return { type, scope: match[2] || '', subject: match[4].trim(), level, breaking: isBreaking };
+}
+
+export function highestReleaseLevel(commits) {
+  const rank = { patch: 1, minor: 2, major: 3 };
+  let best = null;
+  for (const commit of commits) {
+    const parsed = classifyConventionalCommit(commit.message || commit.commit?.message || '');
+    if (parsed && (!best || rank[parsed.level] > rank[best])) best = parsed.level;
+  }
+  return best;
+}
+
+export function makeReleaseNotes(commits, fullName) {
+  const groups = {
+    'Breaking Changes': [],
+    Features: [],
+    'Bug Fixes and Performance': [],
+    Reverts: []
+  };
+  for (const commit of commits) {
+    const message = commit.message || commit.commit?.message || '';
+    const parsed = classifyConventionalCommit(message);
+    if (!parsed) continue;
+    const sha = commit.sha || commit.id || '';
+    const url = 'https://github.com/' + fullName + '/commit/' + sha;
+    const line = '- ' + parsed.subject + ' ([' + sha.slice(0, 7) + '](' + url + '))';
+    if (parsed.breaking) groups['Breaking Changes'].push(line);
+    else if (parsed.type === 'feat') groups.Features.push(line);
+    else if (parsed.type === 'revert') groups.Reverts.push(line);
+    else groups['Bug Fixes and Performance'].push(line);
+  }
+  return Object.entries(groups)
+    .filter(([, items]) => items.length)
+    .map(([title, items]) => '### ' + title + '\n\n' + items.join('\n'))
+    .join('\n\n');
+}
+
+export function insertChangelogSection(existing, version, date, notes) {
+  const source = String(existing || '').replace(/\r/g, '');
+  const headingPattern = new RegExp('^##\\\\s+\\\\[?' + version.replace(/\./g, '\\\\.') + '\\\\]?(?:\\\\s|$)', 'm');
+  if (headingPattern.test(source)) throw new Error('CHANGELOG already contains version ' + version);
+  const block = '## [' + version + '] - ' + date + '\n\n' + notes.trim() + '\n\n';
+  const headings = [...source.matchAll(/^##\s+/gm)];
+  const unreleased = headings.find(item => /^##\s+\[?Unreleased\]?/i.test(item[0]));
+  let insertAt;
+  if (unreleased) {
+    const next = headings.find(item => item.index > unreleased.index);
+    insertAt = next ? next.index : source.length;
+  } else {
+    const firstVersion = headings.find(item => /^\s*##\s+\[?v?\d+\.\d+\.\d+/i.test(item[0]));
+    insertAt = firstVersion ? firstVersion.index : source.length;
+  }
+  if (!source.trim()) return '# Changelog\n\n' + block;
+  return source.slice(0, insertAt).replace(/\s*$/, '\n\n') + block + source.slice(insertAt);
+}
+
+function releaseIntent(message, mode) {
+  const subject = String(message || '').split('\n')[0].trim();
+  const pattern = mode === 'commit'
+    ? /^release:\s*v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/i
+    : /^chore\(release\):\s*prepare\s+v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/i;
+  const match = subject.match(pattern);
+  return match ? match[1] : null;
+}
+
+function highestVersionTag(refs) {
+  const tags = refs.map(item => item.ref.replace(/^refs\/tags\//, ''))
+    .filter(tag => parseSemver(tag) && !parseSemver(tag).prerelease);
+  tags.sort(compareVersions);
+  return tags.length ? tags[tags.length - 1] : null;
+}
+
+async function checkState(fullName, sha) {
+  const [checks, statuses] = await Promise.all([
+    api('/repos/' + fullName + '/commits/' + sha + '/check-runs?per_page=100'),
+    api('/repos/' + fullName + '/commits/' + sha + '/status')
+  ]);
+  const runs = checks.check_runs || [];
+  const contexts = statuses.statuses || [];
+  if (runs.some(run => ['failure', 'timed_out', 'cancelled', 'action_required', 'startup_failure', 'stale', 'error'].includes(String(run.conclusion || '').toLowerCase()))) return 'failure';
+  if (contexts.some(status => ['failure', 'error'].includes(String(status.state || '').toLowerCase()))) return 'failure';
+  if (runs.some(run => String(run.status || '').toLowerCase() !== 'completed')) return 'pending';
+  if (contexts.some(status => String(status.state || '').toLowerCase() === 'pending')) return 'pending';
+  if (!runs.length && !contexts.length) return 'missing';
+  if (runs.some(run => !['success', 'neutral', 'skipped'].includes(String(run.conclusion || '').toLowerCase()))) return 'missing';
+  if (contexts.some(status => String(status.state || '').toLowerCase() !== 'success')) return 'missing';
+  return 'success';
+}
+
+async function getFile(fullName, path, ref) {
+  const encoded = path.split('/').map(encodeURIComponent).join('/');
+  const result = await api('/repos/' + fullName + '/contents/' + encoded + '?ref=' + encodeURIComponent(ref));
+  if (result.encoding !== 'base64') throw new Error('Unsupported encoding for ' + fullName + '/' + path);
+  return Buffer.from(result.content.replace(/\n/g, ''), 'base64').toString('utf8');
+}
+
+function applyVersionFile(file, source, version) {
+  if (file.kind === 'json') {
+    const parsed = JSON.parse(source);
+    for (const path of file.jsonPaths || []) {
+      let cursor = parsed;
+      for (let index = 0; index < path.length - 1; index += 1) {
+        if (!cursor || !Object.prototype.hasOwnProperty.call(cursor, path[index])) {
+          throw new Error('JSON version path missing in ' + file.path + ': ' + path.join('.'));
+        }
+        cursor = cursor[path[index]];
+      }
+      const key = path[path.length - 1];
+      if (!cursor || !Object.prototype.hasOwnProperty.call(cursor, key)) {
+        throw new Error('JSON version key missing in ' + file.path + ': ' + path.join('.'));
+      }
+      cursor[key] = version;
+    }
+    return JSON.stringify(parsed, null, 2) + '\n';
+  }
+  if (file.kind === 'regex') {
+    const expression = new RegExp(file.pattern, 'm');
+    if (!expression.test(source)) throw new Error('Version pattern did not match ' + file.path);
+    const replacement = String(file.replacement).replace(/\{\{version\}\}/g, version);
+    return source.replace(expression, replacement);
+  }
+  throw new Error('Unsupported version-file kind for ' + file.path);
+}
+
+function conventionalCommitLink(fullName, commit) {
+  const sha = commit.sha;
+  const parsed = classifyConventionalCommit(commit.commit?.message || '');
+  if (!parsed) return null;
+  const subject = parsed.subject.replace(/\s+/g, ' ').trim();
+  return '- ' + subject + ' ([' + sha.slice(0, 7) + '](https://github.com/' + fullName + '/commit/' + sha + '))';
+}
+
+function makeTagName(version) {
+  return 'v' + version;
+}
+
+async function createCommit(fullName, branch, headSha, changes, message) {
+  const parent = await api('/repos/' + fullName + '/git/commits/' + headSha);
+  const treeEntries = [];
+  for (const change of changes) {
+    const blob = await api('/repos/' + fullName + '/git/blobs', {
+      method: 'POST',
+      body: { content: change.content, encoding: 'utf-8' }
+    });
+    treeEntries.push({ path: change.path, mode: '100644', type: 'blob', sha: blob.sha });
+  }
+  const tree = await api('/repos/' + fullName + '/git/trees', {
+    method: 'POST',
+    body: { base_tree: parent.tree.sha, tree: treeEntries }
+  });
+  const timestamp = new Date().toISOString();
+  const commit = await api('/repos/' + fullName + '/git/commits', {
+    method: 'POST',
+    body: {
+      message,
+      tree: tree.sha,
+      parents: [headSha],
+      author: { name: VERSION_NAME, email: VERSION_EMAIL, date: timestamp },
+      committer: { name: VERSION_NAME, email: VERSION_EMAIL, date: timestamp }
+    }
+  });
+  await api('/repos/' + fullName + '/git/refs/heads/' + branch, {
+    method: 'PATCH',
+    body: { sha: commit.sha, force: false }
+  });
+  return commit.sha;
+}
+
+async function createAnnotatedTag(fullName, tag, targetSha) {
+  const timestamp = new Date().toISOString();
+  const tagObject = await api('/repos/' + fullName + '/git/tags', {
+    method: 'POST',
+    body: {
+      tag,
+      message: 'Release ' + tag + '\n\nSigned-off-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>',
+      object: targetSha,
+      type: 'commit',
+      tagger: { name: VERSION_NAME, email: VERSION_EMAIL, date: timestamp }
+    }
+  });
+  try {
+    await api('/repos/' + fullName + '/git/refs', {
+      method: 'POST',
+      body: { ref: 'refs/tags/' + tag, sha: tagObject.sha }
+    });
+    console.log('[tagged]', fullName, tag, '->', targetSha);
+  } catch (error) {
+    if (!(error instanceof GitHubError) || error.status !== 422) throw error;
+    console.log('[tag-exists]', fullName, tag);
+  }
+}
+
+async function reconcileRepository(repoName, rule) {
+  const fullName = ORG + '/' + repoName;
+  const repo = await api('/repos/' + fullName);
+  const branch = rule.branch || repo.default_branch;
+  const headRef = await api('/repos/' + fullName + '/git/ref/heads/' + branch);
+  const headSha = headRef.object.sha;
+  const refs = await api('/repos/' + fullName + '/git/matching-refs/tags/v');
+  const latestTag = highestVersionTag(refs);
+  let base = latestTag || rule.baselineSha;
+
+  if (latestTag && rule.baselineSha) {
+    const baselineRelation = await api('/repos/' + fullName + '/compare/' + latestTag + '...' + rule.baselineSha);
+    if (baselineRelation.status === 'ahead' || baselineRelation.status === 'identical') base = rule.baselineSha;
+    else if (baselineRelation.status === 'behind') base = latestTag;
+    else if (baselineRelation.status === 'diverged') {
+      console.warn('[release-hold]', fullName, 'baseline and release history diverged; manual reconciliation required');
+      return;
+    }
+  }
+
+  const comparison = await api('/repos/' + fullName + '/compare/' + base + '...' + headSha);
+  if (comparison.total_commits > 250 || comparison.commits.length < comparison.total_commits) {
+    console.warn('[release-hold]', fullName, 'comparison exceeds the complete commit window; refusing an incomplete release');
+    return;
+  }
+
+  const commits = comparison.commits || [];
+  if (!commits.length) return;
+
+  const pending = [...commits].reverse().find(commit => releaseIntent(commit.commit?.message, rule.mode));
+  if (pending) {
+    const version = releaseIntent(pending.commit.message, rule.mode);
+    const tag = makeTagName(version);
+    if (refs.some(item => item.ref === 'refs/tags/' + tag)) return;
+    if (rule.mode === 'commit') {
+      console.log('[release-delegated]', fullName, tag, '— repository build/release workflow owns this release commit');
+      return;
+    }
+    const state = await checkState(fullName, pending.sha);
+    if (state !== 'success') {
+      console.log('[release-wait]', fullName, tag, '— CI state is ' + state);
+      return;
+    }
+    await createAnnotatedTag(fullName, tag, pending.sha);
+    return;
+  }
+
+  const conventional = commits.filter(commit => classifyConventionalCommit(commit.commit?.message));
+  const level = highestReleaseLevel(conventional.map(commit => ({ message: commit.commit.message })));
+  if (!level) return;
+
+  const currentVersion = latestTag ? latestTag.replace(/^v/, '') : rule.initialVersion;
+  const nextVersion = bumpSemver(currentVersion, level);
+  const tag = makeTagName(nextVersion);
+  if (refs.some(item => item.ref === 'refs/tags/' + tag)) {
+    console.warn('[release-hold]', fullName, tag, 'already exists but was not selected as the latest tag');
+    return;
+  }
+
+  const checkResult = rule.requireSuccessfulChecks ? await checkState(fullName, headSha) : 'success';
+  if (checkResult !== 'success') {
+    console.log('[release-wait]', fullName, 'HEAD ' + headSha + ' — CI state is ' + checkResult);
+    return;
+  }
+
+  const date = new Date().toISOString().slice(0, 10);
+  const notes = makeReleaseNotes(conventional, fullName);
+  const changes = [];
+  for (const file of rule.versionFiles || []) {
+    const source = await getFile(fullName, file.path, headSha);
+    const updated = applyVersionFile(file, source, nextVersion);
+    if (updated !== source) changes.push({ path: file.path, content: updated });
+  }
+
+  const changelogPath = rule.changelogPath || 'CHANGELOG.md';
+  let changelog;
+  try {
+    changelog = await getFile(fullName, changelogPath, headSha);
+  } catch (error) {
+    if (!(error instanceof GitHubError) || error.status !== 404) throw error;
+    changelog = '# Changelog\n\n';
+  }
+  const updatedChangelog = insertChangelogSection(changelog, nextVersion, date, notes);
+  changes.push({ path: changelogPath, content: updatedChangelog });
+
+  const commitMessage = rule.mode === 'commit'
+    ? 'release: v' + nextVersion
+    : 'chore(release): prepare v' + nextVersion;
+  const body = 'Prepared automatically from Conventional Commits since ' + (latestTag || rule.baselineSha) + '.\n\n' +
+    'Co-authored-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>\n' +
+    'Signed-off-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>';
+  const sha = await createCommit(fullName, branch, headSha, changes, commitMessage + '\n\n' + body);
+  console.log('[release-prepared]', fullName, tag, 'commit ' + sha, 'mode=' + rule.mode);
+}
+
+async function run() {
+  const entries = Object.entries(config.repositories || {});
+  console.log('[release] evaluating ' + entries.length + ' configured repositories');
+  for (const [repoName, rule] of entries) {
+    try {
+      await reconcileRepository(repoName, rule);
+    } catch (error) {
+      console.warn('[release-error]', repoName, error.message);
+    }
+  }
+}
+
+if (process.argv[1] && import.meta.url === new URL('file://' + process.argv[1]).href) {
+  run().catch(error => {
+    console.error('[release-fatal]', error);
+    process.exitCode = 1;
+  });
+}
