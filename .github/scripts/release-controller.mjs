@@ -8,8 +8,6 @@ const VERSION_EMAIL = '296222857+thanhnguyxnagent[bot]@users.noreply.github.com'
 const VERSION_NAME = 'ThanhNguyxnAgent[bot]';
 const config = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
-if (!TOKEN) throw new Error('GH_TOKEN is required');
-
 class GitHubError extends Error {
   constructor(status, message, path) {
     super(message);
@@ -19,6 +17,7 @@ class GitHubError extends Error {
 }
 
 async function api(path, options = {}) {
+  if (!TOKEN) throw new Error('GH_TOKEN is required');
   const response = await fetch(API + path, {
     method: options.method || 'GET',
     headers: {
