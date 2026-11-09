@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile } from './release-controller.mjs';
+import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog } from './release-controller.mjs';
 
 const policy = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
@@ -12,6 +12,15 @@ test('Conventional Commit types map to the configured SemVer levels', () => {
   assert.equal(classifyConventionalCommit('refactor: simplify module'), null);
   assert.equal(classifyConventionalCommit('chore: update docs'), null);
   assert.equal(classifyConventionalCommit('feat: change auth\n\nBREAKING CHANGE: old tokens are rejected').level, 'major');
+});
+
+
+test('release notes are extracted from the exact generated changelog section', () => {
+  const changelog = '# Changelog\\n\\n## [1.2.0] - 2026-11-09\\n\\n### Features\\n\\n- Add a new view.\\n\\n## [1.1.0] - 2026-10-01\\n\\nOld release.\\n';
+  const notes = releaseNotesFromChangelog(changelog, '1.2.0');
+  assert.match(notes, /### Features/);
+  assert.match(notes, /Add a new view/);
+  assert.doesNotMatch(notes, /Old release/);
 });
 
 test('SemVer bump is deterministic', () => {
