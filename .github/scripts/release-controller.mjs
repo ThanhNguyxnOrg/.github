@@ -18,24 +18,35 @@ class GitHubError extends Error {
 
 async function api(path, options = {}) {
   if (!TOKEN) throw new Error('GH_TOKEN is required');
-  const response = await fetch(API + path, {
-    method: options.method || 'GET',
-    headers: {
-      Authorization: 'Bearer ' + TOKEN,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28'
-    },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body)
-  });
-  const raw = await response.text();
-  let data = null;
-  if (raw) {
-    try { data = JSON.parse(raw); } catch { data = raw; }
+  const retryable = new Set([429, 500, 502, 503, 504]);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await fetch(API + path, {
+      method: options.method || 'GET',
+      headers: {
+        Authorization: 'Bearer ' + TOKEN,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+      },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body)
+    });
+    const raw = await response.text();
+    let data = null;
+    if (raw) {
+      try { data = JSON.parse(raw); } catch { data = raw; }
+    }
+    if (response.ok) return data;
+
+    const message = (data && data.message) || response.statusText || 'GitHub API request failed';
+    if (!retryable.has(response.status) || attempt === 2) {
+      throw new GitHubError(response.status, message, path);
+    }
+
+    const retryAfter = Number(response.headers.get('retry-after') || 0);
+    const delayMs = Math.min(10000, retryAfter > 0 ? retryAfter * 1000 : 1000 * (2 ** attempt));
+    console.warn('[api-retry]', response.status, path, 'attempt', attempt + 1, 'waiting', delayMs + 'ms');
+    await new Promise(resolve => setTimeout(resolve, delayMs));
   }
-  if (!response.ok) {
-    throw new GitHubError(response.status, (data && data.message) || response.statusText, path);
-  }
-  return data;
+  throw new Error('GitHub API retry loop ended unexpectedly for ' + path);
 }
 
 function parseSemver(value) {
@@ -368,13 +379,18 @@ async function reconcileRepository(repoName, rule) {
 
 async function run() {
   const entries = Object.entries(config.repositories || {});
+  const failures = [];
   console.log('[release] evaluating ' + entries.length + ' configured repositories');
   for (const [repoName, rule] of entries) {
     try {
       await reconcileRepository(repoName, rule);
     } catch (error) {
-      console.warn('[release-error]', repoName, error.message);
+      failures.push(repoName + ': ' + error.message);
+      console.error('[release-error]', repoName, error.message);
     }
+  }
+  if (failures.length) {
+    throw new Error('Release reconciliation was incomplete: ' + failures.join('; '));
   }
 }
 
