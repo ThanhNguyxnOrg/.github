@@ -36,7 +36,7 @@ jobs:
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-checks: read
-          permission-commit-statuses: read
+          permission-statuses: read
           permission-issues: write
           permission-pull-requests: write
 
