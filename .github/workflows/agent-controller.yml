@@ -1,6 +1,13 @@
 name: ThanhNguyxnAgent — Organization Controller
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/agent-controller.mjs'
+      - '.github/scripts/agent-controller.test.mjs'
+      - 'agent-policy.json'
+      - '.github/workflows/agent-controller.yml'
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch:
