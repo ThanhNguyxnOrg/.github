@@ -1,0 +1,40 @@
+name: ThanhNguyxnAgent — Organization Controller
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: thanhnguyxnagent-org-controller
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Triage PRs and issues; merge approved safe updates
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout central policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Create organization-wide Agent token
+        id: agent
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-checks: read
+          permission-commit-statuses: read
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Reconcile open pull requests and issues
+        env:
+          GH_TOKEN: ${{ steps.agent.outputs.token }}
+          ORG: ${{ github.repository_owner }}
+        run: node .github/scripts/agent-controller.mjs
