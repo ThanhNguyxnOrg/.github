@@ -16,18 +16,20 @@ test('Conventional Commit types map to the configured SemVer levels', () => {
 
 
 test('release notes are extracted from the exact generated changelog section', () => {
-  const changelog = \`# Changelog
-
-## [1.2.0] - 2026-11-09
-
-### Features
-
-- Add a new view.
-
-## [1.1.0] - 2026-10-01
-
-Old release.
-\`;
+  const changelog = [
+    '# Changelog',
+    '',
+    '## [1.2.0] - 2026-11-09',
+    '',
+    '### Features',
+    '',
+    '- Add a new view.',
+    '',
+    '## [1.1.0] - 2026-10-01',
+    '',
+    'Old release.',
+    ''
+  ].join('\n');
   const notes = releaseNotesFromChangelog(changelog, '1.2.0');
   assert.match(notes, /### Features/);
   assert.match(notes, /Add a new view/);
@@ -60,6 +62,7 @@ test('every centrally managed version-file pattern compiles and updates its vers
     'LayoutLingua/pyproject.toml': 'version = "2.0.0"\n',
     'LayoutLingua/layoutlingua/_version.py': '__version__ = "2.0.0"\n',
     'PurgeKit/src-tauri/Cargo.toml': 'version = "1.3.0"\n',
+    'Locsight/src-tauri/Cargo.toml': 'version = "2.2.0"\n',
     'git-account-switcher/bin/git-account-switcher': 'SCRIPT_VERSION="1.0.0"\n',
     'git-account-switcher/bin/git-account-switcher.ps1': '$SCRIPT_VERSION = "1.0.0"\n'
   };
