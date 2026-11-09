@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 
 const TOKEN = process.env.GH_TOKEN;
@@ -378,7 +379,7 @@ async function run() {
   }
 }
 
-if (process.argv[1] && import.meta.url === new URL('file://' + process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   run().catch(error => {
     console.error('[release-fatal]', error);
     process.exitCode = 1;
