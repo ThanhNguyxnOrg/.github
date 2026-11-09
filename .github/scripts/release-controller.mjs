@@ -362,29 +362,6 @@ async function createCommit(fullName, branch, headSha, changes, message) {
   return commit.sha;
 }
 
-async function createAnnotatedTag(fullName, tag, targetSha) {
-  const timestamp = new Date().toISOString();
-  const tagObject = await api('/repos/' + fullName + '/git/tags', {
-    method: 'POST',
-    body: {
-      tag,
-      message: 'Release ' + tag + '\n\nSigned-off-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>',
-      object: targetSha,
-      type: 'commit',
-      tagger: { name: VERSION_NAME, email: VERSION_EMAIL, date: timestamp }
-    }
-  });
-  try {
-    await api('/repos/' + fullName + '/git/refs', {
-      method: 'POST',
-      body: { ref: 'refs/tags/' + tag, sha: tagObject.sha }
-    });
-    console.log('[tagged]', fullName, tag, '->', targetSha);
-  } catch (error) {
-    if (!(error instanceof GitHubError) || error.status !== 422) throw error;
-    console.log('[tag-exists]', fullName, tag);
-  }
-}
 
 async function reconcileRepository(repoName, rule) {
   const fullName = ORG + '/' + repoName;
@@ -423,9 +400,6 @@ async function reconcileRepository(repoName, rule) {
     if (state !== 'success') {
       console.log('[release-wait]', fullName, tag, '— CI state is ' + state);
       return;
-    }
-    if (!refs.some(item => item.ref === 'refs/tags/' + tag)) {
-      await createAnnotatedTag(fullName, tag, pending.sha);
     }
     await ensureDraftRelease(fullName, repoName, tag, version, pending.sha, rule);
     if (!rule.releaseWorkflowName) await publishReadyDrafts(repoName, rule);
