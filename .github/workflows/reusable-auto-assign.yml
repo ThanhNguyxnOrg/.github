@@ -4,10 +4,10 @@ on:
   workflow_call:
     inputs:
       assignees:
-        description: "Comma-separated logins to assign"
+        description: "Comma-separated GitHub logins to assign"
         required: false
         type: string
-        default: ThanhNguyxn07,RealThanhNguyxn
+        default: "ThanhNguyxn07,RealThanhNguyxn"
 
 jobs:
   auto-assign:
@@ -17,12 +17,14 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - name: Create ThanhNguyxnAgent token
-        uses: actions/create-github-app-token@v1
+      - name: Create repository-scoped ThanhNguyxnAgent token
+        uses: actions/create-github-app-token@v3
         id: app-token
         with:
           app-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          permission-issues: write
+          permission-pull-requests: write
       - name: Auto-assign issue/PR
         uses: pozil/auto-assign-issue@v4
         with:
