@@ -1,0 +1,71 @@
+{
+  "reviewers": [
+    "RealThanhNguyxn",
+    "ThanhNguyxn07"
+  ],
+  "labels": {
+    "needsReview": "needs-review",
+    "triageNeeded": "triage-needed",
+    "security": "security",
+    "bug": "bug",
+    "enhancement": "enhancement",
+    "documentation": "documentation",
+    "question": "question",
+    "agentAutoMerge": "agent-auto-merge",
+    "ciFailed": "ci-failed",
+    "ciPending": "ci-pending",
+    "ciMissing": "ci-missing",
+    "mergeConflict": "merge-conflict"
+  },
+  "blockLabels": [
+    "needs-review",
+    "do-not-merge",
+    "breaking",
+    "security",
+    "wip",
+    "major-update",
+    "ci-failed",
+    "merge-conflict"
+  ],
+  "ignoreIssueLabels": [
+    "automated",
+    "incident",
+    "dependencies",
+    "renovate",
+    "keep-me"
+  ],
+  "repositories": {
+    "WriteCanvas": {
+      "autoMergeDefault": true,
+      "sensitivePaths": [
+        "main/**",
+        "preload.js"
+      ],
+      "allowedBaseBranches": [
+        "master"
+      ],
+      "workflowPinOnly": true
+    },
+    "Techstack-Studio": {
+      "autoMergeDefault": true,
+      "sensitivePaths": [
+        "scripts/buildCatalogManifest*",
+        "scripts/generateStandaloneSvgLibrary*"
+      ],
+      "allowedBaseBranches": [
+        "main"
+      ],
+      "workflowPinOnly": true
+    },
+    "LayoutLingua": {
+      "autoMergeLabels": [
+        "safe-update",
+        "automerge"
+      ],
+      "allowedBaseBranches": [
+        "main"
+      ],
+      "workflowPinOnly": true
+    }
+  }
+}
