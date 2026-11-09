@@ -6,7 +6,7 @@ const ORG = process.env.ORG || 'ThanhNguyxnOrg';
 const API = process.env.GITHUB_API_URL || 'https://api.github.com';
 const VERSION_EMAIL = '296222857+thanhnguyxnagent[bot]@users.noreply.github.com';
 const VERSION_NAME = 'ThanhNguyxnAgent[bot]';
-const config = JSON.parse(fs.readFileSync(new URL('../release-policy.json', import.meta.url), 'utf8'));
+const config = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
 if (!TOKEN) throw new Error('GH_TOKEN is required');
 
