@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection } from './release-controller.mjs';
+import fs from 'node:fs';
+import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile } from './release-controller.mjs';
+
+const policy = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
 test('Conventional Commit types map to the configured SemVer levels', () => {
   assert.equal(classifyConventionalCommit('feat(ui): add palette switch').level, 'minor');
@@ -29,4 +32,38 @@ test('changelog section is inserted before previous releases without deleting co
   assert.match(updated, /## \[1.0.0\] - 2026-01-01/);
   assert.match(updated, /Old release\./);
   assert.match(updated, /## \[Unreleased\]/);
+});
+
+test('every centrally managed version-file pattern compiles and updates its version', () => {
+  const fixtures = {
+    'ClipForge/CMakeLists.txt': 'project(ClipForge VERSION 0.2.0 LANGUAGES CXX)\n',
+    'LayoutLingua/pyproject.toml': 'version = "2.0.0"\n',
+    'LayoutLingua/layoutlingua/_version.py': '__version__ = "2.0.0"\n',
+    'PurgeKit/src-tauri/Cargo.toml': 'version = "1.3.0"\n',
+    'git-account-switcher/bin/git-account-switcher': 'SCRIPT_VERSION="1.0.0"\n',
+    'git-account-switcher/bin/git-account-switcher.ps1': '$SCRIPT_VERSION = "1.0.0"\n'
+  };
+  for (const [repo, rule] of Object.entries(policy.repositories)) {
+    for (const file of rule.versionFiles || []) {
+      if (file.kind !== 'regex') continue;
+      const key = repo + '/' + file.path;
+      const fixture = fixtures[key];
+      assert.ok(fixture, 'fixture must exist for ' + key);
+      assert.doesNotThrow(() => new RegExp(file.pattern, 'm'), key + ' regex must compile');
+      const updated = applyVersionFile(file, fixture, '9.8.7');
+      assert.match(updated, /9\.8\.7/, key + ' must contain the new version');
+      assert.doesNotMatch(updated, /(?:0\.2\.0|2\.0\.0|1\.3\.0|1\.0\.0)/, key + ' must not retain the old version');
+    }
+  }
+});
+
+test('JSON version paths preserve the project manifest while updating configured values', () => {
+  const purge = policy.repositories.PurgeKit.versionFiles;
+  const fixture = { package: '{"version":"1.3.0","name":"purgekit"}\n', tauri: '{"version":"1.3.0","productName":"PurgeKit"}\n' };
+  const packageFile = applyVersionFile(purge[0], fixture.package, '1.4.0');
+  const tauriFile = applyVersionFile(purge[1], fixture.tauri, '1.4.0');
+  assert.equal(JSON.parse(packageFile).version, '1.4.0');
+  assert.equal(JSON.parse(packageFile).name, 'purgekit');
+  assert.equal(JSON.parse(tauriFile).version, '1.4.0');
+  assert.equal(JSON.parse(tauriFile).productName, 'PurgeKit');
 });
