@@ -227,12 +227,9 @@ function makeTagName(version) {
 }
 
 export function releaseNotesFromChangelog(changelog, version) {
-  const escaped = String(version).replace(/[.*+?^${}()|[\]\\]/g, '\\function makeTagName(version) {
-  return 'v' + version;
-}
-');
+  const escaped = String(version).replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp('^##\\s+\\[?' + escaped + '\\]?(?:\\s+-[^\\n]*)?\\s*\\n([\\s\\S]*?)(?=^##\\s+|$)', 'm');
-  const match = String(changelog || '').replace(/\\r/g, '').match(pattern);
+  const match = String(changelog || '').replace(/\r/g, '').match(pattern);
   return match ? match[1].trim() : '';
 }
 
