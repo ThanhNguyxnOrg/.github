@@ -22,7 +22,7 @@
     "cogmint": {
       "branch": "main",
       "mode": "tag",
-      "baselineSha": "4e72584d1e46d74f4b815f1e5efb9f80167d1d7c",
+      "baselineSha": "4e72584d1e46d74e560922ef4dad8feac9122d73",
       "initialVersion": "0.1.0",
       "versionFiles": [
         {
@@ -56,7 +56,7 @@
         {
           "path": "CMakeLists.txt",
           "kind": "regex",
-          "pattern": "(VERSION\\\\s+)\\\\d+\\\\.\\\\d+\\\\.\\\\d+",
+          "pattern": "(VERSION\\s+)\\d+\\.\\d+\\.\\d+",
           "replacement": "$1{{version}}"
         }
       ],
@@ -72,13 +72,13 @@
         {
           "path": "pyproject.toml",
           "kind": "regex",
-          "pattern": "^(version\\\\s*=\\\\s*)[\\\"'][^\\\"'\\\\r\\\\n]+[\\\"']",
-          "replacement": "$1\\\"{{version}}\\\""
+          "pattern": "^(version\\s*=\\s*)[\"'][^\"'\\r\\n]+[\"']",
+          "replacement": "$1\"{{version}}\""
         },
         {
           "path": "layoutlingua/_version.py",
           "kind": "regex",
-          "pattern": "(__version__\\\\s*=\\\\s*\\\")[^\\\"]+(\\\")",
+          "pattern": "(__version__\\s*=\\s*\")[^\"]+(\")",
           "replacement": "$1{{version}}$2"
         }
       ],
@@ -122,7 +122,7 @@
         {
           "path": "src-tauri/Cargo.toml",
           "kind": "regex",
-          "pattern": "^(version\\\\s*=\\\\s*\\\")[^\\\"]+(\\\")",
+          "pattern": "^(version\\s*=\\s*\")[^\"]+(\")",
           "replacement": "$1{{version}}$2"
         }
       ],
@@ -171,14 +171,14 @@
         {
           "path": "bin/git-account-switcher",
           "kind": "regex",
-          "pattern": "^(SCRIPT_VERSION=)\\\"[^\\\"]+\\\"",
-          "replacement": "$1\\\"{{version}}\\\""
+          "pattern": "^(SCRIPT_VERSION=)\"[^\"]+\"",
+          "replacement": "$1\"{{version}}\""
         },
         {
           "path": "bin/git-account-switcher.ps1",
           "kind": "regex",
-          "pattern": "^(\\\\$SCRIPT_VERSION\\\\s*=\\\\s*)\\\"[^\\\"]+\\\"",
-          "replacement": "$1\\\"{{version}}\\\""
+          "pattern": "^(\\$SCRIPT_VERSION\\s*=\\s*)\"[^\"]+\"",
+          "replacement": "$1\"{{version}}\""
         }
       ],
       "changelogPath": "CHANGELOG.md",
