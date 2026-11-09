@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 const TOKEN = process.env.GH_TOKEN;
 const ORG = process.env.ORG || 'ThanhNguyxnOrg';
@@ -239,7 +240,8 @@ async function processPullRequest(repo, pr) {
   const labels = names(pr.labels);
   const author = pr.user?.login || '';
   const dependabot = author === 'dependabot[bot]' || author === 'renovate[bot]';
-  const explicitAutoMerge = config.defaultAutoMergeLabels.some(label => labels.has(label));
+  const mergeLabels = [...config.defaultAutoMergeLabels, ...(policy.autoMergeLabels || [])];
+  const explicitAutoMerge = mergeLabels.some(label => labels.has(label));
   const repoDefaultAutoMerge = policy.autoMergeDefault === true;
 
   if (pr.draft) return;
@@ -384,7 +386,9 @@ async function run() {
   }
 }
 
-run().catch(error => {
-  console.error('[agent-fatal]', error);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  run().catch(error => {
+    console.error('[agent-fatal]', error);
+    process.exitCode = 1;
+  });
+}
