@@ -176,7 +176,7 @@ async function getFile(fullName, path, ref) {
   return Buffer.from(result.content.replace(/\n/g, ''), 'base64').toString('utf8');
 }
 
-function applyVersionFile(file, source, version) {
+export function applyVersionFile(file, source, version) {
   if (file.kind === 'json') {
     const parsed = JSON.parse(source);
     for (const path of file.jsonPaths || []) {
