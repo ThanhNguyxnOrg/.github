@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 1,
+  "organization": "ThanhNguyxnOrg",
+  "conventionalCommitPolicy": {
+    "breaking": "major",
+    "feat": "minor",
+    "fix": "patch",
+    "perf": "patch",
+    "revert": "patch",
+    "otherTypes": "no release"
+  },
+  "repositories": {
+    "judgeloom-core": {
+      "branch": "master",
+      "mode": "tag",
+      "baselineSha": "be22765b47f8415061308e6bc74e82aec971803f",
+      "initialVersion": "0.1.0",
+      "versionFiles": [],
+      "changelogPath": "CHANGELOG.md",
+      "requireSuccessfulChecks": true
+    },
+    "cogmint": {
+      "branch": "main",
+      "mode": "tag",
+      "baselineSha": "4e72584d1e46d74f4b815f1e5efb9f80167d1d7c",
+      "initialVersion": "0.1.0",
+      "versionFiles": [
+        {
+          "path": "package.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        }
+      ],
+      "changelogPath": "CHANGELOG.md",
+      "requireSuccessfulChecks": true
+    },
+    "lagvex": {
+      "branch": "main",
+      "mode": "commit",
+      "baselineSha": "0d7952460e1e1fe3e38a69e688a32d26ad187030",
+      "initialVersion": "1.1.0",
+      "versionFiles": [],
+      "changelogPath": "CHANGELOG.md",
+      "requireSuccessfulChecks": true
+    },
+    "ClipForge": {
+      "branch": "main",
+      "mode": "commit",
+      "baselineSha": "c064fec9b2d2fb6e89be07bfdf6fd7b16e52a905",
+      "initialVersion": "0.2.0",
+      "versionFiles": [
+        {
+          "path": "CMakeLists.txt",
+          "kind": "regex",
+          "pattern": "(VERSION\\\\s+)\\\\d+\\\\.\\\\d+\\\\.\\\\d+",
+          "replacement": "$1{{version}}"
+        }
+      ],
+      "changelogPath": "CHANGELOG.md",
+      "requireSuccessfulChecks": true
+    },
+    "LayoutLingua": {
+      "branch": "main",
+      "mode": "commit",
+      "baselineSha": "603544cc394dbabeeeaf6ebe13948f1ae98dcb4b",
+      "initialVersion": "2.0.0",
+      "versionFiles": [
+        {
+          "path": "pyproject.toml",
+          "kind": "regex",
+          "pattern": "^(version\\\\s*=\\\\s*)[\\\"'][^\\\"'\\\\r\\\\n]+[\\\"']",
+          "replacement": "$1\\\"{{version}}\\\""
+        },
+        {
+          "path": "layoutlingua/_version.py",
+          "kind": "regex",
+          "pattern": "(__version__\\\\s*=\\\\s*\\\")[^\\\"]+(\\\")",
+          "replacement": "$1{{version}}$2"
+        }
+      ],
+      "changelogPath": "CHANGELOG.md",
+      "requireSuccessfulChecks": true
+    },
+    "Locsight": {
+      "branch": "main",
+      "mode": "commit",
+      "baselineSha": "614195b514507dccfc5b34486092dd9bccf9f714",
+      "initialVersion": "2.2.0",
+      "versionFiles": [],
+      "changelogPath": "CHANGELOG.md",
+      "requireSuccessfulChecks": true,
+      "versionBumpHandledByLocalReleaseWorkflow": true
+    },
+    "PurgeKit": {
+      "branch": "main",
+      "mode": "commit",
+      "baselineSha": "514fe387c53c309235c326de61c092041a21afcb",
+      "initialVersion": "1.3.0",
+      "versionFiles": [
+        {
+          "path": "package.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": "src-tauri/tauri.conf.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": "src-tauri/Cargo.toml",
+          "kind": "regex",
+          "pattern": "^(version\\\\s*=\\\\s*\\\")[^\\\"]+(\\\")",
+          "replacement": "$1{{version}}$2"
+        }
+      ],
+      "changelogPath": "CHANGELOG.md",
+      "requireSuccessfulChecks": true
+    },
+    "WriteCanvas": {
+      "branch": "master",
+      "mode": "commit",
+      "baselineSha": "ef070fdead085f24d6cfb2cf357f7db9efc38654",
+      "initialVersion": "1.1.0",
+      "versionFiles": [
+        {
+          "path": "package.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": "package-lock.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ],
+            [
+              "packages",
+              "",
+              "version"
+            ]
+          ]
+        }
+      ],
+      "changelogPath": "CHANGELOG.md",
+      "requireSuccessfulChecks": true
+    },
+    "git-account-switcher": {
+      "branch": "master",
+      "mode": "tag",
+      "baselineSha": "7e0f5f0f0c75d9333a4dbd1e5da8b752294af22b",
+      "initialVersion": "1.0.0",
+      "versionFiles": [
+        {
+          "path": "bin/git-account-switcher",
+          "kind": "regex",
+          "pattern": "^(SCRIPT_VERSION=)\\\"[^\\\"]+\\\"",
+          "replacement": "$1\\\"{{version}}\\\""
+        },
+        {
+          "path": "bin/git-account-switcher.ps1",
+          "kind": "regex",
+          "pattern": "^(\\\\$SCRIPT_VERSION\\\\s*=\\\\s*)\\\"[^\\\"]+\\\"",
+          "replacement": "$1\\\"{{version}}\\\""
+        }
+      ],
+      "changelogPath": "CHANGELOG.md",
+      "requireSuccessfulChecks": true
+    }
+  },
+  "excluded": {
+    "lumeo": "Tagging publishes to Firefox AMO and Microsoft Edge stores; keep releases manually approved until store publishing is explicitly opted into.",
+    "apidex-hub": "Curated API catalog with its own health/remediation lifecycle; do not version-release automatically.",
+    ".github": "Automation control plane; not a product release.",
+    "ForgeHelm": "Chart release/version policy has not been mapped yet.",
+    "Snapbooth": "No project release pipeline is configured.",
+    "awesome-cert-sherpa": "No project release pipeline is configured.",
+    "SkillGauge": "No project release pipeline is configured.",
+    "StepDSA": "No project release pipeline is configured.",
+    "Techstack-Studio": "No project release pipeline is configured.",
+    "ThanhNguyxnOrg.github.io": "Organization profile website; no product release pipeline."
+  }
+}
