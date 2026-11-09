@@ -1,0 +1,42 @@
+name: Release Controller — Conventional Commits
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: thanhnguyxnagent-release-controller
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Prepare versions, changelogs and release tags
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout central release policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Create organization-wide Agent token
+        id: agent
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-checks: read
+          permission-commit-statuses: read
+          permission-contents: write
+
+      - name: Test release policy helpers
+        run: node --test .github/scripts/release-controller.test.mjs
+
+      - name: Reconcile conventional-commit releases
+        env:
+          GH_TOKEN: ${{ steps.agent.outputs.token }}
+          ORG: ${{ github.repository_owner }}
+        run: node .github/scripts/release-controller.mjs
