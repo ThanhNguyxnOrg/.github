@@ -293,6 +293,9 @@
     "SkillGauge": "No project release pipeline is configured.",
     "StepDSA": "No project release pipeline is configured.",
     "Techstack-Studio": "No project release pipeline is configured.",
-    "ThanhNguyxnOrg.github.io": "Organization profile website; no product release pipeline."
+    "ThanhNguyxnOrg.github.io": "Organization profile website; no product release pipeline.",
+    "blendops": "Blender-agent framework and skill distribution project; no stable end-user release artifact contract is defined yet. Keep automatic product releases disabled until packaging and versioning are specified.",
+    "AFTERFRAME-THE-LAST-LOOP": "Game project is in active development and has no release packaging workflow or agreed ship targets yet. Keep automatic releases disabled until desktop/game distribution targets are defined.",
+    "chess-on-glass": "Private project has no verified release build or distributable artifacts yet. Keep automatic releases disabled until the repository contains a release-ready product."
   }
 }

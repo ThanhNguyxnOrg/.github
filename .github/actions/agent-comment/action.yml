@@ -1,0 +1,23 @@
+name: Comment as ThanhNguyxnAgent
+description: Create an issue or pull-request comment using the Agent installation token.
+inputs:
+  token:
+    description: Repository-scoped ThanhNguyxnAgent installation token.
+    required: true
+  issue-number:
+    description: Issue or pull-request number.
+    required: true
+  body:
+    description: Markdown comment body.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Create Agent-authored comment
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        COMMENT_BODY: ${{ inputs.body }}
+        REPOSITORY: ${{ github.repository }}
+      run: node "$GITHUB_ACTION_PATH/index.mjs"

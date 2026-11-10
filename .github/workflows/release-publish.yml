@@ -1,0 +1,68 @@
+name: ThanhNguyxnAgent — Reusable Release Publisher
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Existing version tag created by the central Release Controller.
+        required: true
+        type: string
+      artifact_pattern:
+        description: GitHub Actions artifact name or pattern containing release assets.
+        required: false
+        default: release-assets-*
+        type: string
+      artifact_directory:
+        description: Flat directory to collect final release assets into.
+        required: false
+        default: dist/release
+        type: string
+      policy_ref:
+        description: Ref containing the central release-policy.json.
+        required: false
+        default: main
+        type: string
+    secrets:
+      BOT_APP_ID:
+        description: Organization-wide ThanhNguyxnAgent GitHub App client ID.
+        required: true
+      BOT_PRIVATE_KEY:
+        description: Organization-wide ThanhNguyxnAgent GitHub App private key.
+        required: true
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  publish:
+    name: Upload and verify assets as ThanhNguyxnAgent
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Download all platform build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ${{ inputs.artifact_pattern }}
+          path: ${{ inputs.artifact_directory }}
+          merge-multiple: true
+          if-no-artifact-found: error
+
+      - name: Mint repository-scoped ThanhNguyxnAgent token
+        id: agent
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          client-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Upload assets and verify central manifest
+        uses: ThanhNguyxnOrg/.github/.github/actions/agent-release-assets@main
+        with:
+          token: ${{ steps.agent.outputs.token }}
+          tag: ${{ inputs.tag }}
+          path: ${{ inputs.artifact_directory }}
+          policy-ref: ${{ inputs.policy_ref }}

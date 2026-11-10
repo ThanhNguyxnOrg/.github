@@ -1,0 +1,89 @@
+name: ThanhNguyxnOrg — Reusable Node CI
+
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        description: Node.js version.
+        required: false
+        default: "22"
+        type: string
+      working_directory:
+        description: Project directory containing package.json.
+        required: false
+        default: "."
+        type: string
+      cache:
+        description: setup-node cache provider (npm, pnpm, yarn, or empty).
+        required: false
+        default: npm
+        type: string
+      install_command:
+        description: Dependency installation command.
+        required: false
+        default: npm ci
+        type: string
+      lint_command:
+        description: Optional lint command.
+        required: false
+        default: ""
+        type: string
+      typecheck_command:
+        description: Optional type-check command.
+        required: false
+        default: ""
+        type: string
+      test_command:
+        description: Optional test command.
+        required: false
+        default: npm test
+        type: string
+      build_command:
+        description: Optional production build command.
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (Node ${{ inputs.node_version }})
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
+      - name: Install dependencies
+        if: inputs.install_command != ''
+        env:
+          COMMAND: ${{ inputs.install_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Lint
+        if: inputs.lint_command != ''
+        env:
+          COMMAND: ${{ inputs.lint_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Typecheck
+        if: inputs.typecheck_command != ''
+        env:
+          COMMAND: ${{ inputs.typecheck_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Test
+        if: inputs.test_command != ''
+        env:
+          COMMAND: ${{ inputs.test_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Build
+        if: inputs.build_command != ''
+        env:
+          COMMAND: ${{ inputs.build_command }}
+        run: bash -euo pipefail -c "$COMMAND"

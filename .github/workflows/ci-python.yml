@@ -1,0 +1,84 @@
+name: ThanhNguyxnOrg — Reusable Python CI
+
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        description: Python version.
+        required: false
+        default: "3.12"
+        type: string
+      working_directory:
+        description: Project directory.
+        required: false
+        default: "."
+        type: string
+      install_command:
+        description: Dependency installation command.
+        required: false
+        default: python -m pip install -r requirements.txt
+        type: string
+      lint_command:
+        description: Optional lint command.
+        required: false
+        default: ""
+        type: string
+      typecheck_command:
+        description: Optional type-check command.
+        required: false
+        default: ""
+        type: string
+      test_command:
+        description: Optional test command.
+        required: false
+        default: pytest -q
+        type: string
+      build_command:
+        description: Optional build command.
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (Python ${{ inputs.python_version }})
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: pip
+      - name: Install dependencies
+        if: inputs.install_command != ''
+        env:
+          COMMAND: ${{ inputs.install_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Lint
+        if: inputs.lint_command != ''
+        env:
+          COMMAND: ${{ inputs.lint_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Typecheck
+        if: inputs.typecheck_command != ''
+        env:
+          COMMAND: ${{ inputs.typecheck_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Test
+        if: inputs.test_command != ''
+        env:
+          COMMAND: ${{ inputs.test_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Build
+        if: inputs.build_command != ''
+        env:
+          COMMAND: ${{ inputs.build_command }}
+        run: bash -euo pipefail -c "$COMMAND"

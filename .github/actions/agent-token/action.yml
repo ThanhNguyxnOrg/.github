@@ -1,0 +1,86 @@
+name: ThanhNguyxnAgent token
+description: Create a repository-scoped installation token for ThanhNguyxnAgent.
+inputs:
+  profile:
+    description: "Permission profile: content, issues, release, or read."
+    required: true
+  client-id:
+    description: GitHub App client ID (organization secret BOT_APP_ID).
+    required: true
+  private-key:
+    description: GitHub App private key (organization secret BOT_PRIVATE_KEY).
+    required: true
+  owner:
+    description: Optional installation owner. Omit to scope the token to the calling repository.
+    required: false
+    default: ""
+  repositories:
+    description: Optional comma-separated repository allowlist. Used only with owner.
+    required: false
+    default: ""
+outputs:
+  token:
+    description: Short-lived installation access token.
+    value: ${{ steps.content.outputs.token || steps.issues.outputs.token || steps.release.outputs.token || steps.read.outputs.token }}
+runs:
+  using: composite
+  steps:
+    - name: Validate permission profile
+      shell: bash
+      env:
+        PROFILE: ${{ inputs.profile }}
+      run: |
+        case "$PROFILE" in
+          content|issues|release|read) ;;
+          *) echo "::error::Unsupported Agent token profile: $PROFILE"; exit 1 ;;
+        esac
+    - name: Create content-write token
+      id: content
+      if: inputs.profile == 'content'
+      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+      with:
+        client-id: ${{ inputs.client-id }}
+        private-key: ${{ inputs.private-key }}
+        owner: ${{ inputs.owner }}
+        repositories: ${{ inputs.repositories }}
+        permission-contents: write
+    - name: Create issue-and-PR token
+      id: issues
+      if: inputs.profile == 'issues'
+      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+      with:
+        client-id: ${{ inputs.client-id }}
+        private-key: ${{ inputs.private-key }}
+        owner: ${{ inputs.owner }}
+        repositories: ${{ inputs.repositories }}
+        permission-contents: read
+        permission-issues: write
+        permission-pull-requests: write
+        permission-checks: read
+        permission-statuses: read
+    - name: Create release token
+      id: release
+      if: inputs.profile == 'release'
+      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+      with:
+        client-id: ${{ inputs.client-id }}
+        private-key: ${{ inputs.private-key }}
+        owner: ${{ inputs.owner }}
+        repositories: ${{ inputs.repositories }}
+        permission-contents: write
+        permission-workflows: write
+        permission-actions: read
+        permission-checks: read
+        permission-statuses: read
+    - name: Create read-only token
+      id: read
+      if: inputs.profile == 'read'
+      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+      with:
+        client-id: ${{ inputs.client-id }}
+        private-key: ${{ inputs.private-key }}
+        owner: ${{ inputs.owner }}
+        repositories: ${{ inputs.repositories }}
+        permission-contents: read
+        permission-checks: read
+        permission-statuses: read

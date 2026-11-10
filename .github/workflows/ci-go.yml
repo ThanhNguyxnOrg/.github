@@ -1,0 +1,64 @@
+name: ThanhNguyxnOrg — Reusable Go CI
+
+on:
+  workflow_call:
+    inputs:
+      go_version:
+        description: Go version or stable.
+        required: false
+        default: stable
+        type: string
+      working_directory:
+        description: Module working directory.
+        required: false
+        default: "."
+        type: string
+      test_command:
+        description: Test command.
+        required: false
+        default: go test ./...
+        type: string
+      vet_command:
+        description: Vet command.
+        required: false
+        default: go vet ./...
+        type: string
+      build_command:
+        description: Optional build command.
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (Go ${{ inputs.go_version }})
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ inputs.go_version }}
+          cache: true
+      - name: Test
+        if: inputs.test_command != ''
+        env:
+          COMMAND: ${{ inputs.test_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Vet
+        if: inputs.vet_command != ''
+        env:
+          COMMAND: ${{ inputs.vet_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Build
+        if: inputs.build_command != ''
+        env:
+          COMMAND: ${{ inputs.build_command }}
+        run: bash -euo pipefail -c "$COMMAND"

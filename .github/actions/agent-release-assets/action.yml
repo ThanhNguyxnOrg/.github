@@ -1,0 +1,30 @@
+name: Upload and verify release assets as ThanhNguyxnAgent
+description: Upload a flat release asset directory to the central draft and validate it against release-policy.json.
+inputs:
+  token:
+    description: Repository-scoped Agent installation token with contents:write.
+    required: true
+  tag:
+    description: Existing version tag, e.g. v1.2.3.
+    required: true
+  path:
+    description: Flat directory containing the final release files.
+    required: false
+    default: dist/release
+  policy-ref:
+    description: Ref in ThanhNguyxnOrg/.github containing release-policy.json.
+    required: false
+    default: main
+runs:
+  using: composite
+  steps:
+    - name: Upload and verify release assets
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        RELEASE_TAG: ${{ inputs.tag }}
+        ASSET_PATH: ${{ inputs.path }}
+        POLICY_REF: ${{ inputs.policy-ref }}
+        REPOSITORY: ${{ github.repository }}
+        API_URL: ${{ github.api_url }}
+      run: node "$GITHUB_ACTION_PATH/index.mjs"

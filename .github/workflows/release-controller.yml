@@ -11,6 +11,10 @@ on:
       - '.github/scripts/check-policy.mjs'
       - '.github/scripts/check-policy.test.mjs'
       - '.github/workflows/release-controller.yml'
+      - '.github/workflows/release-publish.yml'
+      - '.github/workflows/ci-*.yml'
+      - '.github/actions/**'
+      - '.github/scripts/release-assets.test.mjs'
   schedule:
     - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
@@ -45,7 +49,7 @@ jobs:
           permission-actions: read
 
       - name: Test release policy helpers
-        run: node --test .github/scripts/release-controller.test.mjs .github/scripts/check-policy.test.mjs
+        run: node --test .github/scripts/release-controller.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/release-assets.test.mjs
 
       - name: Reconcile conventional-commit releases
         env:

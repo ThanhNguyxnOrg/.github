@@ -1,0 +1,10 @@
+name: Configure ThanhNguyxnAgent Git identity
+description: Set the exact Git author and committer identity used by the organization Agent.
+runs:
+  using: composite
+  steps:
+    - name: Configure Agent author and committer
+      shell: bash
+      run: |
+        git config --global user.name "ThanhNguyxnAgent[bot]"
+        git config --global user.email "296222857+thanhnguyxnagent[bot]@users.noreply.github.com"

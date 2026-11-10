@@ -1,0 +1,60 @@
+name: ThanhNguyxnOrg — Reusable CMake CI
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: GitHub-hosted runner label.
+        required: false
+        default: ubuntu-latest
+        type: string
+      dependencies_command:
+        description: Optional runner-specific system dependency installation.
+        required: false
+        default: ""
+        type: string
+      configure_command:
+        description: CMake configure command.
+        required: false
+        default: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        type: string
+      build_command:
+        description: CMake build command.
+        required: false
+        default: cmake --build build --config Release --parallel
+        type: string
+      test_command:
+        description: Optional test command.
+        required: false
+        default: ctest --test-dir build --build-config Release --output-on-failure
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (CMake / ${{ inputs.runner }})
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install system dependencies
+        if: inputs.dependencies_command != ''
+        env:
+          COMMAND: ${{ inputs.dependencies_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Configure
+        env:
+          COMMAND: ${{ inputs.configure_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Build
+        env:
+          COMMAND: ${{ inputs.build_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Test
+        if: inputs.test_command != ''
+        env:
+          COMMAND: ${{ inputs.test_command }}
+        run: bash -euo pipefail -c "$COMMAND"
