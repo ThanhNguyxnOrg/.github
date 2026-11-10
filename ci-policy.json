@@ -73,7 +73,7 @@
       "defaultBranch": "main",
       "autoMergeDependabot": true,
       "requiredChecks": [
-        "build"
+        "verify / Smoke & E2E"
       ]
     },
     "Locsight": {
