@@ -33,3 +33,15 @@ test('an unchanged stale item closes only after its additional grace window', ()
   const expired = new Date(now.getTime() - 5 * day);
   assert.equal(staleDecision({ updated_at: expired.toISOString(), labels: [{name:'stale'}] }, expired, now), 'close');
 });
+
+test('stale marker bot updates do not reactivate an item inside timestamp tolerance', () => {
+  const marker = new Date(now.getTime() - 2 * day);
+  const updatedAt = new Date(marker.getTime() + 2 * 60 * 1000).toISOString();
+  assert.equal(staleDecision({ updated_at: updatedAt, labels: [{name:'stale'}] }, marker, now, {daysBeforeStale:14,daysBeforeClose:5,activityTimestampToleranceMinutes:5}), 'wait');
+});
+
+test('draft PRs and locked issues are exempt from stale handling', () => {
+  const old = {updated_at:new Date(now.getTime()-40*day).toISOString(),labels:[]};
+  assert.equal(staleDecision({...old,draft:true},null,now),'exempt');
+  assert.equal(staleDecision({...old,locked:true},null,now),'exempt');
+});
