@@ -166,11 +166,11 @@
       "defaultBranch": "master",
       "autoMergeDependabot": true,
       "requiredChecks": [
-        "tests / ubuntu-latest / node 22.x",
-        "tests / ubuntu-latest / node 24.x",
-        "tests / windows-latest / node 22.x",
-        "tests / macos-latest / node 22.x",
-        "syntax check"
+        "tests (ubuntu-latest, 22.x) / ubuntu-latest / node 22.x",
+        "tests (ubuntu-latest, 24.x) / ubuntu-latest / node 24.x",
+        "tests (windows-latest, 22.x) / windows-latest / node 22.x",
+        "tests (macos-latest, 22.x) / macos-latest / node 22.x",
+        "syntax / syntax check"
       ]
     },
     "Techstack-Studio": {
