@@ -20,7 +20,9 @@ Product repositories keep their native adapters for stack-specific tests, compil
 
 Each profile records the default branch, exact required GitHub Actions check/job names, and whether Dependabot/Renovate patch/minor auto-merge is enabled.
 
-A required check must exist on the commit and finish with the exact `success` conclusion. Missing checks, skipped/neutral required checks, pending jobs and failures all hold the gate. Unconfigured repositories fail closed and require human review. A green unrelated check cannot substitute for a missing required job.
+A required check must exist on the commit and finish with the exact `success` conclusion. The newest attempt for each exact check name is authoritative, so a successful rerun supersedes an older failed attempt. Missing checks, skipped/neutral required checks, pending jobs and failures all hold the gate. Unconfigured repositories fail closed and require human review. A green unrelated check cannot substitute for a missing required job.
+
+Path-scoped entries live only in this central registry and mirror the native workflow's `paths` filters. For pull requests, the controller checks the current synthetic merge commit SHA—not only the contributor head SHA—and defers if the head changes during evaluation.
 
 Regular PRs still need an explicit `automerge`, `safe-update` or repository-allowlisted label. Dependency auto-merge additionally requires `autoMergeDependabot: true` in the central CI profile. Major, downgrade, unknown, malformed and security-sensitive updates remain human-reviewed.
 
@@ -35,7 +37,7 @@ Regular PRs still need an explicit `automerge`, `safe-update` or repository-allo
 | Failed, pending, missing, skipped or unconfigured required CI | Hold for human review; fail closed |
 | Merge conflict, draft PR, blocking label or protected path | Do not merge |
 
-The controller does not check out or execute pull-request code. It reads PR metadata, changed-file names, mergeability, checks and commit statuses through the GitHub API. Branch protection/rulesets are optional repository-owner choices; this automation does not require them for a solo-maintained repository.
+The controller does not check out or execute pull-request code. It reads PR metadata, changed-file names, mergeability, checks and commit statuses through the GitHub API. This is designed for a solo-maintained organization: no branch protection, required review, or repository-side policy file is needed. The controller performs a direct squash merge only after central policy checks pass.
 
 ## Release safety
 
@@ -51,7 +53,7 @@ Lumeo store releases remain manually approved because tag creation can trigger b
 
 ## Stale issue and PR lifecycle
 
-The central stale controller scans active organization repositories daily. It marks items inactive for 14 days, then closes them after a further 5-day grace period only when there has been no new activity. Items with `keep-me`, `incident`, `automated`, `security`, active CI/merge-review or workflow labels are exempt. A stable timestamp comment prevents reruns from resetting the close window.
+The central stale controller scans active organization repositories daily. It marks items inactive for 14 days, then closes them after a further 5-day grace period only when there has been no new activity. Items with `keep-me`, `incident`, `automated`, `security`, active CI/merge-review or workflow labels are exempt. A stable timestamp comment prevents reruns from resetting the close window. Draft pull requests and locked conversations are excluded, and a configurable five-minute tolerance prevents the bot's own label/comment updates from immediately reactivating stale items.
 
 ## Adding a new repository
 
