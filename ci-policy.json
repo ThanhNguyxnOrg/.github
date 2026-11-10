@@ -17,7 +17,9 @@
     "blendops": {
       "defaultBranch": "main",
       "autoMergeDependabot": false,
-      "requiredChecks": []
+      "requiredChecks": [
+        "verify / Verify (BlendOps)"
+      ]
     },
     "apidex-hub": {
       "defaultBranch": "main",
