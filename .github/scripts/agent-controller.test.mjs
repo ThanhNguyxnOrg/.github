@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyVersionUpdate, evaluateCheckRollup, hasExplicitAutoMergeLabel } from './agent-controller.mjs';
+import { classifyVersionUpdate, evaluateCheckRollup, hasExplicitAutoMergeLabel, pullRequestCheckSha } from './agent-controller.mjs';
 
 test('Dependabot update classification is SemVer-aware', () => {
   assert.equal(classifyVersionUpdate('Bump foo from 1.2.3 to 1.2.4'), 'patch');
@@ -25,4 +25,11 @@ test('regular pull requests require an explicit auto-merge label', () => {
   assert.equal(hasExplicitAutoMergeLabel([{ name: 'automerge' }], {}), true);
   assert.equal(hasExplicitAutoMergeLabel([{ name: 'safe-update' }], {}), true);
   assert.equal(hasExplicitAutoMergeLabel([{ name: 'maintainer-approved' }], { autoMergeLabels: ['maintainer-approved'] }), true);
+});
+
+test('PR checks use the synthetic merge commit SHA', () => {
+  const mergeSha = 'a'.repeat(40);
+  assert.equal(pullRequestCheckSha({ head: { sha: 'b'.repeat(40) }, merge_commit_sha: mergeSha }), mergeSha);
+  assert.equal(pullRequestCheckSha({ merge_commit_sha: null }), null);
+  assert.equal(pullRequestCheckSha({ merge_commit_sha: 'invalid' }), null);
 });
