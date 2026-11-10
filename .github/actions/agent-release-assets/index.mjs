@@ -36,6 +36,17 @@ export function planAssetUpload(localAssets, expectedNames, existingAssets) {
   return { missing, uploads };
 }
 
+export function selectDraftRelease(releases, releaseTag) {
+  const matches = (Array.isArray(releases) ? releases : [])
+    .filter(release => release && release.tag_name === releaseTag && release.draft === true)
+    .sort((a, b) => {
+      const aDate = String(a.updated_at || a.created_at || '');
+      const bDate = String(b.updated_at || b.created_at || '');
+      return bDate.localeCompare(aDate);
+    });
+  return matches[0] || null;
+}
+
 async function request(url, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -94,13 +105,29 @@ async function main() {
   });
   if (!localAssets.length) fail('No release assets were found');
   const releaseUrl = `${api}/repos/${owner}/${repo}/releases/tags/${encodeURIComponent(tag)}`;
+  const releaseListUrl = `${api}/repos/${owner}/${repo}/releases?per_page=100`;
   let release;
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
       release = await request(releaseUrl);
       break;
     } catch (error) {
-      if (!String(error.message).startsWith('GitHub API 404:') || attempt === 19) throw error;
+      if (!String(error.message).startsWith('GitHub API 404:')) throw error;
+
+      // GitHub can return 404 from GET /releases/tags/{tag} for a freshly
+      // created draft even while GET /releases already exposes that draft.
+      // Resolve by exact tag_name from the collection before assuming that the
+      // central controller has not created the draft yet.
+      const releases = await request(releaseListUrl);
+      release = selectDraftRelease(releases, tag);
+      if (release) {
+        console.log(`[release-lookup-fallback] resolved draft ${tag} from release collection (id=${release.id})`);
+        break;
+      }
+
+      if (attempt === 19) {
+        fail(`Central draft release ${tag} was not found by tag lookup or exact-tag collection lookup`);
+      }
       console.log(`[release-wait] draft ${tag} is not visible yet; retry ${attempt + 1}/20`);
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
