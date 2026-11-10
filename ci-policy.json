@@ -211,7 +211,9 @@
     "ThanhNguyxnOrg.github.io": {
       "defaultBranch": "main",
       "autoMergeDependabot": false,
-      "requiredChecks": []
+      "requiredChecks": [
+        "verify / Verify (Website)"
+      ]
     },
     "AFTERFRAME-THE-LAST-LOOP": {
       "defaultBranch": "main",
