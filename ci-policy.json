@@ -52,7 +52,7 @@
       "defaultBranch": "main",
       "autoMergeDependabot": false,
       "requiredChecks": [
-        "lint-and-syntax"
+        "verify / lint-and-syntax"
       ]
     },
     "cogmint": {
