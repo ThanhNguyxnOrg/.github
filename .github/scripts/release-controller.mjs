@@ -327,7 +327,7 @@ async function publishReadyDrafts(repoName, rule) {
   const fullName = ORG + '/' + repoName;
   const releases = await api('/repos/' + fullName + '/releases?per_page=100');
   for (const release of releases) {
-    if (!release.draft || !/^v\\d+\\.\\d+\\.\\d+/.test(release.tag_name || '')) continue;
+    if (!release.draft || !/^v\d+\.\d+\.\d+/.test(release.tag_name || '')) continue;
     const tag = release.tag_name;
     await ensureTagRef(fullName, tag, release.target_commitish);
     if (!rule.releaseWorkflowName) {
