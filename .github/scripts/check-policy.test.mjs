@@ -151,7 +151,7 @@ test('CI profiles match the real project gates and quarantine known failing or o
     'rust / Rust Compiler Check',
   ]);
   assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, false);
-  assert.deepEqual(getRepositoryProfile('blendops').requiredChecks, []);
+  assert.deepEqual(getRepositoryProfile('blendops').requiredChecks, ['verify / Verify (BlendOps)']);
   assert.deepEqual(getRepositoryProfile('ClipForge').requiredChecks, [
     'build-test-ubuntu / 🐧 g++ C++ backend (ubuntu)',
     '🪟 MSVC + NASM (windows)',
