@@ -136,11 +136,12 @@
       "defaultBranch": "main",
       "autoMergeDependabot": true,
       "requiredChecks": [
-        "🧪 Tests & Lint",
+        "verify / Verify (Lagvex Go)",
         "🔨 Cross-Compile Check (linux, amd64, bin/lagvex-client-linux-amd64)",
         "🔨 Cross-Compile Check (windows, amd64, bin/lagvex-client.exe)",
         "🔨 Cross-Compile Check (darwin, arm64, bin/lagvex-client-darwin-arm64)",
-        "🔨 Cross-Compile Check (linux, amd64, bin/lagvex-relay, ./cmd/lagvex-relay)"
+        "🔨 Cross-Compile Check (linux, amd64, bin/lagvex-relay, ./cmd/lagvex-relay)",
+        "🔨 Cross-Compile Check (darwin, amd64, bin/lagvex-client-darwin-amd64)"
       ]
     },
     "git-account-switcher": {
