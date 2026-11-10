@@ -144,6 +144,10 @@ test('CI profiles match the real project gates and quarantine known failing or o
   );
   assert.deepEqual(getRepositoryProfile('apidex-hub').requiredChecks.find(check => typeof check === 'object' && check.name.startsWith('regression-tests')).name, 'regression-tests / Python Regression Tests');
   assert.equal(getRepositoryProfile('cogmint').autoMergeDependabot, false);
+  assert.deepEqual(getRepositoryProfile('PurgeKit').requiredChecks, [
+    'frontend / Frontend (Svelte & TypeScript)',
+    'rust / Rust Compiler Check',
+  ]);
   assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('blendops').requiredChecks, []);
   assert.deepEqual(getRepositoryProfile('ClipForge').requiredChecks, [
