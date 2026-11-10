@@ -57,9 +57,9 @@
     },
     "cogmint": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
+      "autoMergeDependabot": false,
       "requiredChecks": [
-        "Quality & Build"
+        "Typecheck"
       ]
     },
     "awesome-cert-sherpa": {
@@ -73,7 +73,7 @@
       "defaultBranch": "main",
       "autoMergeDependabot": true,
       "requiredChecks": [
-        "CI Build & E2E"
+        "build"
       ]
     },
     "Locsight": {

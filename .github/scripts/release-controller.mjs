@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { evaluateRequiredChecks, getRepositoryProfile } from './check-policy.mjs';
 
 const TOKEN = process.env.GH_TOKEN;
@@ -247,6 +248,158 @@ export function missingRequiredAssets(assets, patterns, tag) {
 }
 
 
+export function planOrphanAssetRecovery(sourceAssets, destinationAssets, requiredPatterns, tag) {
+  const version = String(tag || '').replace(/^v/, '');
+  const required = (Array.isArray(requiredPatterns) ? requiredPatterns : [])
+    .map(pattern => String(pattern).replaceAll('{tag}', tag).replaceAll('{version}', version));
+  if (!required.length) {
+    return { required, copy: [], missing: [], conflicts: [], safeToDelete: false };
+  }
+
+  const uploaded = assets => (Array.isArray(assets) ? assets : [])
+    .filter(asset => asset && asset.state === 'uploaded' && asset.name);
+  const source = new Map(uploaded(sourceAssets).map(asset => [String(asset.name), asset]));
+  const destination = new Map(uploaded(destinationAssets).map(asset => [String(asset.name), asset]));
+  const copy = [];
+  const missing = [];
+  const conflicts = [];
+
+  for (const name of required) {
+    const existing = destination.get(name);
+    const candidate = source.get(name);
+    if (existing) {
+      if (candidate && (
+        Number(candidate.size) !== Number(existing.size) ||
+        !candidate.digest ||
+        !existing.digest ||
+        candidate.digest !== existing.digest
+      )) conflicts.push(name);
+      continue;
+    }
+    if (candidate) copy.push(candidate);
+    else missing.push(name);
+  }
+
+  const sourceItems = Array.isArray(sourceAssets) ? sourceAssets : [];
+  const safeToDelete = !missing.length && !conflicts.length &&
+    sourceItems.length > 0 &&
+    sourceItems.every(asset => {
+      if (!asset || asset.state !== 'uploaded' || !required.includes(String(asset.name || ''))) return false;
+      const copyInDestination = destination.get(String(asset.name));
+      return Boolean(
+        copyInDestination &&
+        Number(asset.size) === Number(copyInDestination.size) &&
+        asset.digest &&
+        copyInDestination.digest &&
+        asset.digest === copyInDestination.digest
+      );
+    });
+
+  return { required, copy, missing, conflicts, safeToDelete };
+}
+
+async function downloadReleaseAsset(fullName, asset) {
+  const response = await fetch(API + '/repos/' + fullName + '/releases/assets/' + asset.id, {
+    headers: {
+      Authorization: 'Bearer ' + TOKEN,
+      Accept: 'application/octet-stream',
+      'X-GitHub-Api-Version': API_VERSION
+    }
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new GitHubError(response.status, detail || 'Release asset download failed', '/repos/' + fullName + '/releases/assets/' + asset.id);
+  }
+
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length !== Number(asset.size)) {
+    throw new Error('Downloaded asset size mismatch for ' + asset.name + ': expected ' + asset.size + ', received ' + bytes.length);
+  }
+  const digest = 'sha256:' + createHash('sha256').update(bytes).digest('hex');
+  if (asset.digest && digest !== asset.digest) {
+    throw new Error('Downloaded asset SHA-256 mismatch for ' + asset.name);
+  }
+  return { bytes, digest };
+}
+
+async function uploadReleaseAsset(fullName, destinationRelease, sourceAsset, bytes, digest) {
+  const uploadBase = String(destinationRelease.upload_url || '').replace(/\\{\\?.*$/, '');
+  if (!uploadBase) throw new Error('Release upload URL is missing for ' + fullName + ' #' + destinationRelease.id);
+  const uploadUrl = uploadBase + '?name=' + encodeURIComponent(sourceAsset.name);
+  const response = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + TOKEN,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': sourceAsset.content_type || 'application/octet-stream',
+      'X-GitHub-Api-Version': API_VERSION
+    },
+    body: bytes
+  });
+  const raw = await response.text();
+  let result = null;
+  if (raw) {
+    try { result = JSON.parse(raw); } catch { result = raw; }
+  }
+  if (!response.ok) {
+    const message = (result && result.message) || response.statusText || 'Release asset upload failed';
+    throw new GitHubError(response.status, message, uploadUrl);
+  }
+  if (!result || result.state !== 'uploaded' || Number(result.size) !== bytes.length || result.digest !== digest) {
+    throw new Error('Uploaded asset verification failed for ' + sourceAsset.name);
+  }
+  console.log('[release-asset-copied]', fullName, sourceAsset.name, bytes.length, digest);
+  return result;
+}
+
+async function recoverOrphanReleaseAssets(fullName, orphanDraft, publishedRelease, rule) {
+  const tag = String(orphanDraft.tag_name || '');
+  if (!rule.releaseWorkflowName || !Array.isArray(rule.requiredAssets) || !rule.requiredAssets.length) {
+    console.warn('[release-recovery-held]', fullName, tag, 'missing build workflow or required asset manifest; preserving draft', orphanDraft.id);
+    return false;
+  }
+
+  const headSha = await getTagCommitSha(fullName, tag);
+  const runs = await api('/repos/' + fullName + '/actions/runs?head_sha=' + encodeURIComponent(headSha) + '&per_page=100');
+  const matching = (runs.workflow_runs || [])
+    .filter(run => run.name === rule.releaseWorkflowName)
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  const latest = matching[0];
+  if (!latest || latest.status !== 'completed' || latest.conclusion !== 'success') {
+    console.warn('[release-recovery-held]', fullName, tag, 'matching build workflow is not successful for tag commit', headSha);
+    return false;
+  }
+
+  let destination = await api('/repos/' + fullName + '/releases/' + publishedRelease.id);
+  let plan = planOrphanAssetRecovery(orphanDraft.assets || [], destination.assets || [], rule.requiredAssets, tag);
+  if (plan.conflicts.length) {
+    console.error('[release-recovery-conflict]', fullName, tag, 'same-name assets differ; preserving orphan draft:', plan.conflicts.join(', '));
+    return false;
+  }
+  if (plan.missing.length) {
+    console.error('[release-recovery-incomplete]', fullName, tag, 'required assets are missing from both releases; preserving orphan draft:', plan.missing.join(', '));
+    return false;
+  }
+
+  for (const asset of plan.copy) {
+    const downloaded = await downloadReleaseAsset(fullName, asset);
+    await uploadReleaseAsset(fullName, destination, asset, downloaded.bytes, downloaded.digest);
+    destination = await api('/repos/' + fullName + '/releases/' + publishedRelease.id);
+  }
+
+  destination = await api('/repos/' + fullName + '/releases/' + publishedRelease.id);
+  plan = planOrphanAssetRecovery(orphanDraft.assets || [], destination.assets || [], rule.requiredAssets, tag);
+  const missingAfterCopy = missingRequiredAssets(destination.assets || [], rule.requiredAssets, tag);
+  if (missingAfterCopy.length || !plan.safeToDelete) {
+    console.error('[release-recovery-held]', fullName, tag, 'assets copied but the orphan cannot yet be safely deleted; missing:', missingAfterCopy.join(', ') || 'none', 'source assets fully mirrored:', plan.safeToDelete);
+    return false;
+  }
+
+  await api('/repos/' + fullName + '/releases/' + orphanDraft.id, { method: 'DELETE' });
+  console.log('[release-orphan-cleaned]', fullName, tag, 'all required assets verified on public release; removed draft', orphanDraft.id);
+  return true;
+}
+
 export function releaseNotesFromChangelog(changelog, version) {
   const escaped = String(version).replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp('^##\\s+\\[?' + escaped + '\\]?(?:\\s+-[^\\n]*)?\\s*\\n([\\s\\S]*?)(?=^##(?!#)\\s+|(?![\\s\\S]))', 'm');
@@ -301,12 +454,16 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
   let changelog = await getFile(fullName, rule.changelogPath || 'CHANGELOG.md', targetSha);
   let body = releaseNotesFromChangelog(changelog, version);
   if (!body) {
-    body = 'Release ' + repoName + ' ' + tag + '\\n\\n' +
+    body = 'Release ' + repoName + ' ' + tag + '\n\n' +
       'See the repository changelog for details.';
   }
 
   const prerelease = Boolean(parseSemver(version)?.prerelease);
   const name = repoName + ' ' + tag;
+  // Create and verify the real Git tag before asking the Releases API to create
+  // a draft. Creating a draft for a tag that does not yet exist can leave an
+  // untagged-<id> release record which later tag lookups cannot reconcile.
+  const tagSha = await ensureTagRef(fullName, tag, targetSha);
   let release;
   try {
     release = await api('/repos/' + fullName + '/releases/tags/' + encodeURIComponent(tag));
@@ -316,7 +473,7 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
       method: 'POST',
       body: {
         tag_name: tag,
-        target_commitish: targetSha,
+        target_commitish: tagSha,
         name,
         body,
         draft: true,
@@ -324,7 +481,9 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
         generate_release_notes: false
       }
     });
-    await ensureTagRef(fullName, tag, targetSha);
+    if (release.tag_name !== tag || !String(release.html_url || '').endsWith('/tag/' + tag)) {
+      throw new Error('GitHub created an unexpected release record for ' + fullName + ' ' + tag + ': ' + release.html_url);
+    }
     console.log('[release-draft-created]', fullName, tag, release.html_url);
     return release;
   }
@@ -353,8 +512,8 @@ async function publishReadyDrafts(repoName, rule) {
     if (!release.draft || !/^v\d+\.\d+\.\d+/.test(tag)) continue;
     if (!pendingIds.has(release.id)) {
       const published = releases.find(item => !item.draft && item.tag_name === tag);
-      if (release.assets?.length && published && !(published.assets || []).length) {
-        console.error('[release-recovery-required]', fullName, tag, 'published release has no assets; orphan draft', release.id, 'retains', release.assets.length, 'assets. Preserve this draft until assets are recovered.');
+      if (release.assets?.length && published) {
+        await recoverOrphanReleaseAssets(fullName, release, published, rule);
       } else {
         console.warn('[release-duplicate-draft]', fullName, tag, '— an existing published release or newer draft already owns this tag; skipping orphan draft', release.id);
       }

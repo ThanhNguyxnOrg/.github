@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, pendingDraftReleases, missingRequiredAssets } from './release-controller.mjs';
+import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery } from './release-controller.mjs';
 
 const policy = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
@@ -112,4 +112,46 @@ test('required release assets are verified by name and version placeholders', ()
   assert.deepEqual(missingRequiredAssets(assets, manifest, tag), []);
   assert.deepEqual(missingRequiredAssets(assets.slice(0, 2), manifest, tag), ['App-1.2.3.dmg']);
   assert.deepEqual(missingRequiredAssets([{ name: 'app-v1.2.3.zip', state: 'new' }], ['app-{tag}.zip'], tag), ['app-v1.2.3.zip']);
+});
+
+
+test('orphan release recovery copies only manifest assets and deletes only after digest-verified mirroring', () => {
+  const source = [
+    { id: 1, name: 'app-v1.2.3.zip', state: 'uploaded', size: 10, digest: 'sha256:app' },
+    { id: 2, name: 'checksums.txt', state: 'uploaded', size: 20, digest: 'sha256:sum' }
+  ];
+  const required = ['app-{tag}.zip', 'checksums.txt'];
+  const plan = planOrphanAssetRecovery(source, [], required, 'v1.2.3');
+  assert.deepEqual(plan.copy.map(asset => asset.name), ['app-v1.2.3.zip', 'checksums.txt']);
+  assert.deepEqual(plan.missing, []);
+  assert.equal(plan.safeToDelete, false);
+
+  const mirrored = planOrphanAssetRecovery(source, source.map(asset => ({ ...asset })), required, 'v1.2.3');
+  assert.equal(mirrored.safeToDelete, true);
+});
+
+test('orphan release recovery refuses mismatched or unexpected assets', () => {
+  const source = [
+    { name: 'app-v1.2.3.zip', state: 'uploaded', size: 10, digest: 'sha256:source' },
+    { name: 'unlisted-debug.zip', state: 'uploaded', size: 4, digest: 'sha256:debug' }
+  ];
+  const conflictingDestination = [
+    { name: 'app-v1.2.3.zip', state: 'uploaded', size: 10, digest: 'sha256:other' }
+  ];
+  const conflict = planOrphanAssetRecovery(source, conflictingDestination, ['app-{tag}.zip'], 'v1.2.3');
+  assert.deepEqual(conflict.conflicts, ['app-v1.2.3.zip']);
+  assert.equal(conflict.safeToDelete, false);
+
+  const extra = planOrphanAssetRecovery(source, [source[0]], ['app-{tag}.zip'], 'v1.2.3');
+  assert.equal(extra.safeToDelete, false);
+});
+
+test('orphan release recovery fails closed when no asset manifest exists', () => {
+  const plan = planOrphanAssetRecovery(
+    [{ name: 'app.zip', state: 'uploaded', size: 10, digest: 'sha256:app' }],
+    [],
+    [],
+    'v1.2.3'
+  );
+  assert.equal(plan.safeToDelete, false);
 });
