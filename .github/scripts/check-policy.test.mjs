@@ -152,6 +152,14 @@ test('CI profiles match the real project gates and quarantine known failing or o
   ]);
   assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('blendops').requiredChecks, ['verify / Verify (BlendOps)']);
+  assert.deepEqual(getRepositoryProfile('lagvex').requiredChecks, [
+    'verify / Verify (Lagvex Go)',
+    '🔨 Cross-Compile Check (linux, amd64, bin/lagvex-client-linux-amd64)',
+    '🔨 Cross-Compile Check (windows, amd64, bin/lagvex-client.exe)',
+    '🔨 Cross-Compile Check (darwin, arm64, bin/lagvex-client-darwin-arm64)',
+    '🔨 Cross-Compile Check (linux, amd64, bin/lagvex-relay, ./cmd/lagvex-relay)',
+    '🔨 Cross-Compile Check (darwin, amd64, bin/lagvex-client-darwin-amd64)',
+  ]);
   assert.deepEqual(getRepositoryProfile('ClipForge').requiredChecks, [
     'build-test-ubuntu / 🐧 g++ C++ backend (ubuntu)',
     '🪟 MSVC + NASM (windows)',
