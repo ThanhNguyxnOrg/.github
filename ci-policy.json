@@ -90,7 +90,8 @@
       "defaultBranch": "main",
       "autoMergeDependabot": false,
       "requiredChecks": [
-        "checks"
+        "frontend / Frontend (Svelte & TypeScript)",
+        "rust / Rust Compiler Check"
       ]
     },
     "LayoutLingua": {
