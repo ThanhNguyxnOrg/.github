@@ -4,7 +4,7 @@ import { evaluateRequiredChecks, getRepositoryProfile, matchesPathPattern } from
 
 test('repository profiles are centrally defined and unknown repositories fail closed', () => {
   assert.equal(getRepositoryProfile('WriteCanvas').defaultBranch, 'master');
-  assert.equal(getRepositoryProfile('WriteCanvas').autoMergeDependabot, true);
+  assert.equal(getRepositoryProfile('WriteCanvas').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('WriteCanvas').requiredChecks, [
     'tests (ubuntu-latest, 22.x) / ubuntu-latest / node 22.x',
     'tests (ubuntu-latest, 24.x) / ubuntu-latest / node 24.x',
@@ -24,11 +24,10 @@ test('central profiles cover every active organization repository and fail close
     'AFTERFRAME-THE-LAST-LOOP', 'chess-on-glass'
   ];
   for (const name of names) assert.ok(getRepositoryProfile(name), 'missing central CI profile: ' + name);
-  for (const [name, profile] of Object.entries(Object.fromEntries(names.map(name => [name, getRepositoryProfile(name)])))) {
+  for (const name of names) {
+    const profile = getRepositoryProfile(name);
     assert.ok(profile.defaultBranch, name + ' must declare its default branch');
-    if (profile.autoMergeDependabot === true) {
-      assert.ok(profile.requiredChecks.length > 0, name + ' cannot auto-merge dependencies without required checks');
-    }
+    assert.equal(profile.autoMergeDependabot, false, name + ' must route dependency PRs to a human maintainer');
   }
   assert.equal(getRepositoryProfile('ForgeHelm').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('ForgeHelm').requiredChecks, ['verify / Verify (ForgeHelm)']);
