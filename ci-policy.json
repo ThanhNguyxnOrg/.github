@@ -11,7 +11,7 @@
       "autoMergeDependabot": false,
       "requiredChecks": [
         "Lint • Typecheck • Test (Python 3.12)",
-        "Go worker test • vet"
+        "go-test / Go worker test • vet"
       ]
     },
     "blendops": {
