@@ -712,7 +712,7 @@ async function run() {
       await reconcileRepository(repoName, rule);
     } catch (error) {
       failures.push(repoName + ': ' + error.message);
-      console.error('[release-error]', repoName, error.message);
+      console.error('[release-error]', repoName, 'status=' + (error.status || 'unknown'), 'path=' + (error.path || 'unknown'), error.message);
     }
   }
   if (failures.length) {
