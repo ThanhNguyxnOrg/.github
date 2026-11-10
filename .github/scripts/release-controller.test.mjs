@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy, releaseMatchesTag } from './release-controller.mjs';
+import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy, releaseMatchesTag, selectReleaseByTag, selectOrphanDraftForTag } from './release-controller.mjs';
 
 const policy = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
@@ -171,4 +171,30 @@ test('release check policy receives changed-file context when paths are configur
 test('release matching trusts tag_name and actual tag identity, not a stale untagged html_url slug', () => {
   assert.equal(releaseMatchesTag({tag_name:'v1.1.2',html_url:'https://github.com/owner/repo/releases/tag/untagged-abc'},'v1.1.2'),true);
   assert.equal(releaseMatchesTag({tag_name:'v1.1.1',html_url:'https://github.com/owner/repo/releases/tag/v1.1.2'},'v1.1.2'),false);
+});
+
+test('release collection fallback reuses the exact draft when tag lookup returns 404', () => {
+  const exactDraft = {
+    id: 440246458,
+    tag_name: 'v1.1.1',
+    html_url: 'https://github.com/owner/repo/releases/tag/untagged-e3ee0aa97d6964c6b5df',
+    draft: true,
+    created_at: '2026-11-10T10:56:03Z'
+  };
+  assert.equal(selectReleaseByTag([exactDraft, { id: 9, tag_name: 'v1.1.10', draft: true }], 'v1.1.1').id, 440246458);
+  assert.equal(selectReleaseByTag([{ id: 10, tag_name: 'v1.1.1', draft: false }, exactDraft], 'v1.1.1').id, 10);
+  assert.equal(selectReleaseByTag([{ id: 11, tag_name: 'v1.1.10', draft: true }], 'v1.1.1'), null);
+});
+
+test('legacy untagged drafts are reused only when name and target SHA identify the exact release', () => {
+  const targetSha = 'a'.repeat(40);
+  const releases = [
+    { id: 1, tag_name: 'untagged-e3ee0aa97d6964c6b5df', name: 'WriteCanvas v1.1.1', target_commitish: targetSha, draft: true },
+    { id: 2, tag_name: 'untagged-bbbb1111222233334444', name: 'WriteCanvas v1.1.1', target_commitish: 'b'.repeat(40), draft: true },
+    { id: 3, tag_name: 'untagged-cccc1111222233334444', name: 'WriteCanvas v1.1.1', target_commitish: targetSha, draft: false },
+    { id: 4, tag_name: 'untagged-dddd1111222233334444', name: 'Other release', target_commitish: targetSha, draft: true }
+  ];
+  assert.equal(selectOrphanDraftForTag(releases, 'v1.1.1', targetSha, 'WriteCanvas v1.1.1').id, 1);
+  assert.equal(selectOrphanDraftForTag(releases, 'v1.1.1', 'not-a-sha', 'WriteCanvas v1.1.1'), null);
+  assert.equal(selectOrphanDraftForTag(releases, 'v1.1.1', targetSha, 'Wrong name'), null);
 });

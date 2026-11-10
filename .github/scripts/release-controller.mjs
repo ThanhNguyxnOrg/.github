@@ -425,6 +425,40 @@ export function releaseMatchesTag(release, tag) {
   return String(release?.tag_name || '') === String(tag || '');
 }
 
+export function selectReleaseByTag(releases, tag) {
+  const matches = (Array.isArray(releases) ? releases : [])
+    .filter(release => release && releaseMatchesTag(release, tag))
+    .sort((a, b) => {
+      if (Boolean(a.draft) !== Boolean(b.draft)) return Number(Boolean(a.draft)) - Number(Boolean(b.draft));
+      const aDate = String(a.updated_at || a.created_at || '');
+      const bDate = String(b.updated_at || b.created_at || '');
+      return bDate.localeCompare(aDate);
+    });
+  return matches[0] || null;
+}
+
+export function selectOrphanDraftForTag(releases, tag, targetSha, expectedName) {
+  const expectedTag = String(tag || '');
+  const expectedCommit = String(targetSha || '').toLowerCase();
+  const name = String(expectedName || '');
+  if (!expectedTag || !/^[0-9a-f]{40}$/.test(expectedCommit) || !name) return null;
+
+  const matches = (Array.isArray(releases) ? releases : [])
+    .filter(release =>
+      release &&
+      release.draft === true &&
+      /^untagged-[0-9a-f]{8,}$/i.test(String(release.tag_name || '')) &&
+      String(release.name || '') === name &&
+      String(release.target_commitish || '').toLowerCase() === expectedCommit
+    )
+    .sort((a, b) => {
+      const aDate = String(a.updated_at || a.created_at || '');
+      const bDate = String(b.updated_at || b.created_at || '');
+      return bDate.localeCompare(aDate);
+    });
+  return matches[0] || null;
+}
+
 export function releaseNotesFromChangelog(changelog, version) {
   const escaped = String(version).replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp('^##\\s+\\[?' + escaped + '\\]?(?:\\s+-[^\\n]*)?\\s*\\n([\\s\\S]*?)(?=^##(?!#)\\s+|(?![\\s\\S]))', 'm');
@@ -486,36 +520,59 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
   const prerelease = Boolean(parseSemver(version)?.prerelease);
   const name = repoName + ' ' + tag;
   // Create and verify the real Git tag before asking the Releases API to create
-  // a draft. Creating a draft for a tag that does not yet exist can leave an
-  // untagged-<id> release record which later tag lookups cannot reconcile.
+  // a draft. Draft tag lookup can still return 404 while the collection already
+  // contains the exact draft, so the collection is the authoritative fallback.
   const tagSha = await ensureTagRef(fullName, tag, targetSha);
   let release;
   try {
     release = await api('/repos/' + fullName + '/releases/tags/' + encodeURIComponent(tag));
   } catch (error) {
     if (!(error instanceof GitHubError) || error.status !== 404) throw error;
-    release = await api('/repos/' + fullName + '/releases', {
-      method: 'POST',
-      body: {
-        tag_name: tag,
-        target_commitish: tagSha,
-        name,
-        body,
-        draft: true,
-        prerelease,
-        generate_release_notes: false
-      }
-    });
-    // GitHub can retain an "untagged-<id>" html_url when a release is created
-    // immediately after its tag. The tag_name field plus the verified Git ref
-    // are authoritative; html_url is presentation metadata and can lag.
-    if (!releaseMatchesTag(release, tag)) {
-      throw new Error('GitHub created an unexpected release record for ' + fullName + ' ' + tag + ': tag_name=' + release.tag_name);
+
+    const releases = await api('/repos/' + fullName + '/releases?per_page=100');
+    release = selectReleaseByTag(releases, tag);
+    if (release) {
+      console.log('[release-lookup-fallback]', fullName, tag, 'resolved exact tag from release collection', release.id);
     }
-    console.log('[release-draft-created]', fullName, tag, release.html_url);
-    return release;
+
+    if (!release) {
+      const orphan = selectOrphanDraftForTag(releases, tag, tagSha, name);
+      if (orphan) {
+        release = await api('/repos/' + fullName + '/releases/' + orphan.id, {
+          method: 'PATCH',
+          body: { tag_name: tag, target_commitish: tagSha, name, body, draft: true, prerelease }
+        });
+        if (!releaseMatchesTag(release, tag)) {
+          throw new Error('Unable to attach matching legacy draft ' + orphan.id + ' to tag ' + tag);
+        }
+        console.log('[release-orphan-repaired]', fullName, tag, 'reused exact target draft', release.id);
+      }
+    }
+
+    if (!release) {
+      release = await api('/repos/' + fullName + '/releases', {
+        method: 'POST',
+        body: {
+          tag_name: tag,
+          target_commitish: tagSha,
+          name,
+          body,
+          draft: true,
+          prerelease,
+          generate_release_notes: false
+        }
+      });
+      if (!releaseMatchesTag(release, tag)) {
+        throw new Error('GitHub created an unexpected release record for ' + fullName + ' ' + tag + ': tag_name=' + release.tag_name);
+      }
+      console.log('[release-draft-created]', fullName, tag, release.html_url);
+      return release;
+    }
   }
 
+  if (!releaseMatchesTag(release, tag)) {
+    throw new Error('GitHub returned a release record for the wrong tag: expected ' + tag + ', received ' + release.tag_name);
+  }
   if (!release.draft) {
     console.log('[release-already-published]', fullName, tag, release.html_url);
     return release;
@@ -523,8 +580,11 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
 
   release = await api('/repos/' + fullName + '/releases/' + release.id, {
     method: 'PATCH',
-    body: { name, body, draft: true, prerelease }
+    body: { target_commitish: tagSha, name, body, draft: true, prerelease }
   });
+  if (!releaseMatchesTag(release, tag) || release.draft !== true) {
+    throw new Error('GitHub draft update failed tag/draft verification for ' + fullName + ' ' + tag);
+  }
   console.log('[release-draft-updated]', fullName, tag, release.html_url);
   return release;
 }
