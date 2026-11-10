@@ -32,7 +32,7 @@
           ]
         },
         {
-          "name": "regression-tests",
+          "name": "regression-tests / Python Regression Tests",
           "paths": [
             "scripts/**",
             ".github/workflows/script-tests.yml"
@@ -97,7 +97,7 @@
       "autoMergeDependabot": true,
       "requiredChecks": [
         {
-          "name": "Test (ubuntu-latest)",
+          "name": "test (ubuntu-latest) / Test (ubuntu-latest)",
           "paths": [
             "layoutlingua/**",
             "tests/**",
@@ -107,7 +107,7 @@
           ]
         },
         {
-          "name": "Test (windows-latest)",
+          "name": "test (windows-latest) / Test (windows-latest)",
           "paths": [
             "layoutlingua/**",
             "tests/**",
@@ -117,7 +117,7 @@
           ]
         },
         {
-          "name": "Test (macos-latest)",
+          "name": "test (macos-latest) / Test (macos-latest)",
           "paths": [
             "layoutlingua/**",
             "tests/**",
