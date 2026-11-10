@@ -27,6 +27,14 @@ on:
         required: false
         default: go vet ./...
         type: string
+      lint_install_command:
+        required: false
+        default: ""
+        type: string
+      lint_command:
+        required: false
+        default: ""
+        type: string
       build_command:
         required: false
         default: ""
@@ -62,6 +70,16 @@ jobs:
         with:
           go-version: ${{ inputs.go_version }}
           cache: true
+      - name: Install lint tooling
+        if: inputs.lint_install_command != ''
+        env:
+          COMMAND: ${{ inputs.lint_install_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+      - name: Lint
+        if: inputs.lint_command != ''
+        env:
+          COMMAND: ${{ inputs.lint_command }}
+        run: bash -euo pipefail -c "$COMMAND"
       - name: Test
         if: inputs.test_command != ''
         env:
