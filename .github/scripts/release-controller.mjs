@@ -411,6 +411,10 @@ async function recoverOrphanReleaseAssets(fullName, orphanDraft, publishedReleas
   return true;
 }
 
+export function releaseMatchesTag(release, tag) {
+  return String(release?.tag_name || '') === String(tag || '');
+}
+
 export function releaseNotesFromChangelog(changelog, version) {
   const escaped = String(version).replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp('^##\\s+\\[?' + escaped + '\\]?(?:\\s+-[^\\n]*)?\\s*\\n([\\s\\S]*?)(?=^##(?!#)\\s+|(?![\\s\\S]))', 'm');
@@ -492,8 +496,11 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
         generate_release_notes: false
       }
     });
-    if (release.tag_name !== tag || !String(release.html_url || '').endsWith('/tag/' + tag)) {
-      throw new Error('GitHub created an unexpected release record for ' + fullName + ' ' + tag + ': ' + release.html_url);
+    // GitHub can retain an "untagged-<id>" html_url when a release is created
+    // immediately after its tag. The tag_name field plus the verified Git ref
+    // are authoritative; html_url is presentation metadata and can lag.
+    if (!releaseMatchesTag(release, tag)) {
+      throw new Error('GitHub created an unexpected release record for ' + fullName + ' ' + tag + ': tag_name=' + release.tag_name);
     }
     console.log('[release-draft-created]', fullName, tag, release.html_url);
     return release;
