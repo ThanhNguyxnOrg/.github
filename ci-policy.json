@@ -194,13 +194,16 @@
           "paths": [
             "skills/**/*.md"
           ]
-        }
+        },
+        "verify / Verify (SkillGauge)"
       ]
     },
     "ForgeHelm": {
       "defaultBranch": "main",
       "autoMergeDependabot": false,
-      "requiredChecks": []
+      "requiredChecks": [
+        "verify / Verify (ForgeHelm)"
+      ]
     },
     "ThanhNguyxnOrg.github.io": {
       "defaultBranch": "main",
