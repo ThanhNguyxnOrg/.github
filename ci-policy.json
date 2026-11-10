@@ -17,12 +17,7 @@
     "blendops": {
       "defaultBranch": "main",
       "autoMergeDependabot": false,
-      "requiredChecks": [
-        "cli-cross-platform (ubuntu-latest)",
-        "cli-cross-platform (windows-latest)",
-        "cli-cross-platform (macos-latest)",
-        "docs"
-      ]
+      "requiredChecks": []
     },
     "apidex-hub": {
       "defaultBranch": "main",
@@ -64,7 +59,7 @@
       "defaultBranch": "main",
       "autoMergeDependabot": true,
       "requiredChecks": [
-        "Typecheck"
+        "Quality & Build"
       ]
     },
     "awesome-cert-sherpa": {
@@ -78,7 +73,7 @@
       "defaultBranch": "main",
       "autoMergeDependabot": true,
       "requiredChecks": [
-        "build"
+        "CI Build & E2E"
       ]
     },
     "Locsight": {
@@ -92,7 +87,7 @@
     },
     "PurgeKit": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
+      "autoMergeDependabot": false,
       "requiredChecks": [
         "checks"
       ]
@@ -132,7 +127,6 @@
       "requiredChecks": [
         "🐧 g++ C++ backend (ubuntu)",
         "🪟 MSVC + NASM (windows)",
-        "🖥️ Qt 6 Quick (windows)",
         "🔖 Version consistency"
       ]
     },

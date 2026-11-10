@@ -44,7 +44,7 @@ jobs:
           permission-actions: read
 
       - name: Test release policy helpers
-        run: node --test .github/scripts/release-controller.test.mjs
+        run: node --test .github/scripts/release-controller.test.mjs .github/scripts/check-policy.test.mjs
 
       - name: Reconcile conventional-commit releases
         env:

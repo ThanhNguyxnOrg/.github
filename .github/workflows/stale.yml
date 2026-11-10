@@ -1,6 +1,13 @@
 name: Organization-wide stale issue and PR controller
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/stale-controller.mjs'
+      - '.github/scripts/stale-controller.test.mjs'
+      - 'agent-policy.json'
+      - '.github/workflows/stale.yml'
   schedule:
     - cron: "25 3 * * *"
   workflow_dispatch:

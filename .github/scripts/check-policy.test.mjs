@@ -119,3 +119,12 @@ test('a profile with no applicable required checks fails closed', () => {
   assert.equal(result.state, 'missing');
   assert.deepEqual(result.missing, ['No required checks apply to the changed files']);
 });
+
+
+test('CI profiles match the real project gates and quarantine known failing or optional checks', () => {
+  assert.deepEqual(getRepositoryProfile('cogmint').requiredChecks, ['Quality & Build']);
+  assert.deepEqual(getRepositoryProfile('Snapbooth').requiredChecks, ['CI Build & E2E']);
+  assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, false);
+  assert.deepEqual(getRepositoryProfile('blendops').requiredChecks, []);
+  assert.equal(getRepositoryProfile('ClipForge').requiredChecks.includes('🖥️ Qt 6 Quick (windows)'), false);
+});

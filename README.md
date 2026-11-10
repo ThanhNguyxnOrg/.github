@@ -31,6 +31,9 @@ It keeps the public-facing profile and default documentation clean, organized, a
 - `PULL_REQUEST_TEMPLATE.md` → default pull request template
 - `ISSUE_TEMPLATE/` → default issue templates
 - `docs/` → extra documentation about this workspace
+- `agent-policy.json`, `ci-policy.json`, and `release-policy.json` → centralized organization automation policies
+- `.github/workflows/` → central Agent, Release, Stale, and showcase-sync controllers
+- `docs/agent-automation.md` → control-plane rules, CI profiles, release adapters, and onboarding
 - `scripts/sync-org.py` → auto-syncs showcase tables from live org data
 - `.github/workflows/sync-org.yml` → daily sync job (cron + manual dispatch)
 

@@ -1,6 +1,12 @@
 name: Sync org showcase
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/sync-org.py'
+      - 'scripts/test_sync_org.py'
+      - '.github/workflows/sync-org.yml'
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
@@ -10,23 +16,27 @@ permissions:
 
 concurrency:
   group: sync-org-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/create-github-app-token@v1
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         id: app-token
         with:
-          app-id: "4125740"
+          client-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
-      - uses: actions/checkout@v4
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           token: ${{ steps.app-token.outputs.token }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+      - name: Test org showcase sync helpers
+        run: python -m unittest scripts/test_sync_org.py
       - name: Sync showcase tables
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

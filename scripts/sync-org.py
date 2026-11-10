@@ -60,7 +60,7 @@ def fetch_repos(org, token):
     while url:
         data, url = api_get(url, token)
         repos.extend(data)
-    return [r for r in repos if not r.get("archived", False) or True]
+    return [r for r in repos if not r.get("archived", False)]
 
 
 def clean(text, limit=MAX_DESC):
