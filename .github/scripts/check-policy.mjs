@@ -36,6 +36,15 @@ export function matchesPathPattern(path, pattern) {
   return globToRegExp(pattern).test(String(path || '').replace(/\\/g, '/'));
 }
 
+function activityTimestamp(item) {
+  const value = Date.parse(item.created_at || item.started_at || item.updated_at || item.completed_at || '');
+  return Number.isNaN(value) ? 0 : value;
+}
+
+function latestAttempt(items) {
+  return [...items].sort((a, b) => activityTimestamp(a) - activityTimestamp(b) || Number(a.id || 0) - Number(b.id || 0)).at(-1) || null;
+}
+
 function isCheckApplicable(spec, changedFiles) {
   const include = Array.isArray(spec.paths) ? spec.paths : [];
   const exclude = Array.isArray(spec.excludePaths) ? spec.excludePaths : [];
@@ -51,8 +60,9 @@ function isCheckApplicable(spec, changedFiles) {
 /**
  * Evaluate only the explicitly required checks for the changed files.
  * Unlisted check-runs are informational and cannot block an otherwise-valid
- * gate. Every configured check must exist and every matching instance must
- * complete successfully; skipped/neutral required checks are not green.
+ * gate. The newest attempt for each configured check name is authoritative,
+ * so a successful rerun supersedes an older failed attempt. Skipped/neutral
+ * required checks are not green.
  */
 export function evaluateRequiredChecks(checkRuns = [], statuses = {}, requiredChecks = [], changedFiles = undefined) {
   const required = Array.isArray(requiredChecks) ? requiredChecks : [];
@@ -86,28 +96,23 @@ export function evaluateRequiredChecks(checkRuns = [], statuses = {}, requiredCh
     if (!applies) continue;
 
     applicable.push({ name, kind });
-    const matches = kind === 'status'
+    const candidates = kind === 'status'
       ? contexts.filter(item => String(item.context || '') === name)
       : runs.filter(item => String(item.name || '') === name);
-
-    if (!matches.length) {
+    const matches = spec.appSlug ? candidates.filter(item => String(item.app?.slug || '') === String(spec.appSlug)) : candidates;
+    const latest = latestAttempt(matches);
+    if (!latest) {
       missing.push(name);
       continue;
     }
-
     if (kind === 'status') {
-      const failedMatches = matches.some(item => !['success', 'pending'].includes(String(item.state || '').toLowerCase()));
-      const pendingMatches = matches.some(item => String(item.state || '').toLowerCase() === 'pending');
-      if (failedMatches) failed.push(name);
-      else if (pendingMatches) pending.push(name);
+      const state = String(latest.state || '').toLowerCase();
+      if (state === 'pending') pending.push(name);
+      else if (state !== 'success') failed.push(name);
     } else {
-      const pendingMatches = matches.some(item => String(item.status || '').toLowerCase() !== 'completed');
-      if (pendingMatches) {
-        pending.push(name);
-        continue;
-      }
-      const failedMatches = matches.some(item => String(item.conclusion || '').toLowerCase() !== 'success');
-      if (failedMatches) failed.push(name);
+      const status = String(latest.status || '').toLowerCase();
+      if (status !== 'completed') pending.push(name);
+      else if (String(latest.conclusion || '').toLowerCase() !== 'success') failed.push(name);
     }
   }
 
