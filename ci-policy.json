@@ -10,7 +10,7 @@
       "defaultBranch": "master",
       "autoMergeDependabot": false,
       "requiredChecks": [
-        "Lint • Typecheck • Test (Python 3.12)",
+        "Lint • Test (Python 3.12)",
         "Go worker test • vet"
       ]
     },
@@ -96,9 +96,36 @@
       "defaultBranch": "main",
       "autoMergeDependabot": true,
       "requiredChecks": [
-        "Test (ubuntu-latest)",
-        "Test (windows-latest)",
-        "Test (macos-latest)"
+        {
+          "name": "Test (ubuntu-latest)",
+          "paths": [
+            "layoutlingua/**",
+            "tests/**",
+            "requirements*.txt",
+            ".github/workflows/test.yml",
+            "*.py"
+          ]
+        },
+        {
+          "name": "Test (windows-latest)",
+          "paths": [
+            "layoutlingua/**",
+            "tests/**",
+            "requirements*.txt",
+            ".github/workflows/test.yml",
+            "*.py"
+          ]
+        },
+        {
+          "name": "Test (macos-latest)",
+          "paths": [
+            "layoutlingua/**",
+            "tests/**",
+            "requirements*.txt",
+            ".github/workflows/test.yml",
+            "*.py"
+          ]
+        }
       ]
     },
     "lagvex": {
