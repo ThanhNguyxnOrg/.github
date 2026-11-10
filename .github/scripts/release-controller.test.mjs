@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy } from './release-controller.mjs';
+import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy, releaseMatchesTag } from './release-controller.mjs';
 
 const policy = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
@@ -161,4 +161,9 @@ test('release check policy receives changed-file context when paths are configur
   assert.deepEqual(changedFilesForPolicy({files:[{filename:'layoutlingua/_version.py'},{filename:'CHANGELOG.md'}]},checks),['layoutlingua/_version.py','CHANGELOG.md']);
   assert.equal(changedFilesForPolicy({files:[]},['Lint']),undefined);
   assert.equal(changedFilesForPolicy({files:Array.from({length:300},()=>({filename:'layoutlingua/x.py'}))},checks),undefined);
+});
+
+test('release matching trusts tag_name and actual tag identity, not a stale untagged html_url slug', () => {
+  assert.equal(releaseMatchesTag({tag_name:'v1.1.2',html_url:'https://github.com/owner/repo/releases/tag/untagged-abc'},'v1.1.2'),true);
+  assert.equal(releaseMatchesTag({tag_name:'v1.1.1',html_url:'https://github.com/owner/repo/releases/tag/v1.1.2'},'v1.1.2'),false);
 });
