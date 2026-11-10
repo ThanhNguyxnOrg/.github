@@ -56,6 +56,13 @@ function names(labels) {
   return new Set((labels || []).map(label => (typeof label === 'string' ? label : label.name).toLowerCase()));
 }
 
+export function hasExplicitAutoMergeLabel(labels, policy = {}) {
+  const present = names(labels);
+  const allowed = [...config.defaultAutoMergeLabels, ...(policy.autoMergeLabels || [])]
+    .map(label => String(label).toLowerCase());
+  return allowed.some(label => present.has(label));
+}
+
 function isBot(login) {
   return typeof login === 'string' && login.toLowerCase().endsWith('[bot]');
 }
@@ -239,9 +246,7 @@ async function processPullRequest(repo, pr) {
   const labels = names(pr.labels);
   const author = pr.user?.login || '';
   const dependabot = author === 'dependabot[bot]' || author === 'renovate[bot]';
-  const mergeLabels = [...config.defaultAutoMergeLabels, ...(policy.autoMergeLabels || [])];
-  const explicitAutoMerge = mergeLabels.some(label => labels.has(label));
-  const repoDefaultAutoMerge = policy.autoMergeDefault === true;
+  const explicitAutoMerge = hasExplicitAutoMergeLabel(pr.labels, policy);
 
   if (pr.draft) return;
   if (policy.allowedBaseBranches && !policy.allowedBaseBranches.includes(pr.base.ref)) {
@@ -266,7 +271,7 @@ async function processPullRequest(repo, pr) {
       return;
     }
     candidate = updateType === 'patch' || updateType === 'minor';
-  } else if (repoDefaultAutoMerge || explicitAutoMerge) {
+  } else if (explicitAutoMerge) {
     candidate = true;
   }
 
