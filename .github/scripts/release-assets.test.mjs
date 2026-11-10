@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { expandRequiredAssets, planAssetUpload } from '../actions/agent-release-assets/index.mjs';
+import { expandRequiredAssets, planAssetUpload, selectDraftRelease } from '../actions/agent-release-assets/index.mjs';
 
 test('expands tag and version placeholders in the central asset manifest', () => {
   assert.deepEqual(
@@ -33,4 +33,28 @@ test('replaces a same-name asset when the draft currently has different bytes', 
   );
   assert.equal(plan.uploads[0].action, 'replace');
   assert.equal(plan.uploads[0].existingId, 7);
+});
+
+test('resolves a freshly created draft by exact tag from the releases collection', () => {
+  const draft = {
+    id: 42,
+    tag_name: 'v1.1.1',
+    draft: true,
+    created_at: '2026-11-10T11:00:00Z'
+  };
+  const selected = selectDraftRelease([
+    { id: 99, tag_name: 'v1.1.10', draft: true },
+    { id: 7, tag_name: 'v1.1.1', draft: false },
+    draft,
+    { id: 43, tag_name: 'v1.1.1', draft: true, created_at: '2026-11-10T11:01:00Z' }
+  ], 'v1.1.1');
+
+  assert.equal(selected.id, 43);
+});
+
+test('does not resolve published releases or tags that only partially match', () => {
+  assert.equal(selectDraftRelease([
+    { id: 7, tag_name: 'v1.1.1', draft: false },
+    { id: 8, tag_name: 'v1.1.10', draft: true }
+  ], 'v1.1.1'), null);
 });
