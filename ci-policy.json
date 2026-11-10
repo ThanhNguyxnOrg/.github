@@ -172,14 +172,14 @@
       "defaultBranch": "main",
       "autoMergeDependabot": true,
       "requiredChecks": [
-        "Verify"
+        "verify / Verify"
       ]
     },
     "StepDSA": {
       "defaultBranch": "main",
       "autoMergeDependabot": true,
       "requiredChecks": [
-        "test"
+        "test / test"
       ]
     },
     "SkillGauge": {
