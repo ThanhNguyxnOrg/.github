@@ -1,41 +1,56 @@
-name: ThanhNguyxnOrg — Reusable Go CI
+name: Shared CI — Go
 
 on:
   workflow_call:
     inputs:
+      job_name:
+        required: false
+        default: Verify (Go)
+        type: string
+      runner:
+        required: false
+        default: ubuntu-latest
+        type: string
       go_version:
-        description: Go version or stable.
         required: false
         default: stable
         type: string
       working_directory:
-        description: Module working directory.
         required: false
         default: "."
         type: string
       test_command:
-        description: Test command.
         required: false
         default: go test ./...
         type: string
       vet_command:
-        description: Vet command.
         required: false
         default: go vet ./...
         type: string
       build_command:
-        description: Optional build command.
         required: false
         default: ""
         type: string
+      artifact_name:
+        required: false
+        default: ""
+        type: string
+      artifact_path:
+        required: false
+        default: ""
+        type: string
+      artifact_retention_days:
+        required: false
+        default: 5
+        type: number
 
 permissions:
   contents: read
 
 jobs:
   verify:
-    name: Verify (Go ${{ inputs.go_version }})
-    runs-on: ubuntu-latest
+    name: ${{ inputs.job_name }}
+    runs-on: ${{ inputs.runner }}
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}
@@ -62,3 +77,11 @@ jobs:
         env:
           COMMAND: ${{ inputs.build_command }}
         run: bash -euo pipefail -c "$COMMAND"
+      - name: Upload CI artifact
+        if: inputs.artifact_name != '' && inputs.artifact_path != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.artifact_path }}
+          if-no-files-found: error
+          retention-days: ${{ inputs.artifact_retention_days }}
