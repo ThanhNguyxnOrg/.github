@@ -80,6 +80,7 @@
       "defaultBranch": "main",
       "autoMergeDependabot": true,
       "requiredChecks": [
+        "verify / Registry & Release Script",
         "build-tauri (windows-latest, x64)",
         "build-tauri (macos-latest, x64)",
         "build-tauri (ubuntu-latest, x64)"
