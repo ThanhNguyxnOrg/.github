@@ -10,7 +10,7 @@
       "defaultBranch": "master",
       "autoMergeDependabot": false,
       "requiredChecks": [
-        "Lint • Test (Python 3.12)",
+        "Lint • Typecheck • Test (Python 3.12)",
         "Go worker test • vet"
       ]
     },
