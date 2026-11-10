@@ -43,14 +43,14 @@ async function request(path, options = {}) {
 
 async function listAll(path) {
   const items = [];
-  for (let page = 1; page <= 20; page += 1) {
+  for (let page = 1; page <= 50; page += 1) {
     const separator = path.includes('?') ? '&' : '?';
     const batch = await request(path + separator + 'per_page=100&page=' + page);
     if (!Array.isArray(batch)) throw new Error('Expected an array from ' + path);
     items.push(...batch);
-    if (batch.length < 100) break;
+    if (batch.length < 100) return items;
   }
-  return items;
+  throw new Error('Pagination limit reached while listing ' + path);
 }
 
 function names(labels) {
@@ -62,6 +62,11 @@ export function hasExplicitAutoMergeLabel(labels, policy = {}) {
   const allowed = [...config.defaultAutoMergeLabels, ...(policy.autoMergeLabels || [])]
     .map(label => String(label).toLowerCase());
   return allowed.some(label => present.has(label));
+}
+
+export function pullRequestCheckSha(pullRequest) {
+  const sha = String(pullRequest?.merge_commit_sha || '').trim();
+  return /^[0-9a-f]{40}$/i.test(sha) ? sha : null;
 }
 
 function isBot(login) {
@@ -182,13 +187,32 @@ function hasSensitivePath(paths, patterns) {
   return paths.some(path => patterns.some(pattern => pathMatches(path, pattern)));
 }
 
+async function listCheckRuns(fullName, sha) {
+  const result = [];
+  for (let page = 1; page <= 20; page += 1) {
+    const response = await request('/repos/' + fullName + '/commits/' + sha + '/check-runs?per_page=100&page=' + page);
+    const batch = Array.isArray(response.check_runs) ? response.check_runs : [];
+    result.push(...batch);
+    if (batch.length < 100) return result;
+  }
+  throw new Error('Check-run pagination limit reached for ' + fullName + '@' + sha);
+}
+
+async function listCommitStatuses(fullName, sha) {
+  const result = [];
+  for (let page = 1; page <= 20; page += 1) {
+    const batch = await request('/repos/' + fullName + '/commits/' + sha + '/statuses?per_page=100&page=' + page);
+    if (!Array.isArray(batch)) throw new Error('Expected commit statuses array for ' + fullName + '@' + sha);
+    result.push(...batch);
+    if (batch.length < 100) return result;
+  }
+  throw new Error('Commit-status pagination limit reached for ' + fullName + '@' + sha);
+}
+
 async function getCheckState(fullName, sha, repoName, changedFiles = undefined) {
-  const [runs, statuses] = await Promise.all([
-    request('/repos/' + fullName + '/commits/' + sha + '/check-runs?per_page=100'),
-    request('/repos/' + fullName + '/commits/' + sha + '/status')
-  ]);
+  const [runs, statuses] = await Promise.all([listCheckRuns(fullName, sha), listCommitStatuses(fullName, sha)]);
   const profile = getRepositoryProfile(repoName);
-  const result = evaluateRequiredChecks(runs.check_runs || [], statuses, profile?.requiredChecks || [], changedFiles);
+  const result = evaluateRequiredChecks(runs, { statuses }, profile?.requiredChecks || [], changedFiles);
   if (result.state !== 'success') console.warn('[required-checks]', fullName, sha, JSON.stringify(result));
   return result.state;
 }
@@ -320,12 +344,16 @@ async function processPullRequest(repo, pr) {
     return;
   }
 
-  let checkState = 'missing';
-  try {
-    checkState = await getCheckState(fullName, pr.head.sha, repoName, paths);
-  } catch (error) {
-    console.warn('[checks]', fullName + '#' + pr.number, error.message);
+  if (fresh.head?.sha !== pr.head.sha) {
+    console.log('[defer]', fullName + '#' + pr.number + ': PR head changed during evaluation; retrying next poll');
+    return;
   }
+  const checkSha = pullRequestCheckSha(fresh);
+  if (!checkSha) {
+    console.log('[defer]', fullName + '#' + pr.number + ': merge commit SHA is not available yet');
+    return;
+  }
+  const checkState = await getCheckState(fullName, checkSha, repoName, paths);
 
   if (checkState !== 'success') {
     const label = checkState === 'failure' ? 'ci-failed' : (checkState === 'pending' ? 'ci-pending' : 'ci-missing');
