@@ -25,6 +25,7 @@ test('central profiles cover every active organization repository and fail close
   }
   assert.equal(getRepositoryProfile('ForgeHelm').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('ForgeHelm').requiredChecks, ['verify / Verify (ForgeHelm)']);
+  assert.deepEqual(getRepositoryProfile('ThanhNguyxnOrg.github.io').requiredChecks, ['verify / Verify (Website)']);
   assert.equal(getRepositoryProfile('SkillGauge').pendingLabel, 'skill-verification-pending');
   assert.ok(getRepositoryProfile('SkillGauge').requiredChecks.includes('verify / Verify (SkillGauge)'));
 });
