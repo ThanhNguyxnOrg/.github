@@ -41,6 +41,7 @@ jobs:
           permission-checks: read
           permission-statuses: read
           permission-contents: write
+          permission-workflows: write
           permission-actions: read
 
       - name: Test release policy helpers
