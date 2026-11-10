@@ -79,6 +79,9 @@ export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
   if (dependencyBot || /\b(dependencies|dependency|bump|update package|update action)\b/i.test(title)) {
     labels.add('dependencies');
   }
+  if (dependencyBot && ['major', 'downgrade'].includes(classifyVersionUpdate(title))) {
+    labels.add('major-update');
+  }
   if (/\b(security|vulnerability|CVE-\d{4}-\d+|exploit|credential leak)\b/i.test(text)) {
     labels.add('security');
   }
@@ -321,9 +324,9 @@ async function processPullRequest(repo, pr) {
   }
 
   const existingLabels = names(pr.labels);
-  if ([...config.blockingLabels].some(label => existingLabels.has(label))) {
-    console.log('[review]', fullName + '#' + pr.number + ': an existing blocking label requires human review');
-    return;
+  const activeBlocks = [...config.blockingLabels].filter(label => existingLabels.has(label));
+  if (activeBlocks.length) {
+    console.log('[review]', fullName + '#' + pr.number + ': human review remains required because of ' + activeBlocks.join(', '));
   }
 
   let fresh;

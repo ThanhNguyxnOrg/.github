@@ -17,6 +17,19 @@ test('dependency updates are classified for human review, never automatic merge'
   assert.ok(!labels.includes('automerge'));
 });
 
+test('major and downgrade dependency updates receive the major-update label', () => {
+  const major = classifyPullRequestLabels(
+    { title: 'Bump package from 1.4.0 to 2.0.0', user: { login: 'dependabot[bot]' } },
+    ['package.json']
+  );
+  const downgrade = classifyPullRequestLabels(
+    { title: 'Bump package from 2.0.0 to 1.9.0', user: { login: 'renovate[bot]' } },
+    ['package.json']
+  );
+  assert.ok(major.includes('major-update'));
+  assert.ok(downgrade.includes('major-update'));
+});
+
 test('PR title and changed files produce useful type and area labels', () => {
   const labels = classifyPullRequestLabels(
     { title: 'feat(editor): add keyboard shortcuts', user: { login: 'contributor' } },
