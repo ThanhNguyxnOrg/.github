@@ -70,6 +70,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     defaults:
       run:
+        shell: bash
         working-directory: ${{ inputs.working_directory }}
     steps:
       - uses: actions/checkout@v7

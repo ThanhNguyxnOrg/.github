@@ -47,6 +47,9 @@ jobs:
   verify:
     name: ${{ inputs.job_name }}
     runs-on: ${{ inputs.runner }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7
         with:
