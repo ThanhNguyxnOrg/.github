@@ -5,6 +5,13 @@ import { evaluateRequiredChecks, getRepositoryProfile, matchesPathPattern } from
 test('repository profiles are centrally defined and unknown repositories fail closed', () => {
   assert.equal(getRepositoryProfile('WriteCanvas').defaultBranch, 'master');
   assert.equal(getRepositoryProfile('WriteCanvas').autoMergeDependabot, true);
+  assert.deepEqual(getRepositoryProfile('WriteCanvas').requiredChecks, [
+    'tests (ubuntu-latest, 22.x) / ubuntu-latest / node 22.x',
+    'tests (ubuntu-latest, 24.x) / ubuntu-latest / node 24.x',
+    'tests (windows-latest, 22.x) / windows-latest / node 22.x',
+    'tests (macos-latest, 22.x) / macos-latest / node 22.x',
+    'syntax / syntax check'
+  ]);
   assert.equal(getRepositoryProfile('unregistered-repo'), null);
 });
 
