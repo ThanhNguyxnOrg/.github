@@ -7,7 +7,14 @@
     "fix": "patch",
     "perf": "patch",
     "revert": "patch",
-    "otherTypes": "no release"
+    "otherTypes": "no release",
+    "ignoredScopes": [
+      "release",
+      "ci",
+      "build",
+      "docs",
+      "meta"
+    ]
   },
   "repositories": {
     "judgeloom-core": {
