@@ -226,21 +226,6 @@ async function requestReview(fullName, pr, labels, reason) {
 }
 
 async function mergePullRequest(fullName, pr) {
-  const reviewPath = '/repos/' + fullName + '/pulls/' + pr.number + '/reviews';
-  try {
-    await request(reviewPath, {
-      method: 'POST',
-      body: {
-        event: 'APPROVE',
-        body: 'Approved by ThanhNguyxnAgent after the central safety policy and reported CI checks passed.'
-      }
-    });
-  } catch (error) {
-    // A previous approval or an approval restriction must not trigger a bypass.
-    console.warn('[approval]', fullName + '#' + pr.number, error.message);
-  }
-
-  await addLabels(fullName, pr.number, ['agent-auto-merge']);
   try {
     const result = await request('/repos/' + fullName + '/pulls/' + pr.number + '/merge', {
       method: 'PUT',
