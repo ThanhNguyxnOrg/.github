@@ -8,7 +8,8 @@ The organization keeps repeated automation primitives in `.github`. Project repo
 - Use a composite action for a sequence of steps inside an existing job (Agent token creation, Git identity, comments, or asset upload).
 - Keep project-specific compiler, dependency, signing, packaging, and platform-matrix steps in the project adapter. A Qt/MSVC/CMake app, a Tauri app, a Go CLI, and an Electron app do not share the same build commands.
 - Pin calls into this repository to a full commit SHA. Update pins deliberately when the central library changes.
-- Do not pass all repository secrets to a called workflow. Pass only `BOT_APP_ID` and `BOT_PRIVATE_KEY`.
+- For Agent automation, do not pass all repository secrets to a called workflow; pass only `BOT_APP_ID` and `BOT_PRIVATE_KEY`.
+- For third-party publishing, use the credential documented in [organization-secrets.md](organization-secrets.md). Keep platform-specific publishing in the project adapter until at least two repositories share the same build/publish contract. If a reusable publisher is introduced, declare each required credential explicitly under `workflow_call.secrets`; never use `secrets: inherit`.
 - The Agent-token action scopes tokens to the calling repository by default. Do not set `owner` without a repository allowlist unless organization-wide access is specifically required.
 - Every automated write must use the GitHub App installation token. The default `GITHUB_TOKEN` is read-only in project workflows and must not be used for bot commits, comments, tags, release edits, or package-registry writes.
 
@@ -30,6 +31,19 @@ secrets:
 The App installation must have only the repository permissions required by the workflows. Token profiles in `.github/actions/agent-token` request narrow permissions. Installation tokens expire after one hour, so mint them inside the job that performs the write.
 
 For Git commits, use `.github/actions/agent-git-identity` and check out the repository with the same installation token. This sets both author and committer to `ThanhNguyxnAgent[bot]`; the token determines the actor for the push/API operation. Setting the Git name alone does not authenticate a push as the Agent.
+
+## Platform publishing credentials
+
+Organization-level publishing credentials are shared only with explicitly authorized repositories; they do not belong in the game repository or in reusable-workflow source. The canonical inventory and access policy is [Organization Secrets](organization-secrets.md).
+
+For the current itch.io integration:
+- `BUTLER_API_KEY` is the Organization Actions secret (itch.io key source: `wharf`).
+- The project workflow reads it directly as `secrets.BUTLER_API_KEY` in the publish job.
+- Each caller repository keeps its own `ITCHIO_GAME` repository variable because the account/project slug is project-specific.
+- Keep the build, archive validation, and browser smoke tests in the project adapter. Only the credential is shared.
+- When a second project adopts an equivalent verified-ZIP-to-Butler contract, evaluate extracting the publish job into a reusable workflow with an explicit `BUTLER_API_KEY` input contract. Until then, avoid adding a one-consumer abstraction.
+
+Never put actual secret values in documentation, workflow inputs, artifacts, or command arguments. Expose the key only as a masked environment variable to the Butler process.
 
 ## Reusable workflows
 
