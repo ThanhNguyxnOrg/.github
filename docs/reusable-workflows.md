@@ -33,9 +33,9 @@ For Git commits, use `.github/actions/agent-git-identity` and check out the repo
 
 ## Reusable workflows
 
-- `ci-node.yml`: Node.js setup, npm/pnpm/yarn/Bun install, optional preparation, validation, lint, typecheck, test, build, post-build verification, and optional CI artifact upload. Supports explicit Node version or version files and lockfile-aware caching.
+- `ci-node.yml`: Node.js setup, npm/pnpm/yarn/Bun install, optional preparation, validation, lint, typecheck, test, build, post-build verification, and optional CI artifact upload. Supports explicit Node version or version files and lockfile-aware caching. All command steps use Bash explicitly, including on Windows runners, so caller commands behave consistently across operating systems.
 - `ci-python.yml`: Python setup, pip caching, dependency installation, lint, typecheck, test, build, and optional CI artifact upload.
-- `ci-go.yml`: Go setup, module caching, test, vet, build, and optional CI artifact upload.
+- `ci-go.yml`: Go setup, module caching, optional lint-tool installation and lint command, test, vet, build, and optional CI artifact upload.
 - `ci-cmake.yml`: CMake configure, build, test, optional system dependencies, and optional CI artifact upload; use custom project adapters for extra Qt/MSVC/NASM or other system requirements.
 
 All shared CI workflows expose an explicit `job_name` so the check-run name can match `ci-policy.json`. They default to read-only checkout credentials and `contents: read`. CI artifacts are optional; do not upload every intermediate build by default. Keep short-lived CI artifacts only when another job or a human reviewer consumes them.
@@ -51,7 +51,7 @@ Each project release adapter does only the project-specific work. The release co
 2. Place final distributables in a flat `dist/release/` directory.
 3. Upload each platform's files as a GitHub Actions artifact named `release-assets-<platform>` (for a single job, `release-assets` is also valid).
 4. Call the central `release-publish.yml` job after all build jobs complete.
-5. Do not add a schedule or `push` trigger to the release build adapter. It listens for the central controller's new tag event; duplicate tag events are harmlessly rejected by tag/release checks.
+5. Do not add a schedule or ordinary `push` trigger to the release build adapter. It listens for the central controller's new tag event. A `workflow_dispatch` recovery input may be provided, but it must accept only an existing `vX.Y.Z` tag, check out that exact tag, and must never create or move a tag. Duplicate tag events are harmlessly rejected by tag/release checks.
 
 Example caller:
 
@@ -79,7 +79,7 @@ jobs:
       BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
 ```
 
-The central `release-policy.json` is the only required-asset manifest. Build adapters must produce filenames matching `requiredAssets`, including the supported `{tag}` and `{version}` placeholders. The publisher refuses to upload when a required local file is missing, refuses to mutate a published release, replaces only changed same-name assets in an existing draft, verifies SHA-256 after upload, and leaves publication to the central Release Controller.
+The central `release-policy.json` is the only required-asset manifest. Build adapters must produce filenames matching `requiredAssets`, including the supported `{tag}` and `{version}` placeholders. The publisher refuses to upload when a required local file is missing, refuses to mutate a published release, replaces only changed same-name assets in an existing draft, verifies SHA-256 after upload, and leaves publication to the central Release Controller. Release lookup first tries the tag endpoint and then checks the release collection by exact `tag_name`; an HTTP 404 from the tag endpoint alone must not create a duplicate draft. Legacy orphan drafts may be repaired only when the release name and target commit SHA both match the requested tag.
 
 Do not add a second version bump, changelog generator, tag creator, or GitHub Release publisher in the project adapter. The central Release Controller already owns those decisions.
 
