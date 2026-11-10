@@ -37,7 +37,13 @@
       ],
       "changelogPath": "CHANGELOG.md",
       "requireSuccessfulChecks": true,
-      "releaseWorkflowName": "release-cogmint"
+      "releaseWorkflowName": "release-cogmint",
+      "requiredAssets": [
+        "cogmint-linux-x64.tar.gz",
+        "cogmint-windows-x64.zip",
+        "cogmint-macos-arm64.tar.gz",
+        "checksums.txt"
+      ]
     },
     "lagvex": {
       "branch": "main",
@@ -47,7 +53,15 @@
       "versionFiles": [],
       "changelogPath": "CHANGELOG.md",
       "requireSuccessfulChecks": true,
-      "releaseWorkflowName": "🚀 Build & Publish Release 📦"
+      "releaseWorkflowName": "🚀 Build & Publish Release 📦",
+      "requiredAssets": [
+        "checksums.txt",
+        "lagvex-relay-{tag}-linux-amd64.tar.gz",
+        "lagvex-{tag}-darwin-amd64.tar.gz",
+        "lagvex-{tag}-darwin-arm64.tar.gz",
+        "lagvex-{tag}-linux-amd64.tar.gz",
+        "lagvex-{tag}-windows-amd64.zip"
+      ]
     },
     "ClipForge": {
       "branch": "main",
@@ -64,7 +78,12 @@
       ],
       "changelogPath": "CHANGELOG.md",
       "requireSuccessfulChecks": true,
-      "releaseWorkflowName": "Release 📦"
+      "releaseWorkflowName": "Release 📦",
+      "requiredAssets": [
+        "ClipForge-{version}-windows-x64-qt.zip",
+        "ClipForge-{version}-windows-x64.zip",
+        "ClipForge-cli-{version}-windows-x64.exe"
+      ]
     },
     "LayoutLingua": {
       "branch": "main",
@@ -87,7 +106,13 @@
       ],
       "changelogPath": "CHANGELOG.md",
       "requireSuccessfulChecks": true,
-      "releaseWorkflowName": "Release 3 Desktop Platforms"
+      "releaseWorkflowName": "Release 3 Desktop Platforms",
+      "requiredAssets": [
+        "LayoutLingua-linux-x86_64.AppImage",
+        "LayoutLingua-macos-apple-silicon.dmg",
+        "LayoutLingua-macos-intel.dmg",
+        "LayoutLingua-windows-x86_64.exe"
+      ]
     },
     "Locsight": {
       "branch": "main",
@@ -122,7 +147,23 @@
       ],
       "changelogPath": "CHANGELOG.md",
       "requireSuccessfulChecks": true,
-      "releaseWorkflowName": "Release"
+      "releaseWorkflowName": "Release",
+      "requiredAssets": [
+        "Locsight-{version}-1.aarch64.rpm",
+        "Locsight-{version}-1.x86_64.rpm",
+        "Locsight_{version}_aarch64.app.tar.gz",
+        "Locsight_{version}_aarch64.AppImage",
+        "Locsight_{version}_aarch64.dmg",
+        "Locsight_{version}_amd64.AppImage",
+        "Locsight_{version}_amd64.deb",
+        "Locsight_{version}_arm64-setup.exe",
+        "Locsight_{version}_arm64.deb",
+        "Locsight_{version}_arm64_en-US.msi",
+        "Locsight_{version}_x64-setup.exe",
+        "Locsight_{version}_x64.app.tar.gz",
+        "Locsight_{version}_x64.dmg",
+        "Locsight_{version}_x64_en-US.msi"
+      ]
     },
     "PurgeKit": {
       "branch": "main",
@@ -157,7 +198,11 @@
       ],
       "changelogPath": "CHANGELOG.md",
       "requireSuccessfulChecks": true,
-      "releaseWorkflowName": "Release Windows App"
+      "releaseWorkflowName": "Release Windows App",
+      "requiredAssets": [
+        "PurgeKit_x64-setup.exe",
+        "PurgeKit_x64_en-US.msi"
+      ]
     },
     "WriteCanvas": {
       "branch": "master",
@@ -191,7 +236,15 @@
       ],
       "changelogPath": "CHANGELOG.md",
       "requireSuccessfulChecks": true,
-      "releaseWorkflowName": "Release"
+      "releaseWorkflowName": "Release",
+      "requiredAssets": [
+        "WriteCanvas-{version}-linux-arm64.AppImage",
+        "WriteCanvas-{version}-linux-x86_64.AppImage",
+        "WriteCanvas-{version}-mac-arm64.dmg",
+        "WriteCanvas-{version}-mac-x64.dmg",
+        "WriteCanvas.Setup.{version}.exe",
+        "writecanvas_{version}_amd64.deb"
+      ]
     },
     "git-account-switcher": {
       "branch": "master",
@@ -214,7 +267,20 @@
       ],
       "changelogPath": "CHANGELOG.md",
       "requireSuccessfulChecks": true,
-      "releaseWorkflowName": "Release"
+      "releaseWorkflowName": "Release",
+      "requiredAssets": [
+        "gswitch-{tag}.tar.gz",
+        "gswitch-{tag}.zip",
+        "gswitch.json",
+        "gswitch.rb",
+        "install.ps1",
+        "install.sh",
+        "uninstall.ps1",
+        "uninstall.sh",
+        "update.ps1",
+        "update.sh",
+        "SHA256SUMS"
+      ]
     }
   },
   "excluded": {

@@ -6,6 +6,12 @@ on:
     paths:
       - '.github/scripts/agent-controller.mjs'
       - '.github/scripts/agent-controller.test.mjs'
+      - '.github/scripts/check-policy.mjs'
+      - '.github/scripts/check-policy.test.mjs'
+      - '.github/scripts/stale-controller.mjs'
+      - '.github/scripts/stale-controller.test.mjs'
+      - 'ci-policy.json'
+      - '.github/workflows/stale.yml'
       - 'agent-policy.json'
       - '.github/workflows/agent-controller.yml'
   schedule:
@@ -32,7 +38,7 @@ jobs:
         id: agent
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         with:
-          app-id: ${{ secrets.BOT_APP_ID }}
+          client-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-checks: read
@@ -42,7 +48,7 @@ jobs:
           permission-contents: write
 
       - name: Test central policy helpers
-        run: node --test .github/scripts/agent-controller.test.mjs
+        run: node --test .github/scripts/agent-controller.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/stale-controller.test.mjs
 
       - name: Reconcile open pull requests and issues
         env:

@@ -101,7 +101,6 @@
       ]
     },
     "Techstack-Studio": {
-      "autoMergeDefault": true,
       "sensitivePaths": [
         "scripts/buildCatalogManifest*",
         "scripts/generateStandaloneSvgLibrary*",
@@ -149,5 +148,23 @@
         "main"
       ]
     }
+  },
+  "stalePolicy": {
+    "daysBeforeStale": 14,
+    "daysBeforeClose": 5,
+    "exemptLabels": [
+      "keep-me",
+      "incident",
+      "automated",
+      "security",
+      "needs-review",
+      "ci-failed",
+      "ci-pending",
+      "ci-missing",
+      "merge-conflict",
+      "workflow-update",
+      "wip",
+      "pinned"
+    ]
   }
 }

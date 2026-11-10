@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { evaluateRequiredChecks, getRepositoryProfile } from './check-policy.mjs';
 
 const TOKEN = process.env.GH_TOKEN;
 const ORG = process.env.ORG || 'ThanhNguyxnOrg';
@@ -91,23 +92,10 @@ export function classifyVersionUpdate(title) {
   return newParts[2] > oldParts[2] ? 'patch' : 'downgrade';
 }
 
-export function evaluateCheckRollup(checkRuns = [], statuses = []) {
-  const badConclusions = new Set(['failure', 'timed_out', 'cancelled', 'action_required', 'startup_failure', 'stale', 'error']);
-  const goodConclusions = new Set(['success', 'neutral', 'skipped']);
-  const runs = checkRuns || [];
-  const contexts = (statuses && statuses.statuses) || [];
-
-  if (runs.some(run => badConclusions.has(String(run.conclusion || '').toLowerCase()))) return 'failure';
-  if (contexts.some(status => ['failure', 'error'].includes(String(status.state || '').toLowerCase()))) return 'failure';
-
-  if (runs.some(run => String(run.status || '').toLowerCase() !== 'completed')) return 'pending';
-  if (contexts.some(status => String(status.state || '').toLowerCase() === 'pending')) return 'pending';
-
-  if (runs.length === 0 && contexts.length === 0) return 'missing';
-  if (runs.some(run => !goodConclusions.has(String(run.conclusion || '').toLowerCase()))) return 'missing';
-  if (contexts.some(status => String(status.state || '').toLowerCase() !== 'success')) return 'missing';
-  return 'success';
+export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredChecks = []) {
+  return evaluateRequiredChecks(checkRuns, statuses, requiredChecks).state;
 }
+
 
 function repositoryPolicy(repoName) {
   return config.repositories?.[repoName] || {};
@@ -194,13 +182,17 @@ function hasSensitivePath(paths, patterns) {
   return paths.some(path => patterns.some(pattern => pathMatches(path, pattern)));
 }
 
-async function getCheckState(fullName, sha) {
+async function getCheckState(fullName, sha, repoName) {
   const [runs, statuses] = await Promise.all([
     request('/repos/' + fullName + '/commits/' + sha + '/check-runs?per_page=100'),
     request('/repos/' + fullName + '/commits/' + sha + '/status')
   ]);
-  return evaluateCheckRollup(runs.check_runs || [], statuses);
+  const profile = getRepositoryProfile(repoName);
+  const result = evaluateRequiredChecks(runs.check_runs || [], statuses, profile?.requiredChecks || []);
+  if (result.state !== 'success') console.warn('[required-checks]', fullName, sha, JSON.stringify(result));
+  return result.state;
 }
+
 
 async function requestReview(fullName, pr, labels, reason) {
   const labelNames = ['needs-review', ...labels];
@@ -243,13 +235,15 @@ async function processPullRequest(repo, pr) {
   const fullName = repo.full_name;
   const repoName = repo.name;
   const policy = repositoryPolicy(repoName);
+  const checkProfile = getRepositoryProfile(repoName);
   const labels = names(pr.labels);
   const author = pr.user?.login || '';
   const dependabot = author === 'dependabot[bot]' || author === 'renovate[bot]';
   const explicitAutoMerge = hasExplicitAutoMergeLabel(pr.labels, policy);
 
   if (pr.draft) return;
-  if (policy.allowedBaseBranches && !policy.allowedBaseBranches.includes(pr.base.ref)) {
+  const allowedBaseBranches = policy.allowedBaseBranches || [checkProfile?.defaultBranch || repo.default_branch].filter(Boolean);
+  if (!allowedBaseBranches.includes(pr.base.ref)) {
     await requestReview(fullName, pr, ['triage-needed'], 'target branch is outside the repository policy');
     return;
   }
@@ -261,6 +255,10 @@ async function processPullRequest(repo, pr) {
 
   let candidate = false;
   if (dependabot) {
+    if (checkProfile?.autoMergeDependabot !== true) {
+      await requestReview(fullName, pr, ['needs-review'], 'automatic dependency merging is not enabled in this repository central profile');
+      return;
+    }
     const updateType = classifyVersionUpdate(pr.title);
     if (updateType === 'major' || updateType === 'downgrade' || updateType === 'unknown' || updateType === 'unchanged') {
       await requestReview(fullName, pr, ['major-update'], 'dependency version could not be classified as a safe patch/minor update');
@@ -320,14 +318,14 @@ async function processPullRequest(repo, pr) {
 
   let checkState = 'missing';
   try {
-    checkState = await getCheckState(fullName, pr.head.sha);
+    checkState = await getCheckState(fullName, pr.head.sha, repoName);
   } catch (error) {
     console.warn('[checks]', fullName + '#' + pr.number, error.message);
   }
 
   if (checkState !== 'success') {
     const label = checkState === 'failure' ? 'ci-failed' : (checkState === 'pending' ? 'ci-pending' : 'ci-missing');
-    await requestReview(fullName, pr, [label], 'CI state is ' + checkState + '; the Agent will not merge without successful checks');
+    await requestReview(fullName, pr, [label], 'Required CI gate is ' + checkState + '; every centrally configured check must exist and succeed');
     return;
   }
 

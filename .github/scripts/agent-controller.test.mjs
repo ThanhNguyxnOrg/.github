@@ -11,11 +11,11 @@ test('Dependabot update classification is SemVer-aware', () => {
 });
 
 test('check rollup requires evidence and rejects failed or incomplete checks', () => {
-  assert.equal(evaluateCheckRollup([], []), 'missing');
-  assert.equal(evaluateCheckRollup([{ status: 'in_progress' }], []), 'pending');
-  assert.equal(evaluateCheckRollup([{ status: 'completed', conclusion: 'failure' }], []), 'failure');
-  assert.equal(evaluateCheckRollup([{ status: 'completed', conclusion: 'success' }], []), 'success');
-  assert.equal(evaluateCheckRollup([{ status: 'completed', conclusion: 'success' }], { statuses: [{ state: 'pending' }] }), 'pending');
+  assert.equal(evaluateCheckRollup([], {}, ['tests']), 'missing');
+  assert.equal(evaluateCheckRollup([{ name: 'tests', status: 'in_progress' }], {}, ['tests']), 'pending');
+  assert.equal(evaluateCheckRollup([{ name: 'tests', status: 'completed', conclusion: 'failure' }], {}, ['tests']), 'failure');
+  assert.equal(evaluateCheckRollup([{ name: 'tests', status: 'completed', conclusion: 'success' }], {}, ['tests']), 'success');
+  assert.equal(evaluateCheckRollup([], {}, []), 'unconfigured');
 });
 
 

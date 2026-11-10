@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "organization": "ThanhNguyxnOrg",
+  "defaults": {
+    "autoMergeDependabot": false,
+    "requiredChecks": []
+  },
+  "repositories": {
+    "judgeloom-core": {
+      "defaultBranch": "master",
+      "autoMergeDependabot": false,
+      "requiredChecks": [
+        "Lint • Typecheck • Test (Python 3.12)",
+        "Go worker test • vet"
+      ]
+    },
+    "blendops": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": false,
+      "requiredChecks": [
+        "cli-cross-platform (ubuntu-latest)",
+        "cli-cross-platform (windows-latest)",
+        "cli-cross-platform (macos-latest)",
+        "docs"
+      ]
+    },
+    "apidex-hub": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": false,
+      "requiredChecks": [
+        "check-links",
+        "lint"
+      ]
+    },
+    "lumeo": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": false,
+      "requiredChecks": [
+        "lint-and-syntax"
+      ]
+    },
+    "cogmint": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": true,
+      "requiredChecks": [
+        "Typecheck"
+      ]
+    },
+    "awesome-cert-sherpa": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": true,
+      "requiredChecks": [
+        "Build & Validate"
+      ]
+    },
+    "Snapbooth": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": true,
+      "requiredChecks": [
+        "build"
+      ]
+    },
+    "Locsight": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": true,
+      "requiredChecks": [
+        "build-tauri (windows-latest, x64)",
+        "build-tauri (macos-latest, x64)",
+        "build-tauri (ubuntu-latest, x64)"
+      ]
+    },
+    "PurgeKit": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": true,
+      "requiredChecks": [
+        "checks"
+      ]
+    },
+    "LayoutLingua": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": true,
+      "requiredChecks": [
+        "Test (ubuntu-latest)",
+        "Test (windows-latest)",
+        "Test (macos-latest)"
+      ]
+    },
+    "lagvex": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": true,
+      "requiredChecks": [
+        "🧪 Tests & Lint",
+        "🔨 Cross-Compile Check (linux, amd64, bin/lagvex-client-linux-amd64)",
+        "🔨 Cross-Compile Check (windows, amd64, bin/lagvex-client.exe)",
+        "🔨 Cross-Compile Check (darwin, arm64, bin/lagvex-client-darwin-arm64)",
+        "🔨 Cross-Compile Check (linux, amd64, bin/lagvex-relay, ./cmd/lagvex-relay)"
+      ]
+    },
+    "git-account-switcher": {
+      "defaultBranch": "master",
+      "autoMergeDependabot": true,
+      "requiredChecks": [
+        "Bash (ubuntu-latest)",
+        "Windows PowerShell",
+        "Bash (macos-latest)"
+      ]
+    },
+    "ClipForge": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": true,
+      "requiredChecks": [
+        "🐧 g++ C++ backend (ubuntu)",
+        "🪟 MSVC + NASM (windows)",
+        "🔖 Version consistency"
+      ]
+    },
+    "WriteCanvas": {
+      "defaultBranch": "master",
+      "autoMergeDependabot": true,
+      "requiredChecks": [
+        "tests / ubuntu-latest / node 22.x",
+        "tests / ubuntu-latest / node 24.x",
+        "tests / windows-latest / node 22.x",
+        "tests / macos-latest / node 22.x",
+        "syntax check"
+      ]
+    },
+    "Techstack-Studio": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": true,
+      "requiredChecks": [
+        "Verify"
+      ]
+    },
+    "StepDSA": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": true,
+      "requiredChecks": [
+        "test"
+      ]
+    }
+  }
+}

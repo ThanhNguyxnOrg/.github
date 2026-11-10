@@ -1,4 +1,4 @@
-name: Mark stale issues
+name: Organization-wide stale issue and PR controller
 
 on:
   schedule:
@@ -6,20 +6,36 @@ on:
   workflow_dispatch:
 
 permissions:
-  issues: write
-  pull-requests: write
+  contents: read
+
+concurrency:
+  group: thanhnguyxnagent-stale-controller
+  cancel-in-progress: false
 
 jobs:
-  stale:
+  reconcile:
+    name: Mark and close stale organization issues and pull requests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/stale@v11
+      - name: Checkout central policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Create organization-wide Agent token
+        id: agent
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         with:
-          days-before-stale: 14
-          days-before-close: 5
-          exempt-issue-labels: keep-me
-          exempt-pr-labels: keep-me
-          stale-issue-message: "This issue has been quiet for 14 days and was marked stale. Comment or add the `keep-me` label to keep it open."
-          close-issue-message: "Closing after 5 more quiet days. Reopen anytime with a new comment."
-          stale-pr-message: "This pull request has been quiet for 14 days and was marked stale. Push a commit or comment to keep it alive."
-          operations-per-run: 30
+          client-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Test stale policy helpers
+        run: node --test .github/scripts/stale-controller.test.mjs
+
+      - name: Reconcile stale issues and pull requests
+        env:
+          GH_TOKEN: ${{ steps.agent.outputs.token }}
+          ORG: ${{ github.repository_owner }}
+        run: node .github/scripts/stale-controller.mjs

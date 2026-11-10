@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, pendingDraftReleases } from './release-controller.mjs';
+import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, pendingDraftReleases, missingRequiredAssets } from './release-controller.mjs';
 
 const policy = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
@@ -91,12 +91,25 @@ test('JSON version paths preserve the project manifest while updating configured
   assert.equal(JSON.parse(tauriFile).productName, 'PurgeKit');
 });
 
-test('only one unpublished draft per version is eligible for publication', () => {
-  const olderDraft = { id: 1, tag_name: 'v1.1.1', draft: true };
-  const newerDraft = { id: 2, tag_name: 'v1.1.1', draft: true };
+test('only the newest unpublished draft per version is eligible for publication', () => {
+  const olderDraft = { id: 1, tag_name: 'v1.1.1', draft: true, created_at: '2026-11-09T10:00:00Z' };
+  const newerDraft = { id: 2, tag_name: 'v1.1.1', draft: true, created_at: '2026-11-10T10:00:00Z' };
   const published = { id: 3, tag_name: 'v1.1.1', draft: false };
   assert.deepEqual(pendingDraftReleases([olderDraft]), [olderDraft]);
-  assert.deepEqual(pendingDraftReleases([olderDraft, newerDraft]), [olderDraft]);
+  assert.deepEqual(pendingDraftReleases([olderDraft, newerDraft]), [newerDraft]);
   assert.deepEqual(pendingDraftReleases([olderDraft, published]), []);
   assert.deepEqual(pendingDraftReleases([{ id: 4, tag_name: 'untagged-abc', draft: true }]), []);
+});
+
+test('required release assets are verified by name and version placeholders', () => {
+  const tag = 'v1.2.3';
+  const manifest = ['app-{tag}.zip', 'checksums.txt', 'App-{version}.dmg'];
+  const assets = [
+    { name: 'app-v1.2.3.zip', state: 'uploaded' },
+    { name: 'checksums.txt', state: 'uploaded' },
+    { name: 'App-1.2.3.dmg', state: 'uploaded' }
+  ];
+  assert.deepEqual(missingRequiredAssets(assets, manifest, tag), []);
+  assert.deepEqual(missingRequiredAssets(assets.slice(0, 2), manifest, tag), ['App-1.2.3.dmg']);
+  assert.deepEqual(missingRequiredAssets([{ name: 'app-v1.2.3.zip', state: 'new' }], ['app-{tag}.zip'], tag), ['app-v1.2.3.zip']);
 });

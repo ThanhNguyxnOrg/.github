@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
+import { evaluateRequiredChecks, getRepositoryProfile } from './check-policy.mjs';
 
 const TOKEN = process.env.GH_TOKEN;
 const ORG = process.env.ORG || 'ThanhNguyxnOrg';
@@ -163,22 +164,17 @@ function highestVersionTag(refs) {
   return tags.length ? tags[tags.length - 1] : null;
 }
 
-async function checkState(fullName, sha) {
+async function checkState(fullName, sha, repoName) {
   const [checks, statuses] = await Promise.all([
     api('/repos/' + fullName + '/commits/' + sha + '/check-runs?per_page=100'),
     api('/repos/' + fullName + '/commits/' + sha + '/status')
   ]);
-  const runs = checks.check_runs || [];
-  const contexts = statuses.statuses || [];
-  if (runs.some(run => ['failure', 'timed_out', 'cancelled', 'action_required', 'startup_failure', 'stale', 'error'].includes(String(run.conclusion || '').toLowerCase()))) return 'failure';
-  if (contexts.some(status => ['failure', 'error'].includes(String(status.state || '').toLowerCase()))) return 'failure';
-  if (runs.some(run => String(run.status || '').toLowerCase() !== 'completed')) return 'pending';
-  if (contexts.some(status => String(status.state || '').toLowerCase() === 'pending')) return 'pending';
-  if (!runs.length && !contexts.length) return 'missing';
-  if (runs.some(run => !['success', 'neutral', 'skipped'].includes(String(run.conclusion || '').toLowerCase()))) return 'missing';
-  if (contexts.some(status => String(status.state || '').toLowerCase() !== 'success')) return 'missing';
-  return 'success';
+  const profile = getRepositoryProfile(repoName);
+  const result = evaluateRequiredChecks(checks.check_runs || [], statuses, profile?.requiredChecks || []);
+  if (result.state !== 'success') console.warn('[release-required-checks]', fullName, sha, JSON.stringify(result));
+  return result.state;
 }
+
 
 async function getFile(fullName, path, ref) {
   const encoded = path.split('/').map(encodeURIComponent).join('/');
@@ -228,18 +224,28 @@ function makeTagName(version) {
 }
 
 export function pendingDraftReleases(releases) {
-  const seenTags = new Set((releases || [])
-    .filter(release => !release.draft)
-    .map(release => release.tag_name));
-  const pending = [];
-  for (const release of releases || []) {
-    const tag = String(release.tag_name || '');
-    if (!release.draft || !/^v\d+\.\d+\.\d+/.test(tag) || seenTags.has(tag)) continue;
-    seenTags.add(tag);
-    pending.push(release);
+  const items = Array.isArray(releases) ? releases : [];
+  const publishedTags = new Set(items.filter(item => !item.draft).map(item => item.tag_name));
+  const newestByTag = new Map();
+  for (const item of items) {
+    const tag = String(item.tag_name || '');
+    if (!item.draft || !parseSemver(tag) || publishedTags.has(tag)) continue;
+    const previous = newestByTag.get(tag);
+    if (!previous || String(item.created_at || '') > String(previous.created_at || '')) newestByTag.set(tag, item);
   }
-  return pending;
+  return [...newestByTag.values()].sort((a, b) => String(a.tag_name).localeCompare(String(b.tag_name)));
 }
+
+export function missingRequiredAssets(assets, patterns, tag) {
+  const uploadedNames = new Set((Array.isArray(assets) ? assets : [])
+    .filter(asset => asset.state === 'uploaded')
+    .map(asset => String(asset.name || '')));
+  const version = String(tag || '').replace(/^v/, '');
+  return (Array.isArray(patterns) ? patterns : [])
+    .map(pattern => String(pattern).replaceAll('{tag}', tag).replaceAll('{version}', version))
+    .filter(expected => !uploadedNames.has(expected));
+}
+
 
 export function releaseNotesFromChangelog(changelog, version) {
   const escaped = String(version).replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
@@ -346,7 +352,12 @@ async function publishReadyDrafts(repoName, rule) {
     const tag = String(release.tag_name || '');
     if (!release.draft || !/^v\d+\.\d+\.\d+/.test(tag)) continue;
     if (!pendingIds.has(release.id)) {
-      console.warn('[release-duplicate-draft]', fullName, tag, '— an existing published release or newer draft already owns this tag; skipping orphan draft', release.id);
+      const published = releases.find(item => !item.draft && item.tag_name === tag);
+      if (release.assets?.length && published && !(published.assets || []).length) {
+        console.error('[release-recovery-required]', fullName, tag, 'published release has no assets; orphan draft', release.id, 'retains', release.assets.length, 'assets. Preserve this draft until assets are recovered.');
+      } else {
+        console.warn('[release-duplicate-draft]', fullName, tag, '— an existing published release or newer draft already owns this tag; skipping orphan draft', release.id);
+      }
       continue;
     }
     await ensureTagRef(fullName, tag, release.target_commitish);
@@ -376,6 +387,16 @@ async function publishReadyDrafts(repoName, rule) {
     }
     if (latest.conclusion !== 'success') {
       console.warn('[release-build-failed]', fullName, tag, 'workflow conclusion:', latest.conclusion, '— draft kept unpublished');
+      continue;
+    }
+
+    if (!Array.isArray(rule.requiredAssets) || !rule.requiredAssets.length) {
+      console.error('[release-assets-unconfigured]', fullName, tag, '— build workflow is configured but requiredAssets is empty; draft kept unpublished');
+      continue;
+    }
+    const missingAssets = missingRequiredAssets(release.assets || [], rule.requiredAssets, tag);
+    if (missingAssets.length) {
+      console.error('[release-assets-missing]', fullName, tag, '— draft kept unpublished; missing:', missingAssets.join(', '));
       continue;
     }
 
@@ -453,7 +474,7 @@ async function reconcileRepository(repoName, rule) {
   if (pending) {
     const version = releaseIntent(pending.commit.message, rule.mode);
     const tag = makeTagName(version);
-    const state = await checkState(fullName, pending.sha);
+    const state = await checkState(fullName, pending.sha, repoName);
     if (state !== 'success') {
       console.log('[release-wait]', fullName, tag, '— CI state is ' + state);
       return;
@@ -475,7 +496,7 @@ async function reconcileRepository(repoName, rule) {
     return;
   }
 
-  const checkResult = rule.requireSuccessfulChecks ? await checkState(fullName, headSha) : 'success';
+  const checkResult = rule.requireSuccessfulChecks ? await checkState(fullName, headSha, repoName) : 'success';
   if (checkResult !== 'success') {
     console.log('[release-wait]', fullName, 'HEAD ' + headSha + ' — CI state is ' + checkResult);
     return;

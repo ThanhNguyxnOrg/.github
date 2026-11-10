@@ -1,37 +1,71 @@
 # ThanhNguyxnAgent — Organization automation
 
-The organization uses one central GitHub App controller in this repository. Do not add a second bot or copy the policy engine into individual repositories.
+The organization uses one central GitHub App control plane in this repository. Do not create a second governance bot or copy merge/release policy into product repositories.
 
-## Entry point and cadence
+## Control plane and project adapters
 
-- `.github/workflows/agent-controller.yml` runs every 10 minutes and can also be started manually.
-- `.github/scripts/agent-controller.mjs` scans active organization repositories, triages open issues and pull requests, and applies the policy in `agent-policy.json`.
-- The workflow creates a short-lived installation token from the existing `BOT_APP_ID` and `BOT_PRIVATE_KEY` organization secrets. The token is scoped to this organization and requests read access to checks/statuses plus write access to issues, pull requests and contents. `Contents: write` is required by GitHub's pull-request merge endpoint; branch protection and rulesets still apply.
+The central control plane owns organization-wide policy and decisions:
 
-## Pull request policy
+- `.github/workflows/agent-controller.yml`: issue triage, PR triage, reviewer assignment and explicitly opted-in safe dependency merges (10-minute polling).
+- `.github/workflows/release-controller.yml`: Conventional Commit classification, version/changelog commits, tags, draft releases, build-result checks and asset verification (15-minute polling).
+- `.github/workflows/stale.yml`: organization-wide stale issue/PR lifecycle (daily).
+- `agent-policy.json`, `ci-policy.json` and `release-policy.json`: central policy registries.
+- `.github/scripts/*-controller.mjs`: shared control-plane implementations.
+
+Product repositories keep their native adapters for stack-specific tests, compilation, packaging, signing and artifact upload. A Go project, Electron app, CMake project and Tauri app do not need the same build commands.
+
+## Central CI profile registry
+
+**Required checks are declared once in `ci-policy.json` in this repository. No CI-policy file is uploaded into each product repository.**
+
+Each profile records the default branch, exact required GitHub Actions check/job names, and whether Dependabot/Renovate patch/minor auto-merge is enabled.
+
+A required check must exist on the commit and finish with the exact `success` conclusion. Missing checks, skipped/neutral required checks, pending jobs and failures all hold the gate. Unconfigured repositories fail closed and require human review. A green unrelated check cannot substitute for a missing required job.
+
+Regular PRs still need an explicit `automerge`, `safe-update` or repository-allowlisted label. Dependency auto-merge additionally requires `autoMergeDependabot: true` in the central CI profile. Major, downgrade, unknown, malformed and security-sensitive updates remain human-reviewed.
+
+## Pull request safety
 
 | Change | Agent behavior |
 |---|---|
-| Dependabot/Renovate patch or minor update | Eligible only after SemVer classification, a clean mergeability check, and successful CI |
+| Dependabot/Renovate patch or minor update | Eligible only when the central profile opts in, required checks pass, mergeability is clean and no blocking path/label is present |
 | Major, downgrade, unknown, security-sensitive or malformed dependency update | Human review; never auto-merge |
 | GitHub Actions or repository workflow changes | Human review |
-| Regular pull request | Human review unless it carries an explicit `automerge` or `safe-update` label, or a repository-specific allowlisted label |
-| Failed, pending, missing or incomplete CI | Hold for human review; fail closed |
+| Regular pull request | Human review unless it has an explicit allowed auto-merge label |
+| Failed, pending, missing, skipped or unconfigured required CI | Hold for human review; fail closed |
 | Merge conflict, draft PR, blocking label or protected path | Do not merge |
 
-The controller does not check out or execute pull-request code. It reads PR metadata, changed-file names, mergeability, checks and commit statuses through the GitHub API. It must not bypass repository rulesets or branch protection.
+The controller does not check out or execute pull-request code. It reads PR metadata, changed-file names, mergeability, checks and commit statuses through the GitHub API. Branch protection/rulesets are optional repository-owner choices; this automation does not require them for a solo-maintained repository.
 
-## Issue triage
+## Release safety
 
-Open human-authored issues are categorized with labels and assigned/requested for maintainer attention. Automated, incident, keep-me, stale and wontfix issues are excluded according to policy. Security-related issues are escalated for human review.
+The central release policy owns version files, changelog path, branch, release mode and project build-workflow identity. Each build adapter remains responsible for native tests, compilation and packaging.
 
-## Repository-specific safeguards
+Before publishing a draft, the controller verifies:
+1. the configured release workflow completed successfully for the exact tag commit;
+2. every asset in that repository's central `requiredAssets` manifest exists and is uploaded.
 
-The policy in `agent-policy.json` defines allowed base branches, sensitive paths, explicit merge labels and issue exclusions. No repository may opt all regular PRs into automatic merging by default.
+If a build job is green but an expected archive is missing, the draft stays unpublished. Duplicate drafts are never deleted automatically. An orphan draft containing assets is explicitly reported for recovery.
 
-### APIDex Hub — protected exception
+Lumeo store releases remain manually approved because tag creation can trigger browser-store submission. APIDex remains excluded from generic product releases because its API catalog has a separate health/remediation lifecycle.
 
-`ThanhNguyxnOrg/apidex-hub` has a domain-specific link-health and catalog-remediation pipeline. It is not a generic dependency workflow and must remain independent:
+## Stale issue and PR lifecycle
+
+The central stale controller scans active organization repositories daily. It marks items inactive for 14 days, then closes them after a further 5-day grace period only when there has been no new activity. Items with `keep-me`, `incident`, `automated`, `security`, active CI/merge-review or workflow labels are exempt. A stable timestamp comment prevents reruns from resetting the close window.
+
+## Adding a new repository
+
+1. Keep the project's own CI workflow and make it run on pull requests to the default branch.
+2. Add one entry under `repositories` in central `ci-policy.json`: exact required job names, default branch, and the explicit `autoMergeDependabot` decision.
+3. For automatic releases, add an entry in central `release-policy.json`: branch, baseline SHA, initial version, version files, changelog, release mode, build workflow name and required asset filenames.
+4. Keep the project release workflow as a build/package adapter only. It should build from the central tag and upload files to that tag's draft release; it must not independently bump versions or create a second release.
+5. Verify the first CI run, release build and asset manifest before enabling dependency auto-merge.
+
+The worksheet is in `docs/repository-profile-template.md`. A plain-language note is a useful handoff; the machine-readable entry in this central repository is what the bot executes.
+
+## APIDex Hub — domain-specific exception
+
+`ThanhNguyxnOrg/apidex-hub` has a domain-specific link-health and catalog-remediation pipeline. It remains independent of generic PR/release automation:
 
 - Daily two-stage link checks: fast CLI scan followed by Playwright verification.
 - HTTP 401/403/418/429, WAF challenges, timeouts, SSL failures and 5xx are inconclusive, not proof an API is dead.

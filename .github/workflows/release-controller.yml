@@ -7,6 +7,9 @@ on:
       - '.github/scripts/release-controller.mjs'
       - '.github/scripts/release-controller.test.mjs'
       - 'release-policy.json'
+      - 'ci-policy.json'
+      - '.github/scripts/check-policy.mjs'
+      - '.github/scripts/check-policy.test.mjs'
       - '.github/workflows/release-controller.yml'
   schedule:
     - cron: "7,22,37,52 * * * *"
@@ -32,7 +35,7 @@ jobs:
         id: agent
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         with:
-          app-id: ${{ secrets.BOT_APP_ID }}
+          client-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-checks: read
