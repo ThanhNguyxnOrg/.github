@@ -123,7 +123,12 @@ test('a profile with no applicable required checks fails closed', () => {
 
 test('CI profiles match the real project gates and quarantine known failing or optional checks', () => {
   assert.deepEqual(getRepositoryProfile('judgeloom-core').requiredChecks, ['Lint • Typecheck • Test (Python 3.12)', 'Go worker test • vet']);
-  assert.deepEqual(getRepositoryProfile('cogmint').requiredChecks, ['Typecheck']);
+  assert.deepEqual(getRepositoryProfile('cogmint').requiredChecks, ['verify / Typecheck']);
+  assert.deepEqual(getRepositoryProfile('lumeo').requiredChecks, ['verify / lint-and-syntax']);
+  assert.deepEqual(getRepositoryProfile('Techstack-Studio').requiredChecks, ['verify / Verify']);
+  assert.deepEqual(getRepositoryProfile('StepDSA').requiredChecks, ['test / test']);
+  assert.deepEqual(getRepositoryProfile('awesome-cert-sherpa').requiredChecks, ['build / Build & Validate']);
+  assert.deepEqual(getRepositoryProfile('AFTERFRAME-THE-LAST-LOOP').requiredChecks, ['verify / Verify (Bun)']);
   assert.deepEqual(getRepositoryProfile('Snapbooth').requiredChecks, ['build']);
   assert.equal(getRepositoryProfile('cogmint').autoMergeDependabot, false);
   assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, false);
