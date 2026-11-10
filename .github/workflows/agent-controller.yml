@@ -39,6 +39,7 @@ jobs:
           permission-statuses: read
           permission-issues: write
           permission-pull-requests: write
+          permission-contents: write
 
       - name: Test central policy helpers
         run: node --test .github/scripts/agent-controller.test.mjs
