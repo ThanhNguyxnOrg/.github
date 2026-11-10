@@ -6,7 +6,7 @@ The organization uses one central GitHub App controller in this repository. Do n
 
 - `.github/workflows/agent-controller.yml` runs every 10 minutes and can also be started manually.
 - `.github/scripts/agent-controller.mjs` scans active organization repositories, triages open issues and pull requests, and applies the policy in `agent-policy.json`.
-- The workflow creates a short-lived installation token from the existing `BOT_APP_ID` and `BOT_PRIVATE_KEY` organization secrets. The token is scoped to this organization.
+- The workflow creates a short-lived installation token from the existing `BOT_APP_ID` and `BOT_PRIVATE_KEY` organization secrets. The token is scoped to this organization and requests read access to checks/statuses plus write access to issues, pull requests and contents. `Contents: write` is required by GitHub's pull-request merge endpoint; branch protection and rulesets still apply.
 
 ## Pull request policy
 
