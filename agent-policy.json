@@ -91,7 +91,6 @@
   ],
   "repositories": {
     "WriteCanvas": {
-      "autoMergeDefault": true,
       "sensitivePaths": [
         "main/**",
         "preload.js",
