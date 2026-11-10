@@ -6,6 +6,7 @@ import { evaluateRequiredChecks, getRepositoryProfile } from './check-policy.mjs
 const TOKEN = process.env.GH_TOKEN;
 const ORG = process.env.ORG || 'ThanhNguyxnOrg';
 const API = process.env.GITHUB_API_URL || 'https://api.github.com';
+const API_VERSION = '2022-11-28';
 const VERSION_EMAIL = '296222857+thanhnguyxnagent[bot]@users.noreply.github.com';
 const VERSION_NAME = 'ThanhNguyxnAgent[bot]';
 const config = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
