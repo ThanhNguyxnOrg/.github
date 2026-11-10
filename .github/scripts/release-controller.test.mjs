@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog } from './release-controller.mjs';
+import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, pendingDraftReleases } from './release-controller.mjs';
 
 const policy = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
@@ -89,4 +89,14 @@ test('JSON version paths preserve the project manifest while updating configured
   assert.equal(JSON.parse(packageFile).name, 'purgekit');
   assert.equal(JSON.parse(tauriFile).version, '1.4.0');
   assert.equal(JSON.parse(tauriFile).productName, 'PurgeKit');
+});
+
+test('only one unpublished draft per version is eligible for publication', () => {
+  const olderDraft = { id: 1, tag_name: 'v1.1.1', draft: true };
+  const newerDraft = { id: 2, tag_name: 'v1.1.1', draft: true };
+  const published = { id: 3, tag_name: 'v1.1.1', draft: false };
+  assert.deepEqual(pendingDraftReleases([olderDraft]), [olderDraft]);
+  assert.deepEqual(pendingDraftReleases([olderDraft, newerDraft]), [olderDraft]);
+  assert.deepEqual(pendingDraftReleases([olderDraft, published]), []);
+  assert.deepEqual(pendingDraftReleases([{ id: 4, tag_name: 'untagged-abc', draft: true }]), []);
 });
