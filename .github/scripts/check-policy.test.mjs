@@ -8,6 +8,25 @@ test('repository profiles are centrally defined and unknown repositories fail cl
   assert.equal(getRepositoryProfile('unregistered-repo'), null);
 });
 
+test('central profiles cover every active organization repository and fail closed by default', () => {
+  const names = [
+    'judgeloom-core', 'blendops', 'apidex-hub', 'lumeo', 'ForgeHelm',
+    'cogmint', 'awesome-cert-sherpa', 'Snapbooth', 'Locsight', 'PurgeKit',
+    'SkillGauge', 'LayoutLingua', 'lagvex', 'git-account-switcher', 'StepDSA',
+    'ThanhNguyxnOrg.github.io', 'ClipForge', 'WriteCanvas', 'Techstack-Studio',
+    'AFTERFRAME-THE-LAST-LOOP', 'chess-on-glass'
+  ];
+  for (const name of names) assert.ok(getRepositoryProfile(name), 'missing central CI profile: ' + name);
+  for (const [name, profile] of Object.entries(Object.fromEntries(names.map(name => [name, getRepositoryProfile(name)])))) {
+    assert.ok(profile.defaultBranch, name + ' must declare its default branch');
+    if (profile.autoMergeDependabot === true) {
+      assert.ok(profile.requiredChecks.length > 0, name + ' cannot auto-merge dependencies without required checks');
+    }
+  }
+  assert.equal(getRepositoryProfile('ForgeHelm').autoMergeDependabot, false);
+  assert.equal(getRepositoryProfile('SkillGauge').pendingLabel, 'skill-verification-pending');
+});
+
 test('every required check must be present and successful', () => {
   const checks = [
     { name: 'unit tests', status: 'completed', conclusion: 'success' },
