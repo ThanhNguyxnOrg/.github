@@ -86,13 +86,23 @@ export function classifyConventionalCommit(message) {
   const match = subject.match(/^([a-zA-Z][a-zA-Z0-9-]*)(?:\(([^)]+)\))?(!)?:\s+(.+)$/);
   if (!match) return null;
   const type = match[1].toLowerCase();
+  const scope = (match[2] || '').trim().toLowerCase();
+  const ignoredScopes = new Set([
+    'release',
+    'ci',
+    'build',
+    'docs',
+    'meta',
+    ...(config.conventionalCommitPolicy?.ignoredScopes || []),
+  ].map(value => String(value).trim().toLowerCase()));
+  if (scope && ignoredScopes.has(scope)) return null;
   const isBreaking = Boolean(match[3]) || /^\s*BREAKING CHANGE:\s*.+/im.test(lines.join('\n')) || /^\s*BREAKING-CHANGE:\s*.+/im.test(lines.join('\n'));
   let level = null;
   if (isBreaking) level = 'major';
   else if (type === 'feat') level = 'minor';
   else if (['fix', 'perf', 'revert'].includes(type)) level = 'patch';
   if (!level) return null;
-  return { type, scope: match[2] || '', subject: match[4].trim(), level, breaking: isBreaking };
+  return { type, scope, subject: match[4].trim(), level, breaking: isBreaking };
 }
 
 export function highestReleaseLevel(commits) {
