@@ -34,18 +34,14 @@ jobs:
       - name: Checkout central policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-      - name: Create organization-wide Agent token
+      - name: Create organization-wide ThanhNguyxnAgent token
         id: agent
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        uses: ThanhNguyxnOrg/.github/.github/actions/agent-token@4546359b3efa22e883cb808c85f3b77859690f52
         with:
+          profile: remediation
           client-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          permission-checks: read
-          permission-statuses: read
-          permission-issues: write
-          permission-pull-requests: write
-          permission-contents: write
 
       - name: Test central policy helpers
         run: node --test .github/scripts/agent-controller.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/stale-controller.test.mjs
