@@ -16,7 +16,7 @@ Quick reference for the GitHub Actions secrets configured in [ThanhNguyxnOrg](ht
 
 `BOT_APP_ID` and `BOT_PRIVATE_KEY` are used together by `actions/create-github-app-token`. The action creates a temporary installation token; later workflow steps use that token for bot operations.
 
-Example: [shared Dependabot governance workflow](../.github/workflows/reusable-dependabot-governance.yml), called by repository-local workflows such as [blendops](https://github.com/ThanhNguyxnOrg/blendops/blob/main/.github/workflows/auto-merge-dependabot.yml). See [Agent automation policy](agent-automation.md) for the decision rules and APIDex exception.
+The organization-wide Agent Controller in [agent-controller.yml](../.github/workflows/agent-controller.yml) uses these credentials for metadata-only triage and safe dependency PR governance. See [Agent automation policy](agent-automation.md) for the decision rules and APIDex exception.
 
 ## Chocolatey
 
