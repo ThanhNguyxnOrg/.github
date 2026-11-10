@@ -47,6 +47,44 @@ export function selectDraftRelease(releases, releaseTag) {
   return matches[0] || null;
 }
 
+export function selectOrphanDraftRelease(releases, releaseTag, targetSha) {
+  const tag = String(releaseTag || '');
+  const expectedSha = String(targetSha || '').toLowerCase();
+  if (!tag || !/^[0-9a-f]{40}$/.test(expectedSha)) return null;
+
+  const matches = (Array.isArray(releases) ? releases : [])
+    .filter(release => {
+      if (!release || release.draft !== true) return false;
+      if (!/^untagged-[0-9a-f]{8,}$/i.test(String(release.tag_name || ''))) return false;
+      if (String(release.target_commitish || '').toLowerCase() !== expectedSha) return false;
+      const nameParts = String(release.name || '').trim().split(/\s+/);
+      return nameParts[nameParts.length - 1] === tag;
+    })
+    .sort((a, b) => {
+      const aDate = String(a.updated_at || a.created_at || '');
+      const bDate = String(b.updated_at || b.created_at || '');
+      return bDate.localeCompare(aDate);
+    });
+  return matches[0] || null;
+}
+
+async function resolveTagCommitSha(owner, repo, releaseTag) {
+  const refUrl = `${api}/repos/${owner}/${repo}/git/ref/tags/${encodeURIComponent(releaseTag)}`;
+  let ref;
+  try {
+    ref = await request(refUrl);
+  } catch (error) {
+    if (String(error.message).startsWith('GitHub API 404:')) return null;
+    throw error;
+  }
+  if (ref.object?.type === 'commit') return ref.object.sha;
+  if (ref.object?.type === 'tag') {
+    const annotated = await request(`${api}/repos/${owner}/${repo}/git/tags/${ref.object.sha}`);
+    return annotated.object?.sha || null;
+  }
+  return null;
+}
+
 async function request(url, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -125,8 +163,30 @@ async function main() {
         break;
       }
 
+      // Older controller runs could create a draft before its Git tag existed.
+      // GitHub then retained an untagged-* release record. Recover only when
+      // its target commit and final name both identify this exact tagged build.
+      const targetSha = await resolveTagCommitSha(owner, repo, tag);
+      const orphan = targetSha ? selectOrphanDraftRelease(releases, tag, targetSha) : null;
+      if (orphan) {
+        release = await request(`${api}/repos/${owner}/${repo}/releases/${orphan.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tag_name: tag,
+            target_commitish: targetSha,
+            draft: true
+          })
+        });
+        if (release.tag_name !== tag || release.draft !== true) {
+          fail(`Unable to repair orphan draft ${orphan.id} to tag ${tag}`);
+        }
+        console.log(`[release-orphan-repaired] attached orphan draft ${orphan.id} to existing tag ${tag}`);
+        break;
+      }
+
       if (attempt === 19) {
-        fail(`Central draft release ${tag} was not found by tag lookup or exact-tag collection lookup`);
+        fail(`Central draft release ${tag} was not found by tag lookup or safe orphan-draft recovery`);
       }
       console.log(`[release-wait] draft ${tag} is not visible yet; retry ${attempt + 1}/20`);
       await new Promise(resolve => setTimeout(resolve, 5000));

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { expandRequiredAssets, planAssetUpload, selectDraftRelease } from '../actions/agent-release-assets/index.mjs';
+import { expandRequiredAssets, planAssetUpload, selectDraftRelease, selectOrphanDraftRelease } from '../actions/agent-release-assets/index.mjs';
 
 test('expands tag and version placeholders in the central asset manifest', () => {
   assert.deepEqual(
@@ -57,4 +57,32 @@ test('does not resolve published releases or tags that only partially match', ()
     { id: 7, tag_name: 'v1.1.1', draft: false },
     { id: 8, tag_name: 'v1.1.10', draft: true }
   ], 'v1.1.1'), null);
+});
+
+
+test('recovers only an untagged draft whose name and target commit match the requested tag', () => {
+  const targetSha = 'a'.repeat(40);
+  const selected = selectOrphanDraftRelease([
+    { id: 1, tag_name: 'untagged-e3ee0aa97d6964c6b5df', name: 'WriteCanvas v1.1.1', target_commitish: targetSha, draft: true },
+    { id: 2, tag_name: 'untagged-bbbb1111222233334444', name: 'WriteCanvas v1.1.1', target_commitish: 'b'.repeat(40), draft: true },
+    { id: 3, tag_name: 'untagged-cccc1111222233334444', name: 'WriteCanvas v1.1.10', target_commitish: targetSha, draft: true },
+    { id: 4, tag_name: 'v1.1.1', name: 'WriteCanvas v1.1.1', target_commitish: targetSha, draft: true },
+    { id: 5, tag_name: 'untagged-dddd1111222233334444', name: 'WriteCanvas v1.1.1', target_commitish: targetSha, draft: false }
+  ], 'v1.1.1', targetSha);
+
+  assert.equal(selected.id, 1);
+});
+
+test('does not repair ambiguous or weakly identified untagged draft records', () => {
+  const targetSha = 'a'.repeat(40);
+  assert.equal(selectOrphanDraftRelease([
+    { id: 1, tag_name: 'untagged-e3ee0aa97d6964c6b5df', name: 'WriteCanvas v1.1.1', target_commitish: targetSha, draft: true },
+    { id: 2, tag_name: 'untagged-bbbb1111222233334444', name: 'WriteCanvas release', target_commitish: targetSha, draft: true }
+  ], 'v1.1.1', targetSha)?.id, 1);
+  assert.equal(selectOrphanDraftRelease([
+    { id: 2, tag_name: 'untagged-bbbb1111222233334444', name: 'WriteCanvas release', target_commitish: targetSha, draft: true }
+  ], 'v1.1.1', targetSha), null);
+  assert.equal(selectOrphanDraftRelease([
+    { id: 3, tag_name: 'untagged-eeee1111222233334444', name: 'WriteCanvas v1.1.1', target_commitish: targetSha, draft: true }
+  ], 'v1.1.1', 'not-a-commit-sha'), null);
 });
