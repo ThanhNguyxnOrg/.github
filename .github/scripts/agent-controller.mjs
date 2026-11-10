@@ -381,6 +381,7 @@ async function run() {
   const active = repos.filter(repo => !repo.archived && !repo.fork && !config.ignoredRepositories.includes(repo.name));
   console.log('[agent] scanning ' + active.length + ' repositories with ' + config.pollIntervalMinutes + '-minute polling');
 
+  const failures = [];
   for (const repo of active) {
     const fullName = repo.full_name;
     try {
@@ -388,21 +389,27 @@ async function run() {
         listAll('/repos/' + fullName + '/pulls?state=open'),
         listAll('/repos/' + fullName + '/issues?state=open')
       ]);
-
       for (const pr of pulls) {
         try { await processPullRequest(repo, pr); }
-        catch (error) { console.warn('[pr-error]', fullName + '#' + pr.number, error.message); }
+        catch (error) {
+          failures.push(fullName + '#' + pr.number + ' PR: ' + error.message);
+          console.warn('[pr-error]', fullName + '#' + pr.number, error.message);
+        }
       }
-
       for (const issue of issues) {
         if (issue.pull_request) continue;
         try { await processIssue(repo, issue); }
-        catch (error) { console.warn('[issue-error]', fullName + '#' + issue.number, error.message); }
+        catch (error) {
+          failures.push(fullName + '#' + issue.number + ' issue: ' + error.message);
+          console.warn('[issue-error]', fullName + '#' + issue.number, error.message);
+        }
       }
     } catch (error) {
+      failures.push(fullName + ': ' + error.message);
       console.warn('[repo-error]', fullName, error.message);
     }
   }
+  if (failures.length) throw new Error('Agent reconciliation incomplete (' + failures.length + ' failures): ' + failures.slice(0,20).join('; '));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
