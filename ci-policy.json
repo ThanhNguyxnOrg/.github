@@ -152,7 +152,7 @@
       "defaultBranch": "main",
       "autoMergeDependabot": true,
       "requiredChecks": [
-        "🐧 g++ C++ backend (ubuntu)",
+        "build-test-ubuntu / 🐧 g++ C++ backend (ubuntu)",
         "🪟 MSVC + NASM (windows)",
         "🔖 Version consistency"
       ]
