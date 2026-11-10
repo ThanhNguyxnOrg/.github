@@ -60,7 +60,7 @@ jobs:
           permission-contents: write
 
       - name: Upload assets and verify central manifest
-        uses: ThanhNguyxnOrg/.github/.github/actions/agent-release-assets@main
+        uses: ThanhNguyxnOrg/.github/.github/actions/agent-release-assets@f7c6369e53eb0945e7d02807837277efbbea6eaa
         with:
           token: ${{ steps.agent.outputs.token }}
           tag: ${{ inputs.tag }}
