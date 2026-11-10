@@ -33,22 +33,25 @@ For Git commits, use `.github/actions/agent-git-identity` and check out the repo
 
 ## Reusable workflows
 
-- `ci-node.yml`: common Node setup, install, lint, typecheck, test, and build commands.
-- `ci-python.yml`: common Python setup, install, lint, typecheck, test, and build commands.
-- `ci-go.yml`: common Go setup, test, vet, and build commands.
-- `ci-cmake.yml`: common CMake configure, build, and test flow; use custom project adapters for extra Qt/MSVC/NASM or other system requirements.
+- `ci-node.yml`: Node.js setup, npm/pnpm/yarn/Bun install, optional preparation, validation, lint, typecheck, test, build, post-build verification, and optional CI artifact upload. Supports explicit Node version or version files and lockfile-aware caching.
+- `ci-python.yml`: Python setup, pip caching, dependency installation, lint, typecheck, test, build, and optional CI artifact upload.
+- `ci-go.yml`: Go setup, module caching, test, vet, build, and optional CI artifact upload.
+- `ci-cmake.yml`: CMake configure, build, test, optional system dependencies, and optional CI artifact upload; use custom project adapters for extra Qt/MSVC/NASM or other system requirements.
+
+All shared CI workflows expose an explicit `job_name` so the check-run name can match `ci-policy.json`. They default to read-only checkout credentials and `contents: read`. CI artifacts are optional; do not upload every intermediate build by default. Keep short-lived CI artifacts only when another job or a human reviewer consumes them.
 - `release-publish.yml`: downloads the caller's build artifacts, mints a repository-scoped Agent token, uploads to the central draft release, and verifies the required asset manifest from `release-policy.json`.
 
 Reusable workflow files must live directly under `.github/workflows/`; GitHub does not support nested directories in that folder.
 
 ## Standard release artifact contract
 
-Each project release adapter does only the project-specific work:
+Each project release adapter does only the project-specific work. The release controller is the sole version/tag decision-maker; a normal push does not start platform release packaging:
 
 1. Build and package on the correct OS/architecture.
 2. Place final distributables in a flat `dist/release/` directory.
 3. Upload each platform's files as a GitHub Actions artifact named `release-assets-<platform>` (for a single job, `release-assets` is also valid).
 4. Call the central `release-publish.yml` job after all build jobs complete.
+5. Do not add a schedule or `push` trigger to the release build adapter. It listens for the central controller's new tag event; duplicate tag events are harmlessly rejected by tag/release checks.
 
 Example caller:
 
@@ -82,7 +85,7 @@ Do not add a second version bump, changelog generator, tag creator, or GitHub Re
 
 ## When to keep a custom adapter
 
-Keep a custom workflow where the project has special release mechanics, such as browser-store submission, Tauri signing/updater bundles, macOS notarization, Chocolatey/Scoop/Homebrew synchronization, Qt deployment, cross-compilation, or custom test gates. Reuse the Agent-token and identity actions even in those workflows. Do not force unrelated products into a single generic build command.
+Keep a custom workflow where the project has special release mechanics, such as browser-store submission, Tauri signing/updater bundles, macOS notarization, Chocolatey/Scoop/Homebrew synchronization, Qt deployment, cross-compilation, or custom test gates. Reuse the Agent-token and identity actions even in those workflows. The custom adapter still follows the same tag-only trigger, `dist/release/` staging, artifact naming, manifest validation, and central publisher contract wherever the platform tooling permits. Do not force unrelated products into a single generic build command.
 
 ## New repository onboarding
 
