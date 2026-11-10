@@ -47,7 +47,7 @@ Before publishing a draft, the controller verifies:
 1. the configured release workflow completed successfully for the exact tag commit;
 2. every asset in that repository's central `requiredAssets` manifest exists and is uploaded.
 
-If a build job is green but an expected archive is missing, the draft stays unpublished. Duplicate drafts are never deleted automatically. An orphan draft containing assets is explicitly reported for recovery.
+If a build job is green but an expected archive is missing, the draft stays unpublished. Duplicate/orphan drafts are never deleted merely because they are duplicates. When a published release already owns the same tag, the controller may recover an orphan draft only after the exact tag's build workflow succeeded: it downloads each source asset, verifies its byte count and SHA-256, uploads it to the published release, verifies the uploaded asset's name/size/digest, then re-reads both release records. The orphan is deleted only when every source asset is mirrored byte-for-byte, every required manifest entry exists on the destination, and the source contains no unlisted extras. Missing, conflicting, unverifiable or unlisted assets keep the source draft intact.
 
 Lumeo store releases remain manually approved because tag creation can trigger browser-store submission. APIDex remains excluded from generic product releases because its API catalog has a separate health/remediation lifecycle.
 
