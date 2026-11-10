@@ -2,7 +2,7 @@ name: ThanhNguyxnAgent token
 description: Create a repository-scoped installation token for ThanhNguyxnAgent.
 inputs:
   profile:
-    description: "Permission profile: content, issues, release, or read."
+    description: "Permission profile: content, issues, remediation, release, or read."
     required: true
   client-id:
     description: GitHub App client ID (organization secret BOT_APP_ID).
@@ -71,6 +71,8 @@ runs:
         permission-issues: write
         permission-pull-requests: write
         permission-discussions: write
+        permission-checks: read
+        permission-statuses: read
     - name: Create release token
       id: release
       if: inputs.profile == 'release'
