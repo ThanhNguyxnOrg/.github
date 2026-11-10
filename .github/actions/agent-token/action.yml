@@ -21,7 +21,7 @@ inputs:
 outputs:
   token:
     description: Short-lived installation access token.
-    value: ${{ steps.content.outputs.token || steps.issues.outputs.token || steps.release.outputs.token || steps.read.outputs.token }}
+    value: ${{ steps.content.outputs.token || steps.issues.outputs.token || steps.remediation.outputs.token || steps.release.outputs.token || steps.read.outputs.token }}
 runs:
   using: composite
   steps:
@@ -31,7 +31,7 @@ runs:
         PROFILE: ${{ inputs.profile }}
       run: |
         case "$PROFILE" in
-          content|issues|release|read) ;;
+          content|issues|remediation|release|read) ;;
           *) echo "::error::Unsupported Agent token profile: $PROFILE"; exit 1 ;;
         esac
     - name: Create content-write token
@@ -58,6 +58,19 @@ runs:
         permission-pull-requests: write
         permission-checks: read
         permission-statuses: read
+    - name: Create remediation token
+      id: remediation
+      if: inputs.profile == 'remediation'
+      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+      with:
+        client-id: ${{ inputs.client-id }}
+        private-key: ${{ inputs.private-key }}
+        owner: ${{ inputs.owner }}
+        repositories: ${{ inputs.repositories }}
+        permission-contents: write
+        permission-issues: write
+        permission-pull-requests: write
+        permission-discussions: write
     - name: Create release token
       id: release
       if: inputs.profile == 'release'

@@ -49,15 +49,14 @@ jobs:
           pattern: ${{ inputs.artifact_pattern }}
           path: ${{ inputs.artifact_directory }}
           merge-multiple: true
-          if-no-artifact-found: error
 
       - name: Mint repository-scoped ThanhNguyxnAgent token
         id: agent
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        uses: ThanhNguyxnOrg/.github/.github/actions/agent-token@f7c6369e53eb0945e7d02807837277efbbea6eaa
         with:
+          profile: content
           client-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
-          permission-contents: write
 
       - name: Upload assets and verify central manifest
         uses: ThanhNguyxnOrg/.github/.github/actions/agent-release-assets@f7c6369e53eb0945e7d02807837277efbbea6eaa

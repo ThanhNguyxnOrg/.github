@@ -94,7 +94,18 @@ async function main() {
   });
   if (!localAssets.length) fail('No release assets were found');
   const releaseUrl = `${api}/repos/${owner}/${repo}/releases/tags/${encodeURIComponent(tag)}`;
-  const release = await request(releaseUrl);
+  let release;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      release = await request(releaseUrl);
+      break;
+    } catch (error) {
+      if (!String(error.message).startsWith('GitHub API 404:') || attempt === 19) throw error;
+      console.log(`[release-wait] draft ${tag} is not visible yet; retry ${attempt + 1}/20`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
+  if (!release) fail(`Central draft release was not created for ${tag}`);
   if (release.tag_name !== tag) fail(`Release tag mismatch: expected ${tag}, got ${release.tag_name}`);
   if (!release.draft) fail(`Release ${tag} is already published; refusing to mutate published assets`);
 

@@ -14,7 +14,7 @@ on:
       - '.github/workflows/release-publish.yml'
       - '.github/workflows/ci-*.yml'
       - '.github/actions/**'
-      - '.github/scripts/release-assets.test.mjs'
+      - '.github/scripts/release-assets.test.mjs .github/scripts/release-policy.test.mjs'
   schedule:
     - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
