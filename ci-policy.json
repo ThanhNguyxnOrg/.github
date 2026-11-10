@@ -28,8 +28,29 @@
       "defaultBranch": "main",
       "autoMergeDependabot": false,
       "requiredChecks": [
-        "check-links",
-        "lint"
+        {
+          "name": "check-links",
+          "paths": [
+            "apis/**",
+            "scripts/**",
+            ".github/workflows/link-checker.yml"
+          ]
+        },
+        {
+          "name": "regression-tests",
+          "paths": [
+            "scripts/**",
+            ".github/workflows/script-tests.yml"
+          ]
+        },
+        {
+          "name": "lint",
+          "paths": [
+            "**/*.md",
+            ".markdownlint.json",
+            ".github/workflows/markdownlint.yml"
+          ]
+        }
       ]
     },
     "lumeo": {
@@ -111,6 +132,7 @@
       "requiredChecks": [
         "🐧 g++ C++ backend (ubuntu)",
         "🪟 MSVC + NASM (windows)",
+        "🖥️ Qt 6 Quick (windows)",
         "🔖 Version consistency"
       ]
     },
@@ -138,6 +160,39 @@
       "requiredChecks": [
         "test"
       ]
+    },
+    "SkillGauge": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": false,
+      "pendingLabel": "skill-verification-pending",
+      "requiredChecks": [
+        {
+          "name": "verify",
+          "paths": [
+            "skills/**/*.md"
+          ]
+        }
+      ]
+    },
+    "ForgeHelm": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": false,
+      "requiredChecks": []
+    },
+    "ThanhNguyxnOrg.github.io": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": false,
+      "requiredChecks": []
+    },
+    "AFTERFRAME-THE-LAST-LOOP": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": false,
+      "requiredChecks": []
+    },
+    "chess-on-glass": {
+      "defaultBranch": "main",
+      "autoMergeDependabot": false,
+      "requiredChecks": []
     }
   }
 }
