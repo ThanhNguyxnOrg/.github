@@ -11,6 +11,11 @@ test('Conventional Commit types map to the configured SemVer levels', () => {
   assert.equal(classifyConventionalCommit('feat!: remove legacy config').level, 'major');
   assert.equal(classifyConventionalCommit('refactor: simplify module'), null);
   assert.equal(classifyConventionalCommit('chore: update docs'), null);
+  assert.equal(classifyConventionalCommit('fix(release): repair publisher'), null);
+  assert.equal(classifyConventionalCommit('feat(ci): adopt shared workflow'), null);
+  assert.equal(classifyConventionalCommit('fix(build): update compiler contract'), null);
+  assert.equal(classifyConventionalCommit('fix(docs): correct install guide'), null);
+  assert.equal(classifyConventionalCommit('feat(meta): update repository metadata'), null);
   assert.equal(classifyConventionalCommit('feat: change auth\n\nBREAKING CHANGE: old tokens are rejected').level, 'major');
 });
 
