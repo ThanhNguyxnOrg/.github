@@ -227,6 +227,20 @@ function makeTagName(version) {
   return 'v' + version;
 }
 
+export function pendingDraftReleases(releases) {
+  const seenTags = new Set((releases || [])
+    .filter(release => !release.draft)
+    .map(release => release.tag_name));
+  const pending = [];
+  for (const release of releases || []) {
+    const tag = String(release.tag_name || '');
+    if (!release.draft || !/^v\d+\.\d+\.\d+/.test(tag) || seenTags.has(tag)) continue;
+    seenTags.add(tag);
+    pending.push(release);
+  }
+  return pending;
+}
+
 export function releaseNotesFromChangelog(changelog, version) {
   const escaped = String(version).replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp('^##\\s+\\[?' + escaped + '\\]?(?:\\s+-[^\\n]*)?\\s*\\n([\\s\\S]*?)(?=^##(?!#)\\s+|(?![\\s\\S]))', 'm');
@@ -326,9 +340,15 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
 async function publishReadyDrafts(repoName, rule) {
   const fullName = ORG + '/' + repoName;
   const releases = await api('/repos/' + fullName + '/releases?per_page=100');
+  const pendingDrafts = pendingDraftReleases(releases);
+  const pendingIds = new Set(pendingDrafts.map(release => release.id));
   for (const release of releases) {
-    if (!release.draft || !/^v\d+\.\d+\.\d+/.test(release.tag_name || '')) continue;
-    const tag = release.tag_name;
+    const tag = String(release.tag_name || '');
+    if (!release.draft || !/^v\d+\.\d+\.\d+/.test(tag)) continue;
+    if (!pendingIds.has(release.id)) {
+      console.warn('[release-duplicate-draft]', fullName, tag, '— an existing published release or newer draft already owns this tag; skipping orphan draft', release.id);
+      continue;
+    }
     await ensureTagRef(fullName, tag, release.target_commitish);
     if (!rule.releaseWorkflowName) {
       await api('/repos/' + fullName + '/releases/' + release.id, {
