@@ -70,6 +70,7 @@ export function parseStaleMarker(body) {
 }
 
 export function staleDecision(item, markerDate, now = new Date(), staleConfig = policy) {
+  if (item?.draft || item?.locked) return 'exempt';
   const labels = labelNames(item);
   const exempt = new Set((staleConfig.exemptLabels || []).map(label => String(label).toLowerCase()));
   if ([...exempt].some(label => labels.has(label))) return 'exempt';
@@ -83,7 +84,9 @@ export function staleDecision(item, markerDate, now = new Date(), staleConfig = 
   }
 
   const updatedAt = new Date(item.updated_at);
-  if (!Number.isNaN(updatedAt.getTime()) && updatedAt.getTime() > markerDate.getTime()) return 'reactivated';
+  const toleranceMinutes = Math.max(0, Number(staleConfig.activityTimestampToleranceMinutes ?? 5));
+  const activityThreshold = markerDate.getTime() + toleranceMinutes * 60 * 1000;
+  if (!Number.isNaN(updatedAt.getTime()) && updatedAt.getTime() > activityThreshold) return 'reactivated';
   return now.getTime() - markerDate.getTime() >= Number(staleConfig.daysBeforeClose || 5) * DAY
     ? 'close'
     : 'wait';
@@ -162,12 +165,18 @@ async function closeItem(fullName, item, isPullRequest) {
 
 async function processItem(repo, item, now) {
   const fullName = repo.full_name;
-  const labels = labelNames(item);
-  const hasStaleLabel = labels.has('stale');
   const isPullRequest = Boolean(item.pull_request);
+  const current = isPullRequest ? { ...item, ...(await request('/repos/' + fullName + '/pulls/' + item.number)), pull_request: item.pull_request } : item;
+  const labels = labelNames(current);
+  const hasStaleLabel = labels.has('stale');
+  if (current.draft || current.locked) {
+    if (hasStaleLabel) await removeStaleLabel(fullName, current.number);
+    console.log('[stale-exempt]', fullName + '#' + current.number, current.draft ? 'draft PR' : 'locked item');
+    return;
+  }
 
   if (!hasStaleLabel) {
-    if (staleDecision(item, null, now) !== 'mark') return;
+    if (staleDecision(current, null, now) !== 'mark') return;
     await addStaleLabel(fullName, item.number);
     await request('/repos/' + fullName + '/issues/' + item.number + '/comments', {
       method: 'POST',
@@ -177,7 +186,7 @@ async function processItem(repo, item, now) {
     return;
   }
 
-  const marker = await findMarkerComment(fullName, item.number);
+  const marker = await findMarkerComment(fullName, current.number);
   if (!marker) {
     // Legacy stale labels have no timestamp, so start a fresh and explicit grace period.
     await request('/repos/' + fullName + '/issues/' + item.number + '/comments', {
@@ -188,12 +197,12 @@ async function processItem(repo, item, now) {
     return;
   }
 
-  const decision = staleDecision(item, marker.date, now);
+  const decision = staleDecision(current, marker.date, now);
   if (decision === 'exempt' || decision === 'reactivated') {
     await removeStaleLabel(fullName, item.number);
     console.log('[stale-cleared]', fullName + '#' + item.number, decision);
   } else if (decision === 'close') {
-    await closeItem(fullName, item, isPullRequest);
+    await closeItem(fullName, current, isPullRequest);
     console.log('[stale-closed]', fullName + '#' + item.number);
   }
 }
