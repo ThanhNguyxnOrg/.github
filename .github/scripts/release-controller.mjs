@@ -166,13 +166,23 @@ function highestVersionTag(refs) {
   return tags.length ? tags[tags.length - 1] : null;
 }
 
-async function checkState(fullName, sha, repoName) {
+export function changedFilesForPolicy(comparison, requiredChecks = []) {
+  const pathScoped = requiredChecks.some(entry => typeof entry !== 'string' && (
+    (Array.isArray(entry.paths) && entry.paths.length) ||
+    (Array.isArray(entry.excludePaths) && entry.excludePaths.length)
+  ));
+  if (!pathScoped) return undefined;
+  if (!Array.isArray(comparison?.files) || comparison.files.length >= 300) return undefined;
+  return comparison.files.map(file => String(file.filename || '')).filter(Boolean);
+}
+
+async function checkState(fullName, sha, repoName, changedFiles = undefined) {
   const [checks, statuses] = await Promise.all([
     api('/repos/' + fullName + '/commits/' + sha + '/check-runs?per_page=100'),
     api('/repos/' + fullName + '/commits/' + sha + '/status')
   ]);
   const profile = getRepositoryProfile(repoName);
-  const result = evaluateRequiredChecks(checks.check_runs || [], statuses, profile?.requiredChecks || []);
+  const result = evaluateRequiredChecks(checks.check_runs || [], statuses, profile?.requiredChecks || [], changedFiles);
   if (result.state !== 'success') console.warn('[release-required-checks]', fullName, sha, JSON.stringify(result));
   return result.state;
 }
@@ -628,12 +638,13 @@ async function reconcileRepository(repoName, rule) {
 
   const commits = comparison.commits || [];
   if (!commits.length) return;
+  const changedFiles = changedFilesForPolicy(comparison, getRepositoryProfile(repoName)?.requiredChecks || []);
 
   const pending = [...commits].reverse().find(commit => releaseIntent(commit.commit?.message, rule.mode));
   if (pending) {
     const version = releaseIntent(pending.commit.message, rule.mode);
     const tag = makeTagName(version);
-    const state = await checkState(fullName, pending.sha, repoName);
+    const state = await checkState(fullName, pending.sha, repoName, changedFiles);
     if (state !== 'success') {
       console.log('[release-wait]', fullName, tag, '— CI state is ' + state);
       return;
@@ -655,7 +666,7 @@ async function reconcileRepository(repoName, rule) {
     return;
   }
 
-  const checkResult = rule.requireSuccessfulChecks ? await checkState(fullName, headSha, repoName) : 'success';
+  const checkResult = rule.requireSuccessfulChecks ? await checkState(fullName, headSha, repoName, changedFiles) : 'success';
   if (checkResult !== 'success') {
     console.log('[release-wait]', fullName, 'HEAD ' + headSha + ' — CI state is ' + checkResult);
     return;
