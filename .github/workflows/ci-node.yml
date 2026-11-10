@@ -1,30 +1,80 @@
-name: ThanhNguyxnOrg — Reusable Node CI
+name: Shared CI — Node.js
 
 on:
   workflow_call:
     inputs:
+      job_name:
+        description: Exact check-run name expected by the central CI policy.
+        required: false
+        default: Verify (Node.js)
+        type: string
+      runner:
+        description: GitHub-hosted runner label.
+        required: false
+        default: ubuntu-latest
+        type: string
+      timeout_minutes:
+        description: Maximum job runtime.
+        required: false
+        default: 20
+        type: number
       node_version:
-        description: Node.js version.
+        description: Node.js version when node_version_file is not set.
         required: false
         default: "22"
         type: string
+      node_version_file:
+        description: Optional version file such as .nvmrc or .node-version.
+        required: false
+        default: ""
+        type: string
+      package_manager:
+        description: Dependency manager.
+        required: false
+        default: npm
+        type: string
+      package_manager_version:
+        description: Optional pinned package-manager version (pnpm or Bun).
+        required: false
+        default: ""
+        type: string
       working_directory:
-        description: Project directory containing package.json.
+        description: Project directory containing the package manifest.
         required: false
         default: "."
         type: string
       cache:
-        description: setup-node cache provider (npm, pnpm, yarn, or empty).
+        description: setup-node cache provider; pass an empty string to disable.
         required: false
         default: npm
         type: string
-      install_command:
-        description: Dependency installation command.
+      cache_dependency_path:
+        description: Optional lockfile path or multiline list of lockfiles.
         required: false
-        default: npm ci
+        default: ""
+        type: string
+      install_dependencies:
+        description: Install dependencies before project commands.
+        required: false
+        default: true
+        type: boolean
+      install_command:
+        description: Optional explicit install command; otherwise the selected package manager's frozen install is used.
+        required: false
+        default: ""
+        type: string
+      prepare_command:
+        description: Optional framework preparation command after dependency installation.
+        required: false
+        default: ""
+        type: string
+      validation_command:
+        description: Optional project-specific validation command.
+        required: false
+        default: ""
         type: string
       lint_command:
-        description: Optional lint command.
+        description: Optional lint or syntax command.
         required: false
         default: ""
         type: string
@@ -36,54 +86,157 @@ on:
       test_command:
         description: Optional test command.
         required: false
-        default: npm test
+        default: ""
         type: string
       build_command:
         description: Optional production build command.
         required: false
         default: ""
         type: string
+      post_build_command:
+        description: Optional validation of generated build output.
+        required: false
+        default: ""
+        type: string
+      artifact_name:
+        description: Optional CI artifact name.
+        required: false
+        default: ""
+        type: string
+      artifact_path:
+        description: Optional file or directory to upload as a CI artifact.
+        required: false
+        default: ""
+        type: string
+      artifact_retention_days:
+        description: CI artifact retention in days.
+        required: false
+        default: 5
+        type: number
 
 permissions:
   contents: read
 
 jobs:
   verify:
-    name: Verify (Node ${{ inputs.node_version }})
-    runs-on: ubuntu-latest
+    name: ${{ inputs.job_name }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout_minutes }}
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+
+      - name: Enable Corepack
+        if: inputs.package_manager == 'yarn'
+        run: corepack enable
+
+      - name: Setup pnpm
+        if: inputs.package_manager == 'pnpm'
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ inputs.package_manager_version || '' }}
+
+      - name: Setup Bun
+        if: inputs.package_manager == 'bun'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ inputs.package_manager_version || 'latest' }}
+
+      - name: Setup Node.js from version file
+        if: inputs.node_version_file != ''
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ inputs.node_version_file }}
+          cache: ${{ inputs.cache }}
+          cache-dependency-path: ${{ inputs.cache_dependency_path }}
+
+      - name: Setup Node.js from explicit version
+        if: inputs.node_version_file == ''
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
-      - name: Install dependencies
-        if: inputs.install_command != ''
+          cache-dependency-path: ${{ inputs.cache_dependency_path }}
+
+      - name: Validate package manager
         env:
+          PACKAGE_MANAGER: ${{ inputs.package_manager }}
+        run: |
+          case "$PACKAGE_MANAGER" in
+            npm|pnpm|yarn|bun) ;;
+            *) echo "::error::Unsupported package manager: $PACKAGE_MANAGER"; exit 1 ;;
+          esac
+
+      - name: Install dependencies
+        if: inputs.install_dependencies
+        env:
+          PACKAGE_MANAGER: ${{ inputs.package_manager }}
           COMMAND: ${{ inputs.install_command }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$COMMAND" ]]; then
+            bash -euo pipefail -c "$COMMAND"
+          else
+            case "$PACKAGE_MANAGER" in
+              npm) npm ci ;;
+              pnpm) pnpm install --frozen-lockfile ;;
+              yarn) corepack yarn install --immutable ;;
+              bun) bun install --frozen-lockfile ;;
+            esac
+          fi
+
+      - name: Prepare project
+        if: inputs.prepare_command != ''
+        env:
+          COMMAND: ${{ inputs.prepare_command }}
         run: bash -euo pipefail -c "$COMMAND"
+
+      - name: Project validation
+        if: inputs.validation_command != ''
+        env:
+          COMMAND: ${{ inputs.validation_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+
       - name: Lint
         if: inputs.lint_command != ''
         env:
           COMMAND: ${{ inputs.lint_command }}
         run: bash -euo pipefail -c "$COMMAND"
+
       - name: Typecheck
         if: inputs.typecheck_command != ''
         env:
           COMMAND: ${{ inputs.typecheck_command }}
         run: bash -euo pipefail -c "$COMMAND"
+
       - name: Test
         if: inputs.test_command != ''
         env:
           COMMAND: ${{ inputs.test_command }}
         run: bash -euo pipefail -c "$COMMAND"
+
       - name: Build
         if: inputs.build_command != ''
         env:
           COMMAND: ${{ inputs.build_command }}
         run: bash -euo pipefail -c "$COMMAND"
+
+      - name: Validate build output
+        if: inputs.post_build_command != ''
+        env:
+          COMMAND: ${{ inputs.post_build_command }}
+        run: bash -euo pipefail -c "$COMMAND"
+
+      - name: Upload CI artifact
+        if: inputs.artifact_name != '' && inputs.artifact_path != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.artifact_path }}
+          if-no-files-found: error
+          retention-days: ${{ inputs.artifact_retention_days }}
