@@ -164,6 +164,7 @@ jobs:
           cache-dependency-path: ${{ inputs.cache_dependency_path }}
 
       - name: Validate package manager
+        shell: bash
         env:
           PACKAGE_MANAGER: ${{ inputs.package_manager }}
         run: |
