@@ -142,5 +142,10 @@ test('CI profiles match the real project gates and quarantine known failing or o
   assert.equal(getRepositoryProfile('cogmint').autoMergeDependabot, false);
   assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('blendops').requiredChecks, []);
+  assert.deepEqual(getRepositoryProfile('ClipForge').requiredChecks, [
+    'build-test-ubuntu / 🐧 g++ C++ backend (ubuntu)',
+    '🪟 MSVC + NASM (windows)',
+    '🔖 Version consistency',
+  ]);
   assert.equal(getRepositoryProfile('ClipForge').requiredChecks.includes('🖥️ Qt 6 Quick (windows)'), false);
 });
