@@ -45,12 +45,12 @@ test('skipped or neutral required checks are not accepted', () => {
   assert.equal(evaluateRequiredChecks([{ name: 'build', status: 'completed', conclusion: 'neutral' }], {}, ['build']).state, 'failure');
 });
 
-test('all instances of a duplicated required check must succeed', () => {
+test('the newest check-run attempt controls a duplicated required check name', () => {
   const checks = [
-    { name: 'build', status: 'completed', conclusion: 'success' },
-    { name: 'build', status: 'completed', conclusion: 'failure' }
+    { id: 1, name: 'build', status: 'completed', conclusion: 'failure', created_at: '2026-11-09T10:00:00Z' },
+    { id: 2, name: 'build', status: 'completed', conclusion: 'success', created_at: '2026-11-09T10:05:00Z' }
   ];
-  assert.equal(evaluateRequiredChecks(checks, {}, ['build']).state, 'failure');
+  assert.equal(evaluateRequiredChecks(checks, {}, ['build']).state, 'success');
 });
 
 test('pending required checks hold the gate', () => {
