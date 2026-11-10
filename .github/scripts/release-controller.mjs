@@ -497,7 +497,7 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
     method: 'PATCH',
     body: { name, body, draft: true, prerelease }
   });
-  console.log('[release-draft-updated], fullName, tag, release.html_url);
+  console.log('[release-draft-updated]', fullName, tag, release.html_url);
   return release;
 }
 
