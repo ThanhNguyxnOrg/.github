@@ -130,6 +130,10 @@ test('CI profiles match the real project gates and quarantine known failing or o
   assert.deepEqual(getRepositoryProfile('awesome-cert-sherpa').requiredChecks, ['build / Build & Validate']);
   assert.deepEqual(getRepositoryProfile('AFTERFRAME-THE-LAST-LOOP').requiredChecks, ['verify / Verify (Bun)']);
   assert.deepEqual(getRepositoryProfile('Snapbooth').requiredChecks, ['verify / Smoke & E2E']);
+  assert.equal(
+    getRepositoryProfile('Locsight').requiredChecks.includes('verify / Registry & Release Script'),
+    true,
+  );
   assert.deepEqual(
     getRepositoryProfile('LayoutLingua').requiredChecks.map(check => typeof check === 'string' ? check : check.name),
     [
