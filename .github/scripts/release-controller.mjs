@@ -323,7 +323,7 @@ async function downloadReleaseAsset(fullName, asset) {
 }
 
 async function uploadReleaseAsset(fullName, destinationRelease, sourceAsset, bytes, digest) {
-  const uploadBase = String(destinationRelease.upload_url || '').replace(/\\{\\?.*$/, '');
+  const uploadBase = String(destinationRelease.upload_url || '').replace(/\{\?.*$/, '');
   if (!uploadBase) throw new Error('Release upload URL is missing for ' + fullName + ' #' + destinationRelease.id);
   const uploadUrl = uploadBase + '?name=' + encodeURIComponent(sourceAsset.name);
   const response = await fetch(uploadUrl, {
@@ -497,8 +497,7 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
     method: 'PATCH',
     body: { name, body, draft: true, prerelease }
   });
-  await ensureTagRef(fullName, tag, targetSha);
-  console.log('[release-draft-updated]', fullName, tag, release.html_url);
+  console.log('[release-draft-updated], fullName, tag, release.html_url);
   return release;
 }
 

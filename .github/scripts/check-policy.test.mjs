@@ -125,7 +125,6 @@ test('CI profiles match the real project gates and quarantine known failing or o
   assert.deepEqual(getRepositoryProfile('cogmint').requiredChecks, ['Typecheck']);
   assert.deepEqual(getRepositoryProfile('Snapbooth').requiredChecks, ['build']);
   assert.equal(getRepositoryProfile('cogmint').autoMergeDependabot, false);
-  assert.deepEqual(getRepositoryProfile('Snapbooth').requiredChecks, ['CI Build & E2E']);
   assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('blendops').requiredChecks, []);
   assert.equal(getRepositoryProfile('ClipForge').requiredChecks.includes('🖥️ Qt 6 Quick (windows)'), false);
