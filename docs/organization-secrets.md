@@ -37,6 +37,14 @@ The organization-wide Agent Controller in [agent-controller.yml](../.github/work
 
 The current consumer is [AFTERFRAME's itch.io package/publish workflow](https://github.com/ThanhNguyxnOrg/AFTERFRAME-THE-LAST-LOOP/blob/main/.github/workflows/itch-html5.yml). Its publish job reads the secret directly as `secrets.BUTLER_API_KEY`; the value is never passed as a command-line argument, written to the repository, or echoed into logs. GitHub masks the value in Actions logs.
 
+### Provisioning the Butler credential
+
+1. Install the official [Butler CLI](https://itch.io/docs/butler/installing.html).
+2. Authenticate the CLI with the itch.io account that owns the game: `butler login`.
+3. Complete the browser authorization flow, then open [itch.io API Keys](https://itch.io/user/settings/api-keys).
+4. Use the key whose **Source** is `wharf`. Do not substitute a key created directly from the itch.io web API-key page with source `web`.
+5. Add that value once as the Organization Actions secret `BUTLER_API_KEY`. Never copy the value into a repository, issue, pull request, chat, or documentation.
+
 **Access policy**
 - Store the credential once under **ThanhNguyxnOrg → Settings → Secrets and variables → Actions → Secrets**.
 - Prefer **Selected repositories**. Grant access only to game repositories that are trusted to publish under this itch.io account. Add a repository to the allowlist when it adopts a reviewed publisher workflow.
