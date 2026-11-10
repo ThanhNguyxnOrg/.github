@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery } from './release-controller.mjs';
+import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy } from './release-controller.mjs';
 
 const policy = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
@@ -154,4 +154,11 @@ test('orphan release recovery fails closed when no asset manifest exists', () =>
     'v1.2.3'
   );
   assert.equal(plan.safeToDelete, false);
+});
+
+test('release check policy receives changed-file context when paths are configured', () => {
+  const checks = [{name:'Test (ubuntu-latest)',paths:['layoutlingua/**']}];
+  assert.deepEqual(changedFilesForPolicy({files:[{filename:'layoutlingua/_version.py'},{filename:'CHANGELOG.md'}]},checks),['layoutlingua/_version.py','CHANGELOG.md']);
+  assert.equal(changedFilesForPolicy({files:[]},['Lint']),undefined);
+  assert.equal(changedFilesForPolicy({files:Array.from({length:300},()=>({filename:'layoutlingua/x.py'}))},checks),undefined);
 });
