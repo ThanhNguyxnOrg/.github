@@ -129,7 +129,8 @@ export function makeReleaseNotes(commits, fullName) {
 
 export function insertChangelogSection(existing, version, date, notes) {
   const source = String(existing || '').replace(/\r/g, '');
-  const headingPattern = new RegExp('^##\\\\s+\\\\[?' + version.replace(/\./g, '\\\\.') + '\\\\]?(?:\\\\s|$)', 'm');
+  const escapedVersion = String(version).replace(/\./g, '\\.');
+  const headingPattern = new RegExp('^##\\s+\\[?' + escapedVersion + '\\]?(?:\\s|$)', 'm');
   if (headingPattern.test(source)) throw new Error('CHANGELOG already contains version ' + version);
   const block = '## [' + version + '] - ' + date + '\n\n' + notes.trim() + '\n\n';
   const headings = [...source.matchAll(/^##\s+/gm)];
@@ -243,6 +244,39 @@ async function getTagCommitSha(fullName, tag) {
   throw new Error('Unsupported tag object type for ' + fullName + ':' + tag);
 }
 
+async function ensureTagRef(fullName, tag, targetSha) {
+  const expectedSha = String(targetSha || '');
+  if (!/^[0-9a-f]{40}$/i.test(expectedSha)) {
+    return getTagCommitSha(fullName, tag);
+  }
+
+  try {
+    const currentSha = await getTagCommitSha(fullName, tag);
+    if (currentSha !== expectedSha) {
+      throw new Error('Release tag ' + tag + ' already points to ' + currentSha + ', expected ' + expectedSha);
+    }
+    return currentSha;
+  } catch (error) {
+    if (!(error instanceof GitHubError) || error.status !== 404) throw error;
+  }
+
+  try {
+    await api('/repos/' + fullName + '/git/refs', {
+      method: 'POST',
+      body: { ref: 'refs/tags/' + tag, sha: expectedSha }
+    });
+  } catch (error) {
+    if (!(error instanceof GitHubError) || error.status !== 422) throw error;
+    const currentSha = await getTagCommitSha(fullName, tag);
+    if (currentSha !== expectedSha) {
+      throw new Error('Release tag ' + tag + ' was concurrently created at ' + currentSha + ', expected ' + expectedSha);
+    }
+  }
+
+  console.log('[tag-created]', fullName, tag, expectedSha);
+  return expectedSha;
+}
+
 async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, rule) {
   let changelog = await getFile(fullName, rule.changelogPath || 'CHANGELOG.md', targetSha);
   let body = releaseNotesFromChangelog(changelog, version);
@@ -270,6 +304,7 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
         generate_release_notes: false
       }
     });
+    await ensureTagRef(fullName, tag, targetSha);
     console.log('[release-draft-created]', fullName, tag, release.html_url);
     return release;
   }
@@ -283,6 +318,7 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
     method: 'PATCH',
     body: { name, body, draft: true, prerelease }
   });
+  await ensureTagRef(fullName, tag, targetSha);
   console.log('[release-draft-updated]', fullName, tag, release.html_url);
   return release;
 }
@@ -293,6 +329,7 @@ async function publishReadyDrafts(repoName, rule) {
   for (const release of releases) {
     if (!release.draft || !/^v\\d+\\.\\d+\\.\\d+/.test(release.tag_name || '')) continue;
     const tag = release.tag_name;
+    await ensureTagRef(fullName, tag, release.target_commitish);
     if (!rule.releaseWorkflowName) {
       await api('/repos/' + fullName + '/releases/' + release.id, {
         method: 'PATCH',
