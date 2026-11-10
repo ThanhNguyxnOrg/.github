@@ -1,53 +1,42 @@
 # ThanhNguyxnAgent — Organization automation
 
-This repository is the shared workflow source for the existing `ThanhNguyxnAgent[bot]` GitHub App. Do not create a second bot or duplicate policy engines in individual repositories.
+The organization uses one central GitHub App controller in this repository. Do not add a second bot or copy the policy engine into individual repositories.
 
-## Dependency PR governance
+## Entry point and cadence
 
-Repositories that use Dependabot automation call:
+- `.github/workflows/agent-controller.yml` runs every 10 minutes and can also be started manually.
+- `.github/scripts/agent-controller.mjs` scans active organization repositories, triages open issues and pull requests, and applies the policy in `agent-policy.json`.
+- The workflow creates a short-lived installation token from the existing `BOT_APP_ID` and `BOT_PRIVATE_KEY` organization secrets. The token is scoped to this organization.
 
-`.github/workflows/reusable-dependabot-governance.yml`
-
-The caller workflow stays in each repository because GitHub reusable workflows require an explicit caller. Policy and implementation live here so they can be changed once.
-
-### Decision policy
+## Pull request policy
 
 | Change | Agent behavior |
 |---|---|
-| Non-major package patch/minor | Wait for reported checks; approve and enable squash auto-merge only after checks succeed |
-| Major dependency update | Add review labels, assign/request human reviewers; never auto-merge |
-| GitHub Actions dependency update | Human review, including patch/minor |
-| Missing/unknown dependency metadata | Fail closed and request human review |
-| Failed, missing, or pending CI | Do not merge; label and request human review |
-| PR not authored by Dependabot | Workflow does not run |
+| Dependabot/Renovate patch or minor update | Eligible only after SemVer classification, a clean mergeability check, and successful CI |
+| Major, downgrade, unknown, security-sensitive or malformed dependency update | Human review; never auto-merge |
+| GitHub Actions or repository workflow changes | Human review |
+| Regular pull request | Human review unless it carries an explicit `automerge` or `safe-update` label, or a repository-specific allowlisted label |
+| Failed, pending, missing or incomplete CI | Hold for human review; fail closed |
+| Merge conflict, draft PR, blocking label or protected path | Do not merge |
 
-The Agent uses the existing `BOT_APP_ID` and `BOT_PRIVATE_KEY` organization secrets. Installation tokens are scoped to the current repository and the minimum permissions required for the operation. The shared workflow does not check out or execute code from the pull request.
+The controller does not check out or execute pull-request code. It reads PR metadata, changed-file names, mergeability, checks and commit statuses through the GitHub API. It must not bypass repository rulesets or branch protection.
 
-### Labels
+## Issue triage
 
-The reusable workflow creates/updates these labels when it processes a Dependabot PR:
+Open human-authored issues are categorized with labels and assigned/requested for maintainer attention. Automated, incident, keep-me, stale and wontfix issues are excluded according to policy. Security-related issues are escalated for human review.
 
-- `dependencies`
-- `agent-auto-merge`
-- `needs-review`
-- `major-update`
-- `workflow-update`
-- `ci-failed`
-- `ci-pending`
-- `ci-missing`
+## Repository-specific safeguards
 
-### Migration note
+The policy in `agent-policy.json` defines allowed base branches, sensitive paths, explicit merge labels and issue exclusions. No repository may opt all regular PRs into automatic merging by default.
 
-The reusable workflow is invoked by local `pull_request_target` callers. This event is deliberately used without checking out or executing PR code, so the workflow can access the existing App secrets for safe metadata-only operations. Keep the caller allowlist and GitHub Actions event-policy configuration aligned with GitHub's current platform requirements. Do not replace it with a privileged workflow that checks out untrusted PR code.
+### APIDex Hub — protected exception
 
-## APIDex Hub — protected exception
-
-`ThanhNguyxnOrg/apidex-hub` has a domain-specific link-health and catalog-remediation pipeline. It is not a generic dependency PR workflow and must remain independent:
+`ThanhNguyxnOrg/apidex-hub` has a domain-specific link-health and catalog-remediation pipeline. It is not a generic dependency workflow and must remain independent:
 
 - Daily two-stage link checks: fast CLI scan followed by Playwright verification.
 - HTTP 401/403/418/429, WAF challenges, timeouts, SSL failures and 5xx are inconclusive, not proof an API is dead.
 - Remove a catalog row only for confirmed 404/410 or NXDOMAIN after verification and canonical-documentation/replacement checks.
 - Keep the `--max-delete` safety brake, incident issue, idempotent retry, catalog regeneration and dashboard update.
-- Preserve the APIDex source-of-truth rule: API entries live under `apis/`; generated site data is handled by the repository's CI pipeline.
+- API entries live under `apis/`; generated site data is handled by the APIDex CI pipeline.
 
-Do not point APIDex link-checker incidents at the Dependabot policy. Changes to the API checker or deletion behavior require APIDex-specific regression tests and review.
+Changes to the API checker or deletion behavior require APIDex-specific regression tests and review.
