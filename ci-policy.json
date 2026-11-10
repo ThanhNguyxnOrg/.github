@@ -17,7 +17,9 @@
     "blendops": {
       "defaultBranch": "main",
       "autoMergeDependabot": false,
-      "requiredChecks": []
+      "requiredChecks": [
+        "verify / Verify (BlendOps)"
+      ]
     },
     "apidex-hub": {
       "defaultBranch": "main",
@@ -66,7 +68,7 @@
       "defaultBranch": "main",
       "autoMergeDependabot": true,
       "requiredChecks": [
-        "Build & Validate"
+        "build / Build & Validate"
       ]
     },
     "Snapbooth": {
@@ -208,7 +210,9 @@
     "AFTERFRAME-THE-LAST-LOOP": {
       "defaultBranch": "main",
       "autoMergeDependabot": false,
-      "requiredChecks": []
+      "requiredChecks": [
+        "verify / Verify (Bun + CCGS)"
+      ]
     },
     "chess-on-glass": {
       "defaultBranch": "main",
