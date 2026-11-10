@@ -211,7 +211,7 @@
       "defaultBranch": "main",
       "autoMergeDependabot": false,
       "requiredChecks": [
-        "verify / Verify (Bun + CCGS)"
+        "verify / Verify (Bun)"
       ]
     },
     "chess-on-glass": {
