@@ -1,40 +1,51 @@
-name: ThanhNguyxnOrg — Reusable CMake CI
+name: Shared CI — CMake
 
 on:
   workflow_call:
     inputs:
+      job_name:
+        required: false
+        default: Verify (CMake)
+        type: string
       runner:
-        description: GitHub-hosted runner label.
         required: false
         default: ubuntu-latest
         type: string
       dependencies_command:
-        description: Optional runner-specific system dependency installation.
         required: false
         default: ""
         type: string
       configure_command:
-        description: CMake configure command.
         required: false
         default: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
         type: string
       build_command:
-        description: CMake build command.
         required: false
         default: cmake --build build --config Release --parallel
         type: string
       test_command:
-        description: Optional test command.
         required: false
         default: ctest --test-dir build --build-config Release --output-on-failure
         type: string
+      artifact_name:
+        required: false
+        default: ""
+        type: string
+      artifact_path:
+        required: false
+        default: ""
+        type: string
+      artifact_retention_days:
+        required: false
+        default: 5
+        type: number
 
 permissions:
   contents: read
 
 jobs:
   verify:
-    name: Verify (CMake / ${{ inputs.runner }})
+    name: ${{ inputs.job_name }}
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v7
@@ -58,3 +69,11 @@ jobs:
         env:
           COMMAND: ${{ inputs.test_command }}
         run: bash -euo pipefail -c "$COMMAND"
+      - name: Upload CI artifact
+        if: inputs.artifact_name != '' && inputs.artifact_path != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.artifact_path }}
+          if-no-files-found: error
+          retention-days: ${{ inputs.artifact_retention_days }}
