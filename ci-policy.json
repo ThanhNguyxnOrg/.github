@@ -66,21 +66,21 @@
     },
     "awesome-cert-sherpa": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
+      "autoMergeDependabot": false,
       "requiredChecks": [
         "build / Build & Validate"
       ]
     },
     "Snapbooth": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
+      "autoMergeDependabot": false,
       "requiredChecks": [
         "verify / Smoke & E2E"
       ]
     },
     "Locsight": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
+      "autoMergeDependabot": false,
       "requiredChecks": [
         "verify / Registry & Release Script",
         "build-tauri (windows-latest, x64)",
@@ -98,7 +98,7 @@
     },
     "LayoutLingua": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
+      "autoMergeDependabot": false,
       "requiredChecks": [
         {
           "name": "test (ubuntu-latest) / Test (ubuntu-latest)",
@@ -134,7 +134,7 @@
     },
     "lagvex": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
+      "autoMergeDependabot": false,
       "requiredChecks": [
         "verify / Verify (Lagvex Go)",
         "🔨 Cross-Compile Check (linux, amd64, bin/lagvex-client-linux-amd64)",
@@ -146,7 +146,7 @@
     },
     "git-account-switcher": {
       "defaultBranch": "master",
-      "autoMergeDependabot": true,
+      "autoMergeDependabot": false,
       "requiredChecks": [
         "Bash (ubuntu-latest)",
         "Windows PowerShell",
@@ -155,7 +155,7 @@
     },
     "ClipForge": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
+      "autoMergeDependabot": false,
       "requiredChecks": [
         "build-test-ubuntu / 🐧 g++ C++ backend (ubuntu)",
         "🪟 MSVC + NASM (windows)",
@@ -164,7 +164,7 @@
     },
     "WriteCanvas": {
       "defaultBranch": "master",
-      "autoMergeDependabot": true,
+      "autoMergeDependabot": false,
       "requiredChecks": [
         "tests (ubuntu-latest, 22.x) / ubuntu-latest / node 22.x",
         "tests (ubuntu-latest, 24.x) / ubuntu-latest / node 24.x",
@@ -175,14 +175,14 @@
     },
     "Techstack-Studio": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
+      "autoMergeDependabot": false,
       "requiredChecks": [
         "verify / Verify"
       ]
     },
     "StepDSA": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
+      "autoMergeDependabot": false,
       "requiredChecks": [
         "test / test"
       ]

@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   reconcile:
-    name: Triage PRs and issues; merge approved safe updates
+    name: Triage PRs and issues; route all changes to human review
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

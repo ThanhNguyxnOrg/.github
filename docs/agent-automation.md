@@ -6,7 +6,7 @@ The organization uses one central GitHub App control plane in this repository. D
 
 The central control plane owns organization-wide policy and decisions:
 
-- `.github/workflows/agent-controller.yml`: issue triage, PR triage, reviewer assignment and explicitly opted-in safe dependency merges (10-minute polling).
+- `.github/workflows/agent-controller.yml`: organization-wide issue and PR classification, labels, human assignment, reviewer requests and CI/conflict status routing (10-minute polling).
 - `.github/workflows/release-controller.yml`: Conventional Commit classification, version/changelog commits, tags, draft releases, build-result checks and asset verification (15-minute polling).
 - `.github/workflows/stale.yml`: organization-wide stale issue/PR lifecycle (daily).
 - `agent-policy.json`, `ci-policy.json` and `release-policy.json`: central policy registries.
@@ -18,26 +18,26 @@ Product repositories keep their native adapters for stack-specific tests, compil
 
 **Required checks are declared once in `ci-policy.json` in this repository. No CI-policy file is uploaded into each product repository.**
 
-Each profile records the default branch, exact required GitHub Actions check/job names, and whether Dependabot/Renovate patch/minor auto-merge is enabled.
+Each profile records the default branch and exact required GitHub Actions check/job names. Dependency auto-merge is disabled across the organization.
 
 A required check must exist on the commit and finish with the exact `success` conclusion. The newest attempt for each exact check name is authoritative, so a successful rerun supersedes an older failed attempt. Missing checks, skipped/neutral required checks, pending jobs and failures all hold the gate. Unconfigured repositories fail closed and require human review. A green unrelated check cannot substitute for a missing required job.
 
 Path-scoped entries live only in this central registry and mirror the native workflow's `paths` filters. For pull requests, the controller checks the current synthetic merge commit SHA—not only the contributor head SHA—and defers if the head changes during evaluation.
 
-Regular PRs still need an explicit `automerge`, `safe-update` or repository-allowlisted label. Dependency auto-merge additionally requires `autoMergeDependabot: true` in the central CI profile. Major, downgrade, unknown, malformed and security-sensitive updates remain human-reviewed.
+PR labels are routing metadata, not merge authorization. The Agent never merges pull requests, including Dependabot or Renovate updates. Every non-draft PR receives classification labels, `needs-review`, maintainer assignment and a review request. Major, downgrade, unknown, malformed and security-sensitive dependency updates are clearly labeled for human review.
 
 ## Pull request safety
 
 | Change | Agent behavior |
 |---|---|
-| Dependabot/Renovate patch or minor update | Eligible only when the central profile opts in, required checks pass, mergeability is clean and no blocking path/label is present |
-| Major, downgrade, unknown, security-sensitive or malformed dependency update | Human review; never auto-merge |
-| GitHub Actions or repository workflow changes | Human review |
-| Regular pull request | Human review unless it has an explicit allowed auto-merge label |
-| Failed, pending, missing, skipped or unconfigured required CI | Hold for human review; fail closed |
-| Merge conflict, draft PR, blocking label or protected path | Do not merge |
+| Every non-draft pull request | Classify from title, author and changed files; apply type/area labels; add `needs-review`; assign maintainers and request review |
+| Dependabot/Renovate or other bot PR | Add `automated`; dependency bots also receive `dependencies`; keep the PR assigned for human review |
+| Major, downgrade, unknown or security-sensitive dependency update | Add the appropriate dependency/security labels and require human review |
+| GitHub Actions or repository workflow changes | Add `workflow-update`; require human review |
+| Failed, pending, missing, skipped or unconfigured required CI | Add the corresponding `ci-failed`, `ci-pending` or `ci-missing` label |
+| Merge conflict or protected path | Add `merge-conflict` or retain `needs-review`; require human resolution |
 
-The controller does not check out or execute pull-request code. It reads PR metadata, changed-file names, mergeability, checks and commit statuses through the GitHub API. This is designed for a solo-maintained organization: no branch protection, required review, or repository-side policy file is needed. The controller performs a direct squash merge only after central policy checks pass.
+The Agent does **not** automatically merge pull requests. It is the organization's single decision and routing authority: bots may open PRs, produce review comments, or publish security/check results, but the Agent labels and assigns work for a human maintainer to decide and merge. It does not check out or execute pull-request code; it reads PR metadata, changed-file names, mergeability, checks and commit statuses through the GitHub API.
 
 ## Release safety
 

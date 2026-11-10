@@ -57,13 +57,6 @@ function names(labels) {
   return new Set((labels || []).map(label => (typeof label === 'string' ? label : label.name).toLowerCase()));
 }
 
-export function hasExplicitAutoMergeLabel(labels, policy = {}) {
-  const present = names(labels);
-  const allowed = [...config.defaultAutoMergeLabels, ...(policy.autoMergeLabels || [])]
-    .map(label => String(label).toLowerCase());
-  return allowed.some(label => present.has(label));
-}
-
 export function pullRequestCheckSha(pullRequest) {
   const sha = String(pullRequest?.merge_commit_sha || '').trim();
   return /^[0-9a-f]{40}$/i.test(sha) ? sha : null;
@@ -71,6 +64,63 @@ export function pullRequestCheckSha(pullRequest) {
 
 function isBot(login) {
   return typeof login === 'string' && login.toLowerCase().endsWith('[bot]');
+}
+
+export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
+  const title = String(pullRequest?.title || '');
+  const body = String(pullRequest?.body || '').slice(0, 8000);
+  const author = String(pullRequest?.user?.login || '').toLowerCase();
+  const text = title + '\n' + body;
+  const paths = changedFiles.map(path => String(path).toLowerCase());
+  const labels = new Set();
+  const dependencyBot = author === 'dependabot[bot]' || author === 'renovate[bot]';
+
+  if (isBot(author)) labels.add('automated');
+  if (dependencyBot || /\b(dependencies|dependency|bump|update package|update action)\b/i.test(title)) {
+    labels.add('dependencies');
+  }
+  if (/\b(security|vulnerability|CVE-\d{4}-\d+|exploit|credential leak)\b/i.test(text)) {
+    labels.add('security');
+  }
+
+  if (/^(?:fix|bugfix)(?:\([^)]*\))?:|\b(bug|regression|crash|exception|broken)\b/i.test(title)) {
+    labels.add('bug');
+  }
+  if (/^(?:feat|feature)(?:\([^)]*\))?:|\b(enhancement|feature request|new feature)\b/i.test(title)) {
+    labels.add('enhancement');
+  }
+  if (/^(?:docs?)(?:\([^)]*\))?:|\b(documentation|readme|typo)\b/i.test(title)) {
+    labels.add('documentation');
+  }
+  if (/^(?:refactor|perf|chore|build|ci)(?:\([^)]*\))?:/i.test(title)) {
+    labels.add('maintenance');
+  }
+
+  if (paths.some(path => path.startsWith('.github/workflows/') || path.startsWith('.github/actions/'))) {
+    labels.add('workflow-update');
+  }
+  if (paths.some(path => /(^|\/)(docs?|documentation)(\/|$)|(^|\/)readme(?:\.|$)/.test(path))) {
+    labels.add('documentation');
+  }
+  if (paths.some(path => /(^|\/)(__tests__|tests?|specs?)(\/|$)|\.(test|spec)\.[^.]+$/.test(path))) {
+    labels.add('tests');
+  }
+  if (paths.some(path => /(^|\/)(src-tauri|backend|server|api|services?|workers?|cmd|internal)(\/|$)/.test(path))) {
+    labels.add('backend');
+  }
+  if (paths.some(path => /(^|\/)(frontend|web|ui|components?|pages?)(\/|$)|\.(tsx|jsx|vue|svelte|css|scss|html)$/.test(path))) {
+    labels.add('frontend');
+  }
+  if (paths.some(path => /(^|\/)(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|Cargo\.toml|Cargo\.lock|go\.mod|go\.sum|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock)$/i.test(path))) {
+    labels.add('dependencies');
+  }
+  if (paths.some(path => /(^|\/)(CHANGELOG|RELEASE_NOTES)(\.|$)|(^|\/)release\//i.test(path))) {
+    labels.add('release');
+  }
+
+  const hasType = ['bug', 'enhancement', 'documentation', 'security', 'dependencies', 'maintenance'].some(label => labels.has(label));
+  if (!hasType) labels.add('triage-needed');
+  return [...labels];
 }
 
 function pathMatches(path, pattern) {
@@ -218,98 +268,61 @@ async function getCheckState(fullName, sha, repoName, changedFiles = undefined) 
 }
 
 
-async function requestReview(fullName, pr, labels, reason) {
-  const labelNames = ['needs-review', ...labels];
-  await addLabels(fullName, pr.number, labelNames);
-  await assignHumans(fullName, pr, true);
-  console.log('[review]', fullName + '#' + pr.number + ': ' + reason);
+async function removeLabel(fullName, number, labelName) {
+  try {
+    await request('/repos/' + fullName + '/issues/' + number + '/labels/' + encodeURIComponent(labelName), {
+      method: 'DELETE'
+    });
+  } catch (error) {
+    if (!(error instanceof GitHubError) || error.status !== 404) throw error;
+  }
 }
 
-async function mergePullRequest(fullName, pr) {
-  try {
-    const result = await request('/repos/' + fullName + '/pulls/' + pr.number + '/merge', {
-      method: 'PUT',
-      body: { sha: pr.head.sha, merge_method: 'squash' }
-    });
-    if (!result.merged) throw new Error(result.message || 'GitHub did not merge the pull request');
-    console.log('[merged]', fullName + '#' + pr.number + ' at ' + pr.head.sha);
-  } catch (error) {
-    await addLabels(fullName, pr.number, ['needs-review']);
-    await assignHumans(fullName, pr, true);
-    console.warn('[merge-held]', fullName + '#' + pr.number, error.message);
+async function syncCheckLabels(fullName, number, state) {
+  const labels = ['ci-failed', 'ci-pending', 'ci-missing'];
+  const current = state === 'failure' ? 'ci-failed'
+    : (state === 'pending' ? 'ci-pending'
+      : (state === 'success' ? null : 'ci-missing'));
+  for (const label of labels) {
+    if (label !== current) await removeLabel(fullName, number, label);
   }
+  if (current) await addLabels(fullName, number, [current, 'needs-review']);
 }
 
 async function processPullRequest(repo, pr) {
   const fullName = repo.full_name;
   const repoName = repo.name;
   const policy = repositoryPolicy(repoName);
-  const checkProfile = getRepositoryProfile(repoName);
-  const labels = names(pr.labels);
-  const author = pr.user?.login || '';
-  const dependabot = author === 'dependabot[bot]' || author === 'renovate[bot]';
-  const explicitAutoMerge = hasExplicitAutoMergeLabel(pr.labels, policy);
-
   if (pr.draft) return;
-  if (checkProfile?.pendingLabel && labels.has(String(checkProfile.pendingLabel).toLowerCase())) {
-    console.log('[defer]', fullName + '#' + pr.number + ': waiting for the project-specific validation adapter (' + checkProfile.pendingLabel + ')');
-    return;
-  }
-  const allowedBaseBranches = policy.allowedBaseBranches || [checkProfile?.defaultBranch || repo.default_branch].filter(Boolean);
-  if (!allowedBaseBranches.includes(pr.base.ref)) {
-    await requestReview(fullName, pr, ['triage-needed'], 'target branch is outside the repository policy');
-    return;
-  }
 
-  if ([...config.blockingLabels].some(label => labels.has(label))) {
-    await assignHumans(fullName, pr, true);
-    return;
-  }
-
-  let candidate = false;
-  if (dependabot) {
-    if (checkProfile?.autoMergeDependabot !== true) {
-      await requestReview(fullName, pr, ['needs-review'], 'automatic dependency merging is not enabled in this repository central profile');
-      return;
-    }
-    const updateType = classifyVersionUpdate(pr.title);
-    if (updateType === 'major' || updateType === 'downgrade' || updateType === 'unknown' || updateType === 'unchanged') {
-      await requestReview(fullName, pr, ['major-update'], 'dependency version could not be classified as a safe patch/minor update');
-      return;
-    }
-    if (/security|vulnerability|CVE/i.test(pr.title) || labels.has('security')) {
-      await requestReview(fullName, pr, ['security'], 'security dependency updates require human review');
-      return;
-    }
-    candidate = updateType === 'patch' || updateType === 'minor';
-  } else if (explicitAutoMerge) {
-    candidate = true;
-  }
-
-  if (!candidate) {
-    await addLabels(fullName, pr.number, ['triage-needed']);
-    if (isBot(author)) await addLabels(fullName, pr.number, ['needs-review']);
-    await assignHumans(fullName, pr, true);
-    return;
-  }
-
-  let paths;
+  let paths = [];
+  let pathsAvailable = true;
   try {
     paths = await getChangedFiles(fullName, pr.number);
   } catch (error) {
-    await requestReview(fullName, pr, ['needs-review'], 'could not inspect the full changed-file list');
+    pathsAvailable = false;
     console.warn('[files]', fullName + '#' + pr.number, error.message);
+  }
+
+  const labels = new Set(classifyPullRequestLabels(pr, paths));
+  const allowedBaseBranches = policy.allowedBaseBranches || [getRepositoryProfile(repoName)?.defaultBranch || repo.default_branch].filter(Boolean);
+  if (!allowedBaseBranches.includes(pr.base.ref)) labels.add('triage-needed');
+  if (!pathsAvailable) labels.add('triage-needed');
+  if (hasSensitivePath(paths, policy.sensitivePaths || [])) labels.add('needs-review');
+
+  // The Agent routes every non-draft PR to a human. It never merges PRs.
+  labels.add('needs-review');
+  await addLabels(fullName, pr.number, [...labels]);
+  await assignHumans(fullName, pr, true);
+
+  if (!allowedBaseBranches.includes(pr.base.ref)) {
+    console.log('[review]', fullName + '#' + pr.number + ': target branch is outside the repository policy');
     return;
   }
 
-  const workflowTouched = paths.some(path => path.startsWith('.github/workflows/') || path === '.github/dependabot.yml');
-  if (workflowTouched) {
-    await requestReview(fullName, pr, ['workflow-update'], 'workflow or repository automation changes require human review');
-    return;
-  }
-
-  if (hasSensitivePath(paths, policy.sensitivePaths || [])) {
-    await requestReview(fullName, pr, ['needs-review'], 'pull request touches a protected project path');
+  const existingLabels = names(pr.labels);
+  if ([...config.blockingLabels].some(label => existingLabels.has(label))) {
+    console.log('[review]', fullName + '#' + pr.number + ': an existing blocking label requires human review');
     return;
   }
 
@@ -320,33 +333,28 @@ async function processPullRequest(repo, pr) {
     console.warn('[pull]', fullName + '#' + pr.number, error.message);
     return;
   }
-  if (fresh.mergeable === false || fresh.mergeable_state === 'dirty') {
-    await requestReview(fullName, pr, ['merge-conflict'], 'pull request has merge conflicts');
-    return;
-  }
-  if (fresh.mergeable === null || fresh.mergeable_state === 'unknown') {
-    console.log('[defer]', fullName + '#' + pr.number + ': GitHub has not computed mergeability yet');
-    return;
-  }
 
   if (fresh.head?.sha !== pr.head.sha) {
     console.log('[defer]', fullName + '#' + pr.number + ': PR head changed during evaluation; retrying next poll');
     return;
   }
+
+  if (fresh.mergeable === false || fresh.mergeable_state === 'dirty') {
+    await addLabels(fullName, pr.number, ['merge-conflict', 'needs-review']);
+    console.log('[review]', fullName + '#' + pr.number + ': merge conflict; human resolution required');
+    return;
+  }
+  await removeLabel(fullName, pr.number, 'merge-conflict');
+
   const checkSha = pullRequestCheckSha(fresh);
   if (!checkSha) {
-    console.log('[defer]', fullName + '#' + pr.number + ': merge commit SHA is not available yet');
-    return;
-  }
-  const checkState = await getCheckState(fullName, checkSha, repoName, paths);
-
-  if (checkState !== 'success') {
-    const label = checkState === 'failure' ? 'ci-failed' : (checkState === 'pending' ? 'ci-pending' : 'ci-missing');
-    await requestReview(fullName, pr, [label], 'Required CI gate is ' + checkState + '; every centrally configured check must exist and succeed');
+    console.log('[review]', fullName + '#' + pr.number + ': awaiting GitHub mergeability/check SHA; human review remains assigned');
     return;
   }
 
-  await mergePullRequest(fullName, pr);
+  const checkState = await getCheckState(fullName, checkSha, repoName, pathsAvailable ? paths : undefined);
+  await syncCheckLabels(fullName, pr.number, checkState);
+  console.log('[human-review-required]', fullName + '#' + pr.number + ': checks=' + checkState + '; no automatic merge is performed');
 }
 
 function inferIssueCategory(issue) {

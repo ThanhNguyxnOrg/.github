@@ -15,10 +15,6 @@
       "color": "D93F0B",
       "description": "ThanhNguyxnAgent held this item for human review."
     },
-    "agentAutoMerge": {
-      "color": "0E8A16",
-      "description": "Eligible for Agent-managed merge after successful checks."
-    },
     "majorUpdate": {
       "color": "FBCA04",
       "description": "Major dependency update; human review required."
@@ -66,6 +62,34 @@
     "skillVerificationPending": {
       "color": "FBCA04",
       "description": "A project-specific validation adapter is running; the central Agent defers PR triage until it finishes."
+    },
+    "automated": {
+      "color": "EDEDED",
+      "description": "PR created by an automation bot; requires maintainer review."
+    },
+    "dependencies": {
+      "color": "0366D6",
+      "description": "Dependency or package manifest update."
+    },
+    "frontend": {
+      "color": "1D76DB",
+      "description": "Changes affecting frontend or user-interface code."
+    },
+    "backend": {
+      "color": "0052CC",
+      "description": "Changes affecting backend, API, services, or system components."
+    },
+    "tests": {
+      "color": "FBCA04",
+      "description": "Changes affecting automated tests or test fixtures."
+    },
+    "maintenance": {
+      "color": "C2E0C6",
+      "description": "Maintenance, refactoring, performance, build, or CI changes."
+    },
+    "release": {
+      "color": "5319E7",
+      "description": "Release metadata, changelog, or release automation change."
     }
   },
   "blockingLabels": [
@@ -88,10 +112,6 @@
   ],
   "ignoredRepositories": [
     ".github"
-  ],
-  "defaultAutoMergeLabels": [
-    "automerge",
-    "safe-update"
   ],
   "repositories": {
     "WriteCanvas": {

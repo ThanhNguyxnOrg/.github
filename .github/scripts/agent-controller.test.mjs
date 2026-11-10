@@ -1,8 +1,52 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyVersionUpdate, evaluateCheckRollup, hasExplicitAutoMergeLabel, pullRequestCheckSha } from './agent-controller.mjs';
+import {
+  classifyPullRequestLabels,
+  classifyVersionUpdate,
+  evaluateCheckRollup,
+  pullRequestCheckSha
+} from './agent-controller.mjs';
 
-test('Dependabot update classification is SemVer-aware', () => {
+test('dependency updates are classified for human review, never automatic merge', () => {
+  const labels = classifyPullRequestLabels(
+    { title: 'Bump lodash from 4.17.20 to 4.17.21', user: { login: 'dependabot[bot]' } },
+    ['package.json', 'package-lock.json']
+  );
+  assert.ok(labels.includes('automated'));
+  assert.ok(labels.includes('dependencies'));
+  assert.ok(!labels.includes('automerge'));
+});
+
+test('PR title and changed files produce useful type and area labels', () => {
+  const labels = classifyPullRequestLabels(
+    { title: 'feat(editor): add keyboard shortcuts', user: { login: 'contributor' } },
+    ['src/components/Editor.tsx', 'tests/editor.test.ts']
+  );
+  assert.ok(labels.includes('enhancement'));
+  assert.ok(labels.includes('frontend'));
+  assert.ok(labels.includes('tests'));
+  assert.ok(!labels.includes('triage-needed'));
+});
+
+test('security and workflow changes are explicitly classified', () => {
+  const labels = classifyPullRequestLabels(
+    { title: 'fix: patch CVE-2026-12345', body: 'Resolves a dependency vulnerability.', user: { login: 'contributor' } },
+    ['.github/workflows/ci.yml']
+  );
+  assert.ok(labels.includes('security'));
+  assert.ok(labels.includes('workflow-update'));
+  assert.ok(labels.includes('bug'));
+});
+
+test('unclassified PRs receive the triage-needed label', () => {
+  const labels = classifyPullRequestLabels(
+    { title: 'Update project files', user: { login: 'contributor' } },
+    ['misc/data.bin']
+  );
+  assert.ok(labels.includes('triage-needed'));
+});
+
+test('dependency update classification remains SemVer-aware', () => {
   assert.equal(classifyVersionUpdate('Bump foo from 1.2.3 to 1.2.4'), 'patch');
   assert.equal(classifyVersionUpdate('Bump foo from 1.2.3 to 1.4.0'), 'minor');
   assert.equal(classifyVersionUpdate('Bump foo from 1.2.3 to 2.0.0'), 'major');
@@ -16,15 +60,6 @@ test('check rollup requires evidence and rejects failed or incomplete checks', (
   assert.equal(evaluateCheckRollup([{ name: 'tests', status: 'completed', conclusion: 'failure' }], {}, ['tests']), 'failure');
   assert.equal(evaluateCheckRollup([{ name: 'tests', status: 'completed', conclusion: 'success' }], {}, ['tests']), 'success');
   assert.equal(evaluateCheckRollup([], {}, []), 'unconfigured');
-});
-
-
-test('regular pull requests require an explicit auto-merge label', () => {
-  assert.equal(hasExplicitAutoMergeLabel([], { autoMergeDefault: true }), false);
-  assert.equal(hasExplicitAutoMergeLabel([{ name: 'documentation' }], {}), false);
-  assert.equal(hasExplicitAutoMergeLabel([{ name: 'automerge' }], {}), true);
-  assert.equal(hasExplicitAutoMergeLabel([{ name: 'safe-update' }], {}), true);
-  assert.equal(hasExplicitAutoMergeLabel([{ name: 'maintainer-approved' }], { autoMergeLabels: ['maintainer-approved'] }), true);
 });
 
 test('PR checks use the synthetic merge commit SHA', () => {
