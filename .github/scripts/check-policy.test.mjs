@@ -130,11 +130,14 @@ test('CI profiles match the real project gates and quarantine known failing or o
   assert.deepEqual(getRepositoryProfile('awesome-cert-sherpa').requiredChecks, ['build / Build & Validate']);
   assert.deepEqual(getRepositoryProfile('AFTERFRAME-THE-LAST-LOOP').requiredChecks, ['verify / Verify (Bun)']);
   assert.deepEqual(getRepositoryProfile('Snapbooth').requiredChecks, ['verify / Smoke & E2E']);
-  assert.deepEqual(getRepositoryProfile('LayoutLingua').requiredChecks, [
-    'test (ubuntu-latest) / Test (ubuntu-latest)',
-    'test (windows-latest) / Test (windows-latest)',
-    'test (macos-latest) / Test (macos-latest)',
-  ]);
+  assert.deepEqual(
+    getRepositoryProfile('LayoutLingua').requiredChecks.map(check => typeof check === 'string' ? check : check.name),
+    [
+      'test (ubuntu-latest) / Test (ubuntu-latest)',
+      'test (windows-latest) / Test (windows-latest)',
+      'test (macos-latest) / Test (macos-latest)',
+    ],
+  );
   assert.deepEqual(getRepositoryProfile('apidex-hub').requiredChecks.find(check => typeof check === 'object' && check.name.startsWith('regression-tests')).name, 'regression-tests / Python Regression Tests');
   assert.equal(getRepositoryProfile('cogmint').autoMergeDependabot, false);
   assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, false);
