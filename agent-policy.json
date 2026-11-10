@@ -62,6 +62,10 @@
     "question": {
       "color": "D876E3",
       "description": "Question requiring maintainer response."
+    },
+    "skillVerificationPending": {
+      "color": "FBCA04",
+      "description": "A project-specific validation adapter is running; the central Agent defers PR triage until it finishes."
     }
   },
   "blockingLabels": [
@@ -95,9 +99,6 @@
         "main/**",
         "preload.js",
         ".github/workflows/**"
-      ],
-      "allowedBaseBranches": [
-        "master"
       ]
     },
     "Techstack-Studio": {
@@ -105,29 +106,15 @@
         "scripts/buildCatalogManifest*",
         "scripts/generateStandaloneSvgLibrary*",
         ".github/workflows/**"
-      ],
-      "allowedBaseBranches": [
-        "main"
       ]
     },
     "LayoutLingua": {
-      "autoMergeLabels": [
-        "safe-update",
-        "automerge"
-      ],
       "sensitivePaths": [
         "layoutlingua/**",
         ".github/workflows/**"
-      ],
-      "allowedBaseBranches": [
-        "main"
       ]
     },
     "apidex-hub": {
-      "autoMergeLabels": [
-        "safe-update",
-        "automerge"
-      ],
       "sensitivePaths": [
         "apis/**",
         "scripts/remove_dead_links.py",
@@ -136,16 +123,6 @@
         ".github/workflows/link-checker.yml",
         ".github/ai-instructions.md",
         "site/src/data/apis.json"
-      ],
-      "ignoredIssueLabels": [
-        "automated",
-        "incident",
-        "keep-me",
-        "stale",
-        "wontfix"
-      ],
-      "allowedBaseBranches": [
-        "main"
       ]
     }
   },
@@ -164,7 +141,8 @@
       "merge-conflict",
       "workflow-update",
       "wip",
-      "pinned"
+      "pinned",
+      "skill-verification-pending"
     ]
   }
 }
