@@ -182,13 +182,13 @@ function hasSensitivePath(paths, patterns) {
   return paths.some(path => patterns.some(pattern => pathMatches(path, pattern)));
 }
 
-async function getCheckState(fullName, sha, repoName) {
+async function getCheckState(fullName, sha, repoName, changedFiles = undefined) {
   const [runs, statuses] = await Promise.all([
     request('/repos/' + fullName + '/commits/' + sha + '/check-runs?per_page=100'),
     request('/repos/' + fullName + '/commits/' + sha + '/status')
   ]);
   const profile = getRepositoryProfile(repoName);
-  const result = evaluateRequiredChecks(runs.check_runs || [], statuses, profile?.requiredChecks || []);
+  const result = evaluateRequiredChecks(runs.check_runs || [], statuses, profile?.requiredChecks || [], changedFiles);
   if (result.state !== 'success') console.warn('[required-checks]', fullName, sha, JSON.stringify(result));
   return result.state;
 }
@@ -242,6 +242,10 @@ async function processPullRequest(repo, pr) {
   const explicitAutoMerge = hasExplicitAutoMergeLabel(pr.labels, policy);
 
   if (pr.draft) return;
+  if (checkProfile?.pendingLabel && labels.has(String(checkProfile.pendingLabel).toLowerCase())) {
+    console.log('[defer]', fullName + '#' + pr.number + ': waiting for the project-specific validation adapter (' + checkProfile.pendingLabel + ')');
+    return;
+  }
   const allowedBaseBranches = policy.allowedBaseBranches || [checkProfile?.defaultBranch || repo.default_branch].filter(Boolean);
   if (!allowedBaseBranches.includes(pr.base.ref)) {
     await requestReview(fullName, pr, ['triage-needed'], 'target branch is outside the repository policy');
@@ -318,7 +322,7 @@ async function processPullRequest(repo, pr) {
 
   let checkState = 'missing';
   try {
-    checkState = await getCheckState(fullName, pr.head.sha, repoName);
+    checkState = await getCheckState(fullName, pr.head.sha, repoName, paths);
   } catch (error) {
     console.warn('[checks]', fullName + '#' + pr.number, error.message);
   }
