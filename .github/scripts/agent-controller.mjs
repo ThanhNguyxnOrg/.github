@@ -73,7 +73,7 @@ function isBot(login) {
 
 export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
   const title = String(pullRequest?.title || '');
-  const body = String(pullRequest?.body || '').slice(0, 8000);
+  const body = String(pullRequest?.body || '');
   const author = String(pullRequest?.user?.login || '').toLowerCase();
   const text = title + '\n' + body;
   const paths = changedFiles.map(path => String(path).toLowerCase());

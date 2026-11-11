@@ -102,3 +102,12 @@ test('PR checks prefer the head SHA and fall back to the synthetic merge SHA', (
   assert.equal(pullRequestCheckSha({ merge_commit_sha: null }), null);
   assert.equal(pullRequestCheckSha({ merge_commit_sha: 'invalid' }), null);
 });
+
+test('breaking changes later in long Dependabot release-note bodies are not truncated', () => {
+  const longBody = 'Release notes\\n'.repeat(700) + '<li><strong>Breaking:</strong> API types changed.</li>';
+  const labels = classifyPullRequestLabels(
+    { title: 'build(deps): bump grouped dependencies', body: longBody, user: { login: 'dependabot[bot]' } },
+    ['Cargo.lock']
+  );
+  assert.ok(labels.includes('breaking'));
+});
