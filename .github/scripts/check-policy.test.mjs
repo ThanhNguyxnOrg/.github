@@ -155,7 +155,7 @@ test('CI profiles match the real project gates and quarantine known failing or o
   assert.equal(getRepositoryProfile('cogmint').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('PurgeKit').requiredChecks, [
     'frontend / Frontend (Svelte & TypeScript)',
-    'rust / Rust Compiler Check',
+    'Rust Compiler Check',
   ]);
   assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('blendops').requiredChecks, ['verify / Verify (BlendOps)']);
