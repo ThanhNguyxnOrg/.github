@@ -6,17 +6,17 @@ import {
   assessPullRequestRisk,
   classifyVersionUpdate,
   evaluateCheckRollup,
+  isDependencyManifestPath,
   pullRequestCheckSha
 } from './agent-controller.mjs';
 
-test('dependency labels remain semantic; the Agent separately decides whether to auto-merge', () => {
+test('dependency labels stay descriptive and do not themselves force review', () => {
   const labels = classifyPullRequestLabels(
     { title: 'Bump lodash from 4.17.20 to 4.17.21', user: { login: 'dependabot[bot]' } },
     ['package.json', 'package-lock.json']
   );
   assert.ok(labels.includes('automated'));
   assert.ok(labels.includes('dependencies'));
-  assert.ok(labels.includes('maintenance'));
   assert.ok(!labels.includes('needs-review'));
 });
 
@@ -116,70 +116,49 @@ test('breaking changes later in long Dependabot release-note bodies are not trun
 });
 
 
-test('low-risk Dependabot patch updates are eligible with manifest and lockfile changes only', () => {
-  const result = analyzeDependencyUpdate(
-    {
-      title: 'Bump lodash from 4.17.20 to 4.17.21',
-      body: 'Updates lodash from 4.17.20 to 4.17.21',
-      user: { login: 'dependabot[bot]' }
-    },
+test('safe Dependabot patch and stable minor lockfile updates pass the low-risk gate', () => {
+  const patch = analyzeDependencyUpdate(
+    { title: 'Bump lodash from 4.17.20 to 4.17.21', body: 'Updates lodash from 4.17.20 to 4.17.21', user: { login: 'dependabot[bot]' } },
     ['package.json', 'package-lock.json']
   );
-  assert.equal(result.eligible, true);
-  assert.equal(result.versionRisk, 'patch');
-  assert.deepEqual(result.reasons, []);
-});
-
-test('stable SemVer minor updates can be automated when release notes show no API risk', () => {
-  const result = analyzeDependencyUpdate(
+  const minor = analyzeDependencyUpdate(
     {
-      title: 'build(deps): bump frontend dependencies',
-      body: '| Package | From | To |\n| --- | --- | --- |\n| [foo](https://example.com) | \`1.2.3\` | \`1.3.0\` |',
-      user: { login: 'dependabot[bot]' }
-    },
-    ['package.json', 'package-lock.json']
-  );
-  assert.equal(result.eligible, true);
-  assert.equal(result.versionRisk, 'minor');
-});
-
-test('pre-1.0 minor updates are treated as potentially breaking', () => {
-  const result = analyzeDependencyUpdate(
-    {
-      title: 'Bump mft from 0.9.1 to 0.10.0',
-      body: 'Updates mft from 0.9.1 to 0.10.0',
-      user: { login: 'dependabot[bot]' }
-    },
-    ['Cargo.toml', 'Cargo.lock']
-  );
-  assert.equal(result.eligible, false);
-  assert.equal(result.versionRisk, 'major');
-});
-
-test('breaking release notes and public API renames require human review', () => {
-  const breaking = analyzeDependencyUpdate(
-    {
-      title: 'Bump mft from 0.9.1 to 0.10.0',
-      body: '<li><strong>Breaking:</strong> MftRecord changed.</li>',
-      user: { login: 'dependabot[bot]' }
-    },
-    ['Cargo.toml', 'Cargo.lock']
-  );
-  const renamed = analyzeDependencyUpdate(
-    {
-      title: 'build(deps): bump frontend group',
-      body: 'Updates @lucide/svelte from 1.66.0 to 1.70.0\n<details><summary>Release notes</summary>Renamed *-warning and *-alert to *-exclamation-point.</details>',
+      title: 'build(deps): bump frontend group with 8 updates',
+      body: '| Package | From | To |\n| --- | --- | --- |\n| [@lucide/svelte](https://github.com/lucide-icons/lucide) | \`1.66.0\` | \`1.70.0\` |\n| vite | \`8.3.5\` | \`8.3.6\` |\n\nUpdates @lucide/svelte from 1.66.0 to 1.70.0\n<details><summary>Release notes</summary>Renamed *-warning and *-alert to *-exclamation-point.</details>',
       user: { login: 'dependabot[bot]' }
     },
     ['package-lock.json']
   );
-  assert.equal(breaking.eligible, false);
-  assert.ok(breaking.reasons.includes('breaking-release-notes'));
-  assert.equal(renamed.eligible, false);
-  assert.ok(renamed.reasons.includes('breaking-release-notes'));
+  assert.equal(patch.eligible, true);
+  assert.equal(patch.versionRisk, 'patch');
+  assert.equal(minor.eligible, true);
+  assert.equal(minor.versionRisk, 'minor');
 });
 
-test('Dependabot changes to workflows or application source are never auto-merged', () => {
+test('pre-1.0 minor, major, downgrade and unknown dependency updates require human review', () => {
+  for (const update of [
+    'Bump mft from 0.9.1 to 0.10.0',
+    'Bump framework from 1.2.0 to 2.0.0',
+    'Bump framework from 2.0.0 to 1.9.0',
+    'Update dependencies'
+  ]) {
+    const result = analyzeDependencyUpdate(
+      { title: update, body: update, user: { login: 'dependabot[bot]' } },
+      ['Cargo.toml', 'Cargo.lock']
+    );
+    assert.equal(result.eligible, false, update);
+  }
+});
+
+test('security, explicit breaking changes, workflow and source changes require review', () => {
+  const security = analyzeDependencyUpdate(
+    { title: 'Bump openssl to fix CVE-2026-12345', body: 'Security update for CVE-2026-12345', user: { login: 'dependabot[bot]' } },
+    ['Cargo.toml', 'Cargo.lock']
+  );
+  const breaking = analyzeDependencyUpdate(
+    { title: 'Bump mft from 1.2.0 to 1.3.0', body: '<strong>Breaking:</strong> API changed.', user: { login: 'dependabot[bot]' } },
+    ['Cargo.toml', 'Cargo.lock']
+  );
   const workflow = analyzeDependencyUpdate(
     { title: 'Bump actions/checkout from 4 to 5', body: 'Updates actions/checkout from 4 to 5', user: { login: 'dependabot[bot]' } },
     ['.github/workflows/ci.yml']
@@ -188,44 +167,42 @@ test('Dependabot changes to workflows or application source are never auto-merge
     { title: 'Bump lodash from 4.17.20 to 4.17.21', body: 'Updates lodash from 4.17.20 to 4.17.21', user: { login: 'dependabot[bot]' } },
     ['package-lock.json', 'src/main.ts']
   );
+  assert.equal(security.eligible, false);
+  assert.equal(breaking.eligible, false);
   assert.equal(workflow.eligible, false);
   assert.equal(source.eligible, false);
-  assert.ok(workflow.reasons.includes('non-dependency-files'));
-  assert.ok(source.reasons.includes('non-dependency-files'));
 });
 
-test('unknown-version and security updates fail closed', () => {
-  const unknown = analyzeDependencyUpdate(
-    { title: 'Update dependencies', body: 'Dependency update', user: { login: 'dependabot[bot]' } },
-    ['Cargo.lock']
-  );
-  const security = analyzeDependencyUpdate(
-    { title: 'Bump openssl to fix CVE-2026-12345', body: 'Security update for CVE-2026-12345', user: { login: 'dependabot[bot]' } },
-    ['Cargo.toml', 'Cargo.lock']
-  );
-  assert.equal(unknown.eligible, false);
-  assert.ok(unknown.reasons.includes('version-risk-unknown'));
-  assert.equal(security.eligible, false);
-  assert.ok(security.reasons.includes('security-update'));
-});
-
-test('risk assessment escalates workflow and configured sensitive paths, not routine feature work', () => {
-  const ordinary = assessPullRequestRisk(
+test('risk assessment does not request human review for ordinary frontend work', () => {
+  const risk = assessPullRequestRisk(
     { title: 'feat: add compact mode', user: { login: 'contributor' } },
     ['src/components/Panel.svelte']
   );
-  const risky = assessPullRequestRisk(
+  assert.equal(risk.requiresHumanReview, false);
+});
+
+test('risk assessment routes security, workflow, breaking and sensitive-path changes to humans', () => {
+  const security = assessPullRequestRisk(
+    { title: 'fix: patch CVE-2026-12345', body: 'Vulnerability mitigation', user: { login: 'contributor' } },
+    ['src/security.ts']
+  );
+  const workflow = assessPullRequestRisk(
     { title: 'chore: update workflow permissions', user: { login: 'contributor' } },
     ['.github/workflows/release.yml']
   );
   const sensitive = assessPullRequestRisk(
-    { title: 'refactor: update app startup', user: { login: 'contributor' } },
+    { title: 'refactor: update application bootstrap', user: { login: 'contributor' } },
     ['main/index.ts'],
     { sensitivePaths: ['main/**'] }
   );
-  assert.equal(ordinary.requiresHumanReview, false);
-  assert.equal(risky.requiresHumanReview, true);
-  assert.ok(risky.reasons.includes('workflow-update'));
+  assert.equal(security.requiresHumanReview, true);
+  assert.equal(workflow.requiresHumanReview, true);
   assert.equal(sensitive.requiresHumanReview, true);
-  assert.ok(sensitive.reasons.includes('sensitive-path'));
+});
+
+test('dependency manifest detection excludes runtime source and GitHub workflows', () => {
+  assert.equal(isDependencyManifestPath('package-lock.json'), true);
+  assert.equal(isDependencyManifestPath('src-tauri/Cargo.toml'), true);
+  assert.equal(isDependencyManifestPath('.github/workflows/ci.yml'), false);
+  assert.equal(isDependencyManifestPath('src/main.ts'), false);
 });

@@ -3,8 +3,7 @@
   "organization": "ThanhNguyxnOrg",
   "pollIntervalMinutes": 10,
   "reviewers": [
-    "RealThanhNguyxn",
-    "ThanhNguyxn07"
+    "RealThanhNguyxn"
   ],
   "labels": {
     "triageNeeded": {
@@ -69,7 +68,7 @@
     },
     "automated": {
       "color": "EDEDED",
-      "description": "PR created by an automation bot; requires maintainer review."
+      "description": "Created by an automation bot; assessed by the risk-based PR controller."
     },
     "dependencies": {
       "color": "0366D6",
@@ -94,6 +93,14 @@
     "release": {
       "color": "5319E7",
       "description": "Release metadata, changelog, or release automation change."
+    },
+    "automerge": {
+      "color": "0E8A16",
+      "description": "Low-risk Dependabot update queued for Auto-merge after required CI checks pass."
+    },
+    "automergeBlocked": {
+      "color": "FBCA04",
+      "description": "Low-risk update could not be queued for Auto-merge because repository settings or merge methods block it."
     }
   },
   "blockingLabels": [
@@ -170,5 +177,9 @@
       "skill-verification-pending"
     ],
     "activityTimestampToleranceMinutes": 5
-  }
+  },
+  "legacyReviewers": [
+    "RealThanhNguyxn",
+    "ThanhNguyxn07"
+  ]
 }

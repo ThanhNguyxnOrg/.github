@@ -1,4 +1,4 @@
-name: ThanhNguyxnAgent — Organization Controller
+name: ThanhNguyxnAgent — Risk-Based PR Controller
 
 on:
   push:
@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   reconcile:
-    name: Triage PRs and issues; route all changes to human review
+    name: Triage issues, auto-merge safe dependencies, and route risky PRs to humans
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

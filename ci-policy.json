@@ -16,7 +16,7 @@
     },
     "blendops": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
+      "autoMergeDependabot": true,
       "requiredChecks": [
         "verify / Verify (BlendOps)"
       ]
@@ -90,7 +90,7 @@
     },
     "PurgeKit": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
+      "autoMergeDependabot": true,
       "requiredChecks": [
         "frontend / Frontend (Svelte & TypeScript)",
         "Rust Compiler Check"
@@ -164,7 +164,7 @@
     },
     "WriteCanvas": {
       "defaultBranch": "master",
-      "autoMergeDependabot": false,
+      "autoMergeDependabot": true,
       "requiredChecks": [
         "tests (ubuntu-latest, 22.x) / ubuntu-latest / node 22.x",
         "tests (ubuntu-latest, 24.x) / ubuntu-latest / node 24.x",
