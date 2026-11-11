@@ -43,6 +43,10 @@
       "color": "D73A4A",
       "description": "Security-sensitive issue or change; human review required."
     },
+    "breaking": {
+      "color": "B60205",
+      "description": "A dependency or code change documents a breaking or backward-incompatible change; human review required."
+    },
     "bug": {
       "color": "D73A4A",
       "description": "Bug report."
@@ -154,6 +158,7 @@
       "incident",
       "automated",
       "security",
+      "breaking",
       "needs-review",
       "ci-failed",
       "ci-pending",

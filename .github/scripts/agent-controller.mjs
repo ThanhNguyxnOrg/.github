@@ -58,8 +58,13 @@ function names(labels) {
 }
 
 export function pullRequestCheckSha(pullRequest) {
-  const sha = String(pullRequest?.merge_commit_sha || '').trim();
-  return /^[0-9a-f]{40}$/i.test(sha) ? sha : null;
+  // GitHub Actions/CodeRabbit checks are commonly attached to the PR head.
+  // Prefer that SHA; the synthetic merge SHA is only a fallback when no head SHA is exposed.
+  const headSha = String(pullRequest?.head?.sha || '').trim();
+  if (/^[0-9a-f]{40}$/i.test(headSha)) return headSha;
+
+  const mergeSha = String(pullRequest?.merge_commit_sha || '').trim();
+  return /^[0-9a-f]{40}$/i.test(mergeSha) ? mergeSha : null;
 }
 
 function isBot(login) {
@@ -79,8 +84,11 @@ export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
   if (dependencyBot || /\b(dependencies|dependency|bump|update package|update action)\b/i.test(title)) {
     labels.add('dependencies');
   }
-  if (dependencyBot && ['major', 'downgrade'].includes(classifyVersionUpdate(title))) {
+  if (dependencyBot && ['major', 'downgrade'].includes(classifyVersionUpdate(text))) {
     labels.add('major-update');
+  }
+  if (dependencyBot && /\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)\b/i.test(body)) {
+    labels.add('breaking');
   }
   if (/\b(security|vulnerability|CVE-\d{4}-\d+|exploit|credential leak)\b/i.test(text)) {
     labels.add('security');
@@ -135,11 +143,9 @@ function pathMatches(path, pattern) {
   return path === pattern;
 }
 
-export function classifyVersionUpdate(title) {
-  const match = String(title || '').match(/\bfrom\s+v?(\d+(?:\.\d+){0,2})\s+to\s+v?(\d+(?:\.\d+){0,2})/i);
-  if (!match) return 'unknown';
-  const oldParts = match[1].split('.').map(Number);
-  const newParts = match[2].split('.').map(Number);
+function classifyVersionPair(oldVersion, newVersion) {
+  const oldParts = oldVersion.split('.').map(Number);
+  const newParts = newVersion.split('.').map(Number);
   while (oldParts.length < 3) oldParts.push(0);
   while (newParts.length < 3) newParts.push(0);
   if (newParts.every((part, index) => part === oldParts[index])) return 'unchanged';
@@ -148,6 +154,35 @@ export function classifyVersionUpdate(title) {
   if (newParts[1] > oldParts[1]) return 'minor';
   if (newParts[1] < oldParts[1]) return 'downgrade';
   return newParts[2] > oldParts[2] ? 'patch' : 'downgrade';
+}
+
+export function classifyVersionUpdate(value) {
+  const text = String(value || '');
+  const pairs = [];
+
+  // Dependabot single-package summaries and grouped release-note entries.
+  const fromToPattern = /\bfrom\s+v?(\d+(?:\.\d+){0,2})\s+to\s+v?(\d+(?:\.\d+){0,2})/gi;
+  for (const match of text.matchAll(fromToPattern)) {
+    pairs.push([match[1], match[2]]);
+  }
+
+  // Dependabot grouped npm PRs commonly put old/new versions in a Markdown table.
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.includes('|')) continue;
+    const cells = line.split('|').map(cell => cell.trim()).filter(Boolean);
+    if (cells.length < 3) continue;
+    const oldVersion = cells.at(-2).match(/^\x60v?(\d+(?:\.\d+){0,2})\x60?$/i)?.[1];
+    const newVersion = cells.at(-1).match(/^\x60v?(\d+(?:\.\d+){0,2})\x60?$/i)?.[1];
+    if (oldVersion && newVersion) pairs.push([oldVersion, newVersion]);
+  }
+
+  if (!pairs.length) return 'unknown';
+  const classifications = pairs.map(([oldVersion, newVersion]) => classifyVersionPair(oldVersion, newVersion));
+  if (classifications.includes('major')) return 'major';
+  if (classifications.includes('downgrade')) return 'downgrade';
+  if (classifications.includes('minor')) return 'minor';
+  if (classifications.includes('patch')) return 'patch';
+  return 'unchanged';
 }
 
 export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredChecks = []) {
@@ -317,6 +352,7 @@ async function processPullRequest(repo, pr) {
   labels.add('needs-review');
   await addLabels(fullName, pr.number, [...labels]);
   await assignHumans(fullName, pr, true);
+  console.log('[triaged]', fullName + '#' + pr.number + ': labels=' + [...labels].join(',') + '; maintainer assignment and review requests reconciled');
 
   if (!allowedBaseBranches.includes(pr.base.ref)) {
     console.log('[review]', fullName + '#' + pr.number + ': target branch is outside the repository policy');

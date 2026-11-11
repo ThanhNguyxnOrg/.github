@@ -59,12 +59,31 @@ test('unclassified PRs receive the triage-needed label', () => {
   assert.ok(labels.includes('triage-needed'));
 });
 
-test('dependency update classification remains SemVer-aware', () => {
+test('dependency update classification remains SemVer-aware across grouped summaries', () => {
   assert.equal(classifyVersionUpdate('Bump foo from 1.2.3 to 1.2.4'), 'patch');
   assert.equal(classifyVersionUpdate('Bump foo from 1.2.3 to 1.4.0'), 'minor');
   assert.equal(classifyVersionUpdate('Bump foo from 1.2.3 to 2.0.0'), 'major');
   assert.equal(classifyVersionUpdate('Bump actions/checkout from 4 to 5'), 'major');
+  assert.equal(classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\nUpdates bar from 0.9.1 to 0.10.0'), 'minor');
+  assert.equal(classifyVersionUpdate('| Package | From | To |\n| [foo](https://example.com) | \x601.0.0\x60 | \x602.0.0\x60 |'), 'major');
+  assert.equal(classifyVersionUpdate('| Package | From | To |\n| foo | \x602.0.0\x60 | \x601.9.0\x60 |'), 'downgrade');
   assert.equal(classifyVersionUpdate('Update dependencies'), 'unknown');
+});
+test('grouped Dependabot summaries classify documented breaking changes', () => {
+  const labels = classifyPullRequestLabels(
+    {
+      title: 'build(deps): bump the rust-dependencies group in /src-tauri with 3 updates',
+      body: 'Updates uuid from 1.29.0 to 1.29.1\\nUpdates mft from 0.9.1 to 0.10.0\\n**Breaking:** mft no longer depends on winstructs.',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['src-tauri/Cargo.lock', 'src-tauri/Cargo.toml']
+  );
+  assert.ok(labels.includes('automated'));
+  assert.ok(labels.includes('dependencies'));
+  assert.ok(labels.includes('backend'));
+  assert.ok(labels.includes('maintenance'));
+  assert.ok(labels.includes('breaking'));
+  assert.ok(!labels.includes('triage-needed'));
 });
 
 test('check rollup requires evidence and rejects failed or incomplete checks', () => {
@@ -75,9 +94,11 @@ test('check rollup requires evidence and rejects failed or incomplete checks', (
   assert.equal(evaluateCheckRollup([], {}, []), 'unconfigured');
 });
 
-test('PR checks use the synthetic merge commit SHA', () => {
+test('PR checks prefer the head SHA and fall back to the synthetic merge SHA', () => {
+  const headSha = 'b'.repeat(40);
   const mergeSha = 'a'.repeat(40);
-  assert.equal(pullRequestCheckSha({ head: { sha: 'b'.repeat(40) }, merge_commit_sha: mergeSha }), mergeSha);
+  assert.equal(pullRequestCheckSha({ head: { sha: headSha }, merge_commit_sha: mergeSha }), headSha);
+  assert.equal(pullRequestCheckSha({ head: { sha: 'invalid' }, merge_commit_sha: mergeSha }), mergeSha);
   assert.equal(pullRequestCheckSha({ merge_commit_sha: null }), null);
   assert.equal(pullRequestCheckSha({ merge_commit_sha: 'invalid' }), null);
 });
