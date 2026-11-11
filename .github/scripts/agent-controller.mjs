@@ -84,11 +84,10 @@ export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
   if (dependencyBot || /\b(dependencies|dependency|bump|update package|update action)\b/i.test(title)) {
     labels.add('dependencies');
   }
-  if (dependencyBot && ['major', 'downgrade'].includes(classifyVersionUpdate(text))) {
+  if (dependencyBot && ['major', 'downgrade'].includes(classifyVersionUpdate(dependencySummary(pullRequest)))) {
     labels.add('major-update');
   }
-  const plainBody = body.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
-  if (dependencyBot && /\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)/i.test(plainBody)) {
+  if (dependencyBot && hasDependencyApiRisk(body)) {
     labels.add('breaking');
   }
   if (/\b(security|vulnerability|CVE-\d{4}-\d+|exploit|credential leak)\b/i.test(text)) {
@@ -144,49 +143,7 @@ function pathMatches(path, pattern) {
   return path === pattern;
 }
 
-function classifyVersionPair(oldVersion, newVersion) {
-  const oldParts = oldVersion.split('.').map(Number);
-  const newParts = newVersion.split('.').map(Number);
-  while (oldParts.length < 3) oldParts.push(0);
-  while (newParts.length < 3) newParts.push(0);
-  if (newParts.every((part, index) => part === oldParts[index])) return 'unchanged';
-  if (newParts[0] > oldParts[0]) return 'major';
-  if (newParts[0] < oldParts[0]) return 'downgrade';
-  if (newParts[1] > oldParts[1]) return 'minor';
-  if (newParts[1] < oldParts[1]) return 'downgrade';
-  return newParts[2] > oldParts[2] ? 'patch' : 'downgrade';
-}
-
-export function classifyVersionUpdate(value) {
-  const text = String(value || '');
-  const pairs = [];
-
-  // Dependabot single-package summaries and grouped release-note entries.
-  const fromToPattern = /\bfrom\s+v?(\d+(?:\.\d+){0,2})\s+to\s+v?(\d+(?:\.\d+){0,2})/gi;
-  for (const match of text.matchAll(fromToPattern)) {
-    pairs.push([match[1], match[2]]);
-  }
-
-  // Dependabot grouped npm PRs commonly put old/new versions in a Markdown table.
-  for (const line of text.split(/\r?\n/)) {
-    if (!line.includes('|')) continue;
-    const cells = line.split('|').map(cell => cell.trim()).filter(Boolean);
-    if (cells.length < 3) continue;
-    const oldVersion = cells.at(-2).match(/^\x60v?(\d+(?:\.\d+){0,2})\x60?$/i)?.[1];
-    const newVersion = cells.at(-1).match(/^\x60v?(\d+(?:\.\d+){0,2})\x60?$/i)?.[1];
-    if (oldVersion && newVersion) pairs.push([oldVersion, newVersion]);
-  }
-
-  if (!pairs.length) return 'unknown';
-  const classifications = pairs.map(([oldVersion, newVersion]) => classifyVersionPair(oldVersion, newVersion));
-  if (classifications.includes('major')) return 'major';
-  if (classifications.includes('downgrade')) return 'downgrade';
-  if (classifications.includes('minor')) return 'minor';
-  if (classifications.includes('patch')) return 'patch';
-  return 'unchanged';
-}
-
-export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredChecks = []) {
+0export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredChecks = []) {
   return evaluateRequiredChecks(checkRuns, statuses, requiredChecks).state;
 }
 
@@ -235,7 +192,11 @@ async function addLabels(fullName, number, labelNames) {
 }
 
 function reviewersFor(login) {
-  return config.reviewers.filter(name => name.toLowerCase() !== String(login || '').toLowerCase());
+  return (config.reviewers || []).filter(name => name.toLowerCase() !== String(login || '').toLowerCase());
+}
+
+function managedReviewerNames() {
+  return [...new Set([...(config.reviewers || []), ...(config.legacyReviewers || [])])];
 }
 
 async function assignHumans(fullName, item, isPullRequest) {
@@ -245,8 +206,7 @@ async function assignHumans(fullName, item, isPullRequest) {
   if (assignees.length) {
     try {
       await request('/repos/' + fullName + '/issues/' + item.number + '/assignees', {
-        method: 'POST',
-        body: { assignees }
+        method: 'POST', body: { assignees }
       });
     } catch (error) {
       console.warn('[assign]', fullName + '#' + item.number, error.message);
@@ -258,13 +218,80 @@ async function assignHumans(fullName, item, isPullRequest) {
     if (missing.length) {
       try {
         await request('/repos/' + fullName + '/pulls/' + item.number + '/requested_reviewers', {
-          method: 'POST',
-          body: { reviewers: missing }
+          method: 'POST', body: { reviewers: missing }
         });
       } catch (error) {
         console.warn('[review-request]', fullName + '#' + item.number, error.message);
       }
     }
+  }
+}
+
+async function reconcileReviewRouting(fullName, item, keepReviewers = []) {
+  const keep = new Set(keepReviewers.map(name => name.toLowerCase()));
+  const managed = new Set(managedReviewerNames().map(name => name.toLowerCase()));
+  const obsolete = [...managed].filter(name => !keep.has(name));
+  const requested = (item.requested_reviewers || []).map(user => user.login).filter(name => obsolete.includes(name.toLowerCase()));
+  const assigned = (item.assignees || []).map(user => user.login).filter(name => obsolete.includes(name.toLowerCase()));
+
+  if (requested.length) {
+    try {
+      await request('/repos/' + fullName + '/pulls/' + item.number + '/requested_reviewers', {
+        method: 'DELETE', body: { reviewers: requested }
+      });
+    } catch (error) {
+      console.warn('[review-request-remove]', fullName + '#' + item.number, error.message);
+    }
+  }
+  if (assigned.length) {
+    try {
+      await request('/repos/' + fullName + '/issues/' + item.number + '/assignees', {
+        method: 'DELETE', body: { assignees: assigned }
+      });
+    } catch (error) {
+      console.warn('[assignee-remove]', fullName + '#' + item.number, error.message);
+    }
+  }
+}
+
+async function graphql(query, variables) {
+  const response = await request('/graphql', { method: 'POST', body: { query, variables } });
+  if (Array.isArray(response.errors) && response.errors.length) {
+    throw new Error(response.errors.map(item => item.message || 'GraphQL error').join('; '));
+  }
+  return response.data || {};
+}
+
+function preferredMergeMethod(repo, policy) {
+  const configured = String(policy.mergeMethod || '').toUpperCase();
+  if (['MERGE', 'SQUASH', 'REBASE'].includes(configured)) return configured;
+  if (repo.allow_squash_merge === true) return 'SQUASH';
+  if (repo.allow_merge_commit === true) return 'MERGE';
+  if (repo.allow_rebase_merge === true) return 'REBASE';
+  return null;
+}
+
+async function enablePullRequestAutoMerge(fullName, pullRequest, mergeMethod) {
+  if (pullRequest.auto_merge) return;
+  if (!pullRequest.node_id) throw new Error('PR node_id is unavailable for Auto-merge');
+  const data = await graphql(
+    'mutation($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) { enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: $mergeMethod }) { pullRequest { number autoMergeRequest { enabledAt mergeMethod } } } }',
+    { pullRequestId: pullRequest.node_id, mergeMethod }
+  );
+  if (!data.enablePullRequestAutoMerge?.pullRequest?.autoMergeRequest) {
+    throw new Error('GitHub did not return an enabled Auto-merge request for ' + fullName + '#' + pullRequest.number);
+  }
+}
+
+async function disablePullRequestAutoMerge(fullName, pullRequest) {
+  if (!pullRequest.auto_merge) return;
+  if (!pullRequest.node_id) throw new Error('PR node_id is unavailable while disabling Auto-merge');
+  const data = await graphql(
+    'mutation($pullRequestId: ID!) { disablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId }) { pullRequest { number autoMergeRequest { enabledAt } } } }',
+    { pullRequestId: pullRequest.node_id }
+  );
+  if (!data.disablePullRequestAutoMerge?.pullRequest) {
+    throw new Error('GitHub did not confirm Auto-merge was disabled for ' + fullName + '#' + pullRequest.number);
   }
 }
 
@@ -325,7 +352,11 @@ async function syncCheckLabels(fullName, number, state) {
   for (const label of labels) {
     if (label !== current) await removeLabel(fullName, number, label);
   }
-  if (current) await addLabels(fullName, number, [current, 'needs-review']);
+  if (current) {
+    await addLabels(fullName, number, current === 'ci-failed' || current === 'ci-missing'
+      ? [current, 'needs-review']
+      : [current]);
+  }
 }
 
 async function processPullRequest(repo, pr) {
@@ -343,28 +374,13 @@ async function processPullRequest(repo, pr) {
     console.warn('[files]', fullName + '#' + pr.number, error.message);
   }
 
+  const risk = assessPullRequestRisk(pr, paths, policy);
   const labels = new Set(classifyPullRequestLabels(pr, paths));
   const allowedBaseBranches = policy.allowedBaseBranches || [getRepositoryProfile(repoName)?.defaultBranch || repo.default_branch].filter(Boolean);
-  if (!allowedBaseBranches.includes(pr.base.ref)) labels.add('triage-needed');
-  if (!pathsAvailable) labels.add('triage-needed');
-  if (hasSensitivePath(paths, policy.sensitivePaths || [])) labels.add('needs-review');
-
-  // The Agent routes every non-draft PR to a human. It never merges PRs.
-  labels.add('needs-review');
+  const riskReasons = [...risk.reasons];
+  if (!allowedBaseBranches.includes(pr.base.ref)) riskReasons.push('target-branch-outside-policy');
+  if (!pathsAvailable) riskReasons.push('changed-files-unavailable');
   await addLabels(fullName, pr.number, [...labels]);
-  await assignHumans(fullName, pr, true);
-  console.log('[triaged]', fullName + '#' + pr.number + ': labels=' + [...labels].join(',') + '; maintainer assignment and review requests reconciled');
-
-  if (!allowedBaseBranches.includes(pr.base.ref)) {
-    console.log('[review]', fullName + '#' + pr.number + ': target branch is outside the repository policy');
-    return;
-  }
-
-  const existingLabels = names(pr.labels);
-  const activeBlocks = [...config.blockingLabels].filter(label => existingLabels.has(label));
-  if (activeBlocks.length) {
-    console.log('[review]', fullName + '#' + pr.number + ': human review remains required because of ' + activeBlocks.join(', '));
-  }
 
   let fresh;
   try {
@@ -373,28 +389,106 @@ async function processPullRequest(repo, pr) {
     console.warn('[pull]', fullName + '#' + pr.number, error.message);
     return;
   }
-
   if (fresh.head?.sha !== pr.head.sha) {
     console.log('[defer]', fullName + '#' + pr.number + ': PR head changed during evaluation; retrying next poll');
     return;
   }
 
   if (fresh.mergeable === false || fresh.mergeable_state === 'dirty') {
-    await addLabels(fullName, pr.number, ['merge-conflict', 'needs-review']);
-    console.log('[review]', fullName + '#' + pr.number + ': merge conflict; human resolution required');
-    return;
+    riskReasons.push('merge-conflict');
+    await addLabels(fullName, pr.number, ['merge-conflict']);
+  } else if (fresh.mergeable === true) {
+    await removeLabel(fullName, pr.number, 'merge-conflict');
+  } else {
+    console.log('[defer]', fullName + '#' + pr.number + ': GitHub is still computing mergeability');
   }
-  await removeLabel(fullName, pr.number, 'merge-conflict');
 
   const checkSha = pullRequestCheckSha(fresh);
-  if (!checkSha) {
-    console.log('[review]', fullName + '#' + pr.number + ': awaiting GitHub mergeability/check SHA; human review remains assigned');
+  const checkState = checkSha
+    ? await getCheckState(fullName, checkSha, repoName, pathsAvailable ? paths : undefined)
+    : 'unconfigured';
+  await syncCheckLabels(fullName, pr.number, checkState);
+  if (['failure', 'missing', 'unconfigured'].includes(checkState)) riskReasons.push('required-checks-' + checkState);
+
+  const initialLabels = names(pr.labels);
+  for (const label of ['do-not-merge', 'breaking-change', 'wip']) {
+    if (initialLabels.has(label)) riskReasons.push(label);
+  }
+  const dependencyBot = String(pr.user?.login || '').toLowerCase() === 'dependabot[bot]';
+  const uniqueReasons = [...new Set(riskReasons)];
+
+  if (uniqueReasons.length) {
+    await addLabels(fullName, pr.number, ['needs-review']);
+    await removeLabel(fullName, pr.number, 'automerge');
+    await removeLabel(fullName, pr.number, 'automerge-blocked');
+    await disablePullRequestAutoMerge(fullName, fresh);
+    await reconcileReviewRouting(fullName, pr, config.reviewers || []);
+    await assignHumans(fullName, pr, true);
+    console.log('[human-review-required]', fullName + '#' + pr.number + ': reasons=' + uniqueReasons.join(',') + '; checks=' + checkState);
     return;
   }
 
-  const checkState = await getCheckState(fullName, checkSha, repoName, pathsAvailable ? paths : undefined);
-  await syncCheckLabels(fullName, pr.number, checkState);
-  console.log('[human-review-required]', fullName + '#' + pr.number + ': checks=' + checkState + '; no automatic merge is performed');
+  // Remove blanket routing created by the previous controller; CodeRabbit remains independent.
+  await removeLabel(fullName, pr.number, 'needs-review');
+  await reconcileReviewRouting(fullName, pr, []);
+
+  if (!dependencyBot) {
+    await removeLabel(fullName, pr.number, 'automerge');
+    console.log('[triaged]', fullName + '#' + pr.number + ': no high-risk changes; no human review request needed');
+    return;
+  }
+
+  const dependency = risk.dependency || analyzeDependencyUpdate(pr, paths);
+  if (!dependency.eligible) {
+    await addLabels(fullName, pr.number, ['needs-review']);
+    await reconcileReviewRouting(fullName, pr, config.reviewers || []);
+    await assignHumans(fullName, pr, true);
+    console.log('[human-review-required]', fullName + '#' + pr.number + ': dependency update not auto-merge eligible (' + dependency.reasons.join(',') + ')');
+    return;
+  }
+
+  if (checkState === 'pending') {
+    await removeLabel(fullName, pr.number, 'automerge');
+    console.log('[auto-merge-wait]', fullName + '#' + pr.number + ': low-risk ' + dependency.versionRisk + ' update; waiting for required checks');
+    return;
+  }
+
+  const profile = getRepositoryProfile(repoName);
+  if (policy.autoMergeDependabot !== true || !Array.isArray(profile?.requiredChecks) || profile.requiredChecks.length === 0) {
+    await removeLabel(fullName, pr.number, 'automerge');
+    console.log('[auto-merge-disabled]', fullName + '#' + pr.number + ': repository is not opted in or has no required-check policy');
+    return;
+  }
+
+  let repositorySettings = repo;
+  if (typeof repositorySettings.allow_auto_merge !== 'boolean'
+      || typeof repositorySettings.allow_squash_merge !== 'boolean'
+      || typeof repositorySettings.allow_merge_commit !== 'boolean'
+      || typeof repositorySettings.allow_rebase_merge !== 'boolean') {
+    repositorySettings = { ...repo, ...(await request('/repos/' + fullName)) };
+  }
+  if (repositorySettings.allow_auto_merge !== true) {
+    await addLabels(fullName, pr.number, ['automerge-blocked']);
+    console.warn('[auto-merge-blocked]', fullName + '#' + pr.number + ': Allow auto-merge is disabled in repository settings');
+    return;
+  }
+
+  const mergeMethod = preferredMergeMethod(repositorySettings, policy);
+  if (!mergeMethod) {
+    await addLabels(fullName, pr.number, ['automerge-blocked']);
+    console.warn('[auto-merge-blocked]', fullName + '#' + pr.number + ': no enabled merge method');
+    return;
+  }
+
+  try {
+    await enablePullRequestAutoMerge(fullName, fresh, mergeMethod);
+    await removeLabel(fullName, pr.number, 'automerge-blocked');
+    await addLabels(fullName, pr.number, ['automerge']);
+    console.log('[auto-merge-enabled]', fullName + '#' + pr.number + ': low-risk ' + dependency.versionRisk + ' Dependabot update; checks=success; method=' + mergeMethod);
+  } catch (error) {
+    await addLabels(fullName, pr.number, ['automerge-blocked']);
+    console.warn('[auto-merge-error]', fullName + '#' + pr.number, error.message);
+  }
 }
 
 function inferIssueCategory(issue) {
