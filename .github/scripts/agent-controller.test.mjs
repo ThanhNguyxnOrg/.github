@@ -73,7 +73,7 @@ test('grouped Dependabot summaries classify documented breaking changes', () => 
   const labels = classifyPullRequestLabels(
     {
       title: 'build(deps): bump the rust-dependencies group in /src-tauri with 3 updates',
-      body: 'Updates uuid from 1.29.0 to 1.29.1\\nUpdates mft from 0.9.1 to 0.10.0\\n**Breaking:** mft no longer depends on winstructs.',
+      body: 'Updates uuid from 1.29.0 to 1.29.1\nUpdates mft from 0.9.1 to 0.10.0\n**Breaking:** mft no longer depends on winstructs.',
       user: { login: 'dependabot[bot]' }
     },
     ['src-tauri/Cargo.lock', 'src-tauri/Cargo.toml']
