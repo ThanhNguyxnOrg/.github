@@ -87,7 +87,8 @@ export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
   if (dependencyBot && ['major', 'downgrade'].includes(classifyVersionUpdate(text))) {
     labels.add('major-update');
   }
-  if (dependencyBot && /\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)/i.test(body)) {
+  const plainBody = body.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
+  if (dependencyBot && /\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)/i.test(plainBody)) {
     labels.add('breaking');
   }
   if (/\b(security|vulnerability|CVE-\d{4}-\d+|exploit|credential leak)\b/i.test(text)) {

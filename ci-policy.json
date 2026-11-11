@@ -93,7 +93,7 @@
       "autoMergeDependabot": false,
       "requiredChecks": [
         "frontend / Frontend (Svelte & TypeScript)",
-        "rust / Rust Compiler Check"
+        "Rust Compiler Check"
       ]
     },
     "LayoutLingua": {
