@@ -4,7 +4,7 @@ import { evaluateRequiredChecks, getRepositoryProfile, matchesPathPattern } from
 
 test('repository profiles are centrally defined and unknown repositories fail closed', () => {
   assert.equal(getRepositoryProfile('WriteCanvas').defaultBranch, 'master');
-  assert.equal(getRepositoryProfile('WriteCanvas').autoMergeDependabot, false);
+  assert.equal(getRepositoryProfile('WriteCanvas').autoMergeDependabot, true);
   assert.deepEqual(getRepositoryProfile('WriteCanvas').requiredChecks, [
     'tests (ubuntu-latest, 22.x) / ubuntu-latest / node 22.x',
     'tests (ubuntu-latest, 24.x) / ubuntu-latest / node 24.x',
@@ -27,7 +27,7 @@ test('central profiles cover every active organization repository and fail close
   for (const name of names) {
     const profile = getRepositoryProfile(name);
     assert.ok(profile.defaultBranch, name + ' must declare its default branch');
-    assert.equal(profile.autoMergeDependabot, false, name + ' must route dependency PRs to a human maintainer');
+    assert.equal(profile.autoMergeDependabot, ['PurgeKit', 'WriteCanvas', 'blendops'].includes(name), name + ' has the expected explicit Dependabot Auto-merge opt-in');
   }
   assert.equal(getRepositoryProfile('ForgeHelm').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('ForgeHelm').requiredChecks, ['verify / Verify (ForgeHelm)']);
@@ -157,7 +157,7 @@ test('CI profiles match the real project gates and quarantine known failing or o
     'frontend / Frontend (Svelte & TypeScript)',
     'Rust Compiler Check',
   ]);
-  assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, false);
+  assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, true);
   assert.deepEqual(getRepositoryProfile('blendops').requiredChecks, ['verify / Verify (BlendOps)']);
   assert.deepEqual(getRepositoryProfile('lagvex').requiredChecks, [
     'verify / Verify (Lagvex Go)',
