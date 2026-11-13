@@ -95,17 +95,30 @@ function encodedPath(path) {
   return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
 }
 
+export function normalizeTargetRepository(value, organization = ORG) {
+  const fullName = String(value || '').trim();
+  const match = /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(fullName);
+  if (!match) throw new Error('TARGET_REPOSITORY must be an owner/repository pair');
+  if (match[1].toLowerCase() !== String(organization).toLowerCase()) {
+    throw new Error('TARGET_REPOSITORY is outside the configured organization');
+  }
+  return match[1] + '/' + match[2];
+}
+
 export async function onboardRepositories({
   token = TOKEN,
   organization = ORG,
   fetchImpl = fetch,
   workflows = loadWorkflowTemplates(),
   ignoredRepositories = ['.github'],
+  targetRepository = process.env.TARGET_REPOSITORY,
   log = console
 } = {}) {
   if (!token) throw new Error('GH_TOKEN is required');
   const { request, listAll } = createClient(token, fetchImpl);
-  const repositories = await listAll('/orgs/' + encodeURIComponent(organization) + '/repos?type=all');
+  const repositories = targetRepository
+    ? [await request('/repos/' + encodedPath(normalizeTargetRepository(targetRepository, organization)))]
+    : await listAll('/orgs/' + encodeURIComponent(organization) + '/repos?type=all');
   const eligible = repositories.filter(repo => isEligibleRepository(repo, organization, ignoredRepositories));
   const summary = { repositories: eligible.length, created: 0, updated: 0, unchanged: 0, conflicts: 0, failed: 0, skipped: repositories.length - eligible.length };
 
