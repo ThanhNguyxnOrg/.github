@@ -105,6 +105,17 @@ export function normalizeTargetRepository(value, organization = ORG) {
   return match[1] + '/' + match[2];
 }
 
+export function assertOnboardingSuccess(summary) {
+  const failed = Number(summary?.failed || 0);
+  const conflicts = Number(summary?.conflicts || 0);
+  if (failed > 0) {
+    throw new Error('Auto-onboarding failed for ' + failed + ' managed workflow write(s)');
+  }
+  if (conflicts > 0) {
+    throw new Error('Auto-onboarding found ' + conflicts + ' repository workflow conflict(s); user-owned files were left untouched');
+  }
+}
+
 export async function onboardRepositories({
   token = TOKEN,
   organization = ORG,
@@ -170,12 +181,7 @@ export async function onboardRepositories({
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   onboardRepositories().then(summary => {
-    if (summary.failed > 0) {
-      throw new Error('Auto-onboarding failed for ' + summary.failed + ' managed workflow write(s)');
-    }
-    if (summary.conflicts > 0) {
-      console.warn('[onboard-warning] ' + summary.conflicts + ' user-owned workflow path conflict(s) were left untouched');
-    }
+    assertOnboardingSuccess(summary);
   }).catch(error => {
     console.error('[onboard-fatal]', error);
     process.exitCode = 1;
