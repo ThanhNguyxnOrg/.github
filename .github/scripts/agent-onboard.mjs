@@ -99,6 +99,9 @@ export function normalizeTargetRepository(value, organization = ORG) {
   const fullName = String(value || '').trim();
   const match = /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(fullName);
   if (!match) throw new Error('TARGET_REPOSITORY must be an owner/repository pair');
+  if (match[1] === '.' || match[1] === '..' || match[2] === '.' || match[2] === '..') {
+    throw new Error('TARGET_REPOSITORY must be an owner/repository pair');
+  }
   if (match[1].toLowerCase() !== String(organization).toLowerCase()) {
     throw new Error('TARGET_REPOSITORY is outside the configured organization');
   }
