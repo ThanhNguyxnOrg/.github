@@ -30,7 +30,7 @@ PR labels are routing metadata, not merge authorization. PR opened, reopened, sy
 
 | Change | Agent behavior |
 |---|---|
-| Every non-draft pull request | Classify from title, author and changed files; apply type/area labels; add `needs-review`; assign maintainers and request review |
+| Every non-draft pull request | Classify from title, author and changed files; apply type/area labels; route to a human only when risk or required-check policy demands it |
 | Dependabot/Renovate or other bot PR | Add `automated`; dependency bots also receive `dependencies`; use the same risk and CI rules as other PRs |
 | Major, downgrade, unknown or security-sensitive dependency update | Add the appropriate dependency/security labels and require human review |
 | GitHub Actions or repository workflow changes | Add `workflow-update`; require human review |
