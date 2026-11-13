@@ -640,7 +640,13 @@ async function processIssue(repo, issue) {
   console.log('[issue]', fullName + '#' + issue.number + ': ' + category);
 }
 
-export function resolvePullRequestEvent(repositoryFullName, pullRequestNumber, organization = ORG) {
+export function resolvePullRequestEvent(
+  repositoryFullName,
+  pullRequestNumber,
+  organization = ORG,
+  headSha,
+  headRepository = ''
+) {
   const fullName = String(repositoryFullName || '').trim();
   const match = /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(fullName);
   if (!match) throw new Error('EVENT_REPOSITORY must be an owner/repository pair');
@@ -653,11 +659,46 @@ export function resolvePullRequestEvent(repositoryFullName, pullRequestNumber, o
   const number = Number(rawNumber);
   if (!Number.isSafeInteger(number)) throw new Error('EVENT_PR_NUMBER exceeds the safe integer range');
 
-  return { fullName: match[1] + '/' + match[2], number, owner: match[1], name: match[2] };
+  const normalizedHeadSha = String(headSha || '').trim().toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(normalizedHeadSha)) {
+    throw new Error('EVENT_PR_HEAD_SHA must be a 40-character hexadecimal head SHA');
+  }
+
+  const normalizedHeadRepository = String(headRepository || '').trim();
+  if (normalizedHeadRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(normalizedHeadRepository)) {
+    throw new Error('EVENT_PR_HEAD_REPOSITORY must be an owner/repository pair when provided');
+  }
+
+  return {
+    fullName: match[1] + '/' + match[2],
+    number,
+    owner: match[1],
+    name: match[2],
+    headSha: normalizedHeadSha,
+    headRepository: normalizedHeadRepository
+  };
+}
+
+export function matchesPullRequestEvent(pullRequest, target) {
+  if (String(pullRequest?.state || '').toLowerCase() !== 'open') return false;
+  const currentHeadSha = String(pullRequest?.head?.sha || '').trim().toLowerCase();
+  if (!currentHeadSha || currentHeadSha !== target.headSha) return false;
+
+  if (target.headRepository) {
+    const currentHeadRepository = String(pullRequest?.head?.repo?.full_name || '').trim().toLowerCase();
+    if (!currentHeadRepository || currentHeadRepository !== target.headRepository.toLowerCase()) return false;
+  }
+  return true;
 }
 
 async function runPullRequestEvent() {
-  const target = resolvePullRequestEvent(process.env.EVENT_REPOSITORY, process.env.EVENT_PR_NUMBER, ORG);
+  const target = resolvePullRequestEvent(
+    process.env.EVENT_REPOSITORY,
+    process.env.EVENT_PR_NUMBER,
+    ORG,
+    process.env.EVENT_PR_HEAD_SHA,
+    process.env.EVENT_PR_HEAD_REPOSITORY
+  );
   const repo = await request('/repos/' + target.fullName);
   if (repo.archived || repo.fork || config.ignoredRepositories.includes(repo.name)) {
     console.log('[event-skip] ' + target.fullName + ': repository is archived, forked, or centrally ignored');
@@ -668,8 +709,8 @@ async function runPullRequestEvent() {
   }
 
   const pr = await request('/repos/' + target.fullName + '/pulls/' + target.number);
-  if (pr.state !== 'open') {
-    console.log('[event-skip] ' + target.fullName + '#' + target.number + ': pull request is no longer open');
+  if (!matchesPullRequestEvent(pr, target)) {
+    console.log('[event-skip] ' + target.fullName + '#' + target.number + ': PR is closed or its head metadata no longer matches this event');
     return;
   }
   await processPullRequest(repo, pr);
