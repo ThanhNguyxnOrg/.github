@@ -53,7 +53,7 @@ test('onboarding writes both managed templates to each eligible default branch',
     if (url.endsWith('/orgs/ThanhNguyxnOrg/repos?type=all&per_page=100&page=1')) {
       return new Response(JSON.stringify([repo]), { status: 200 });
     }
-    if (url.includes('/contents/') && !options.method) {
+    if (url.includes('/contents/') && options.method === 'GET') {
       return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
     }
     if (options.method === 'PUT') return new Response(JSON.stringify({ content: { path: 'workflow.yml' } }), { status: 201 });
@@ -114,6 +114,7 @@ test('onboarding reports a custom-file conflict without overwriting it', async (
 
 
 test('onboarding reports failed writes so the controller can fail visibly', async () => {
+  let putAttempted = false;
   const fetchImpl = async (url, options = {}) => {
     if (url.includes('/orgs/')) {
       return new Response(JSON.stringify([{
@@ -125,10 +126,11 @@ test('onboarding reports failed writes so the controller can fail visibly', asyn
         fork: false
       }]), { status: 200 });
     }
-    if (url.includes('/contents/') && !options.method) {
+    if (url.includes('/contents/') && options.method === 'GET') {
       return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
     }
     if (options.method === 'PUT') {
+      putAttempted = true;
       return new Response(JSON.stringify({ message: 'Resource not accessible by integration' }), { status: 403 });
     }
     throw new Error('Unexpected request: ' + url);
@@ -143,6 +145,7 @@ test('onboarding reports failed writes so the controller can fail visibly', asyn
 
   assert.equal(summary.failed, 1);
   assert.equal(summary.created, 0);
+  assert.equal(putAttempted, true);
 });
 
 
@@ -168,7 +171,7 @@ test('scoped onboarding only fetches and writes the requested organization repos
     if (url.endsWith('/repos/ThanhNguyxnOrg/demo')) {
       return new Response(JSON.stringify(repo), { status: 200 });
     }
-    if (url.includes('/contents/') && !options.method) {
+    if (url.includes('/contents/') && options.method === 'GET') {
       return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
     }
     if (options.method === 'PUT') return new Response(JSON.stringify({ content: { path: 'workflow.yml' } }), { status: 201 });
