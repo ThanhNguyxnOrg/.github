@@ -37,7 +37,7 @@ PR labels are routing metadata, not merge authorization. The Agent never merges 
 | Failed, pending, missing, skipped or unconfigured required CI | Add the corresponding `ci-failed`, `ci-pending` or `ci-missing` label |
 | Merge conflict or protected path | Add `merge-conflict` or retain `needs-review`; require human resolution |
 
-The Agent does **not** automatically merge pull requests. It is the organization's single decision and routing authority: bots may open PRs, produce review comments, or publish security/check results, but the Agent labels and assigns work for a human maintainer to decide and merge. It does not check out or execute pull-request code; it reads PR metadata, changed-file names, mergeability, checks and commit statuses through the GitHub API.
+The Agent is the organization's single decision and routing authority. It may enable guarded GitHub Auto-merge only for explicitly opted-in, low-risk Dependabot patch/minor updates after validating changed paths, required checks, repository settings and the current head SHA. All other risky changes are routed to a human maintainer. It does not check out or execute pull-request code; it reads PR metadata, changed-file names, mergeability, checks and commit statuses through the GitHub API.
 
 ## Release safety
 
