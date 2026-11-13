@@ -109,3 +109,36 @@ test('onboarding reports a custom-file conflict without overwriting it', async (
   assert.equal(summary.conflicts, 1);
   assert.equal(summary.failed, 0);
 });
+
+
+test('onboarding reports failed writes so the controller can fail visibly', async () => {
+  const fetchImpl = async (url, options = {}) => {
+    if (url.includes('/orgs/')) {
+      return new Response(JSON.stringify([{
+        name: 'demo',
+        full_name: 'ThanhNguyxnOrg/demo',
+        owner: { login: 'ThanhNguyxnOrg' },
+        default_branch: 'main',
+        archived: false,
+        fork: false
+      }]), { status: 200 });
+    }
+    if (url.includes('/contents/') && !options.method) {
+      return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
+    }
+    if (options.method === 'PUT') {
+      return new Response(JSON.stringify({ message: 'Resource not accessible by integration' }), { status: 403 });
+    }
+    throw new Error('Unexpected request: ' + url);
+  };
+
+  const summary = await onboardRepositories({
+    token: 'test-token',
+    fetchImpl,
+    workflows: [{ path: '.github/workflows/agent-pr-signal.yml', content: MANAGED_MARKER + '\\nname: signal\\n' }],
+    log: quietLog
+  });
+
+  assert.equal(summary.failed, 1);
+  assert.equal(summary.created, 0);
+});
