@@ -228,7 +228,7 @@ test('event targets require a valid organization PR number and recorded head SHA
   assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '8.5', 'ThanhNguyxnOrg', 'a'.repeat(40)), /positive integer/);
   assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '8', 'ThanhNguyxnOrg'), /40-character hexadecimal head SHA/);
   assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '8', 'ThanhNguyxnOrg', 'not-a-sha'), /40-character hexadecimal head SHA/);
-  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '8', 'ThanhNguyxnOrg', 'a'.repeat(40), 'bad/name/with/slashes'), /head repository/);
+  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '8', 'ThanhNguyxnOrg', 'a'.repeat(40), 'bad/name/with/slashes'), /must be an owner\/repository pair/);
 });
 
 test('event routing skips closed PRs and stale or mismatched head metadata', () => {
