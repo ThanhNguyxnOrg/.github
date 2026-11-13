@@ -640,10 +640,55 @@ async function processIssue(repo, issue) {
   console.log('[issue]', fullName + '#' + issue.number + ': ' + category);
 }
 
+export function resolvePullRequestEvent(repositoryFullName, pullRequestNumber, organization = ORG) {
+  const fullName = String(repositoryFullName || '').trim();
+  const match = /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(fullName);
+  if (!match) throw new Error('EVENT_REPOSITORY must be an owner/repository pair');
+  if (match[1].toLowerCase() !== String(organization).toLowerCase()) {
+    throw new Error('Event repository is outside the configured organization');
+  }
+
+  const rawNumber = String(pullRequestNumber ?? '').trim();
+  if (!/^[1-9][0-9]*$/.test(rawNumber)) throw new Error('EVENT_PR_NUMBER must be a positive integer');
+  const number = Number(rawNumber);
+  if (!Number.isSafeInteger(number)) throw new Error('EVENT_PR_NUMBER exceeds the safe integer range');
+
+  return { fullName: match[1] + '/' + match[2], number, owner: match[1], name: match[2] };
+}
+
+async function runPullRequestEvent() {
+  const target = resolvePullRequestEvent(process.env.EVENT_REPOSITORY, process.env.EVENT_PR_NUMBER, ORG);
+  const repo = await request('/repos/' + target.fullName);
+  if (repo.archived || repo.fork || config.ignoredRepositories.includes(repo.name)) {
+    console.log('[event-skip] ' + target.fullName + ': repository is archived, forked, or centrally ignored');
+    return;
+  }
+  if (String(repo.owner?.login || '').toLowerCase() !== ORG.toLowerCase()) {
+    throw new Error('Resolved repository owner does not match the configured organization');
+  }
+
+  const pr = await request('/repos/' + target.fullName + '/pulls/' + target.number);
+  if (pr.state !== 'open') {
+    console.log('[event-skip] ' + target.fullName + '#' + target.number + ': pull request is no longer open');
+    return;
+  }
+  await processPullRequest(repo, pr);
+}
+
 async function run() {
+  const eventRepository = process.env.EVENT_REPOSITORY;
+  const eventPrNumber = process.env.EVENT_PR_NUMBER;
+  if (eventRepository || eventPrNumber) {
+    if (!eventRepository || !eventPrNumber) {
+      throw new Error('EVENT_REPOSITORY and EVENT_PR_NUMBER must be provided together');
+    }
+    await runPullRequestEvent();
+    return;
+  }
+
   const repos = await listAll('/orgs/' + ORG + '/repos?type=all');
   const active = repos.filter(repo => !repo.archived && !repo.fork && !config.ignoredRepositories.includes(repo.name));
-  console.log('[agent] scanning ' + active.length + ' repositories with ' + config.pollIntervalMinutes + '-minute polling');
+  console.log('[agent] full reconciliation across ' + active.length + ' repositories; fallback interval=' + config.pollIntervalMinutes + ' minutes');
 
   const failures = [];
   for (const repo of active) {
