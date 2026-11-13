@@ -7,25 +7,27 @@ on:
       - ThanhNguyxnAgent PR Event Signal
     types: [completed]
 
-# The privileged worker only receives a read-only GITHUB_TOKEN.
-# The central reusable workflow mints a narrowly scoped GitHub App token.
+# This workflow runs after the metadata-only signal. It receives only the two
+# Agent secrets required by the central reusable workflow.
 permissions:
+  actions: read
   contents: read
 
 concurrency:
-  group: agent-pr-${{ github.event.workflow_run.repository.name }}-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
-  cancel-in-progress: true
+  group: agent-pr-event-${{ github.event.workflow_run.repository.id }}-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
 
 jobs:
   process:
     if: >-
-      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.event == 'pull_request_target' &&
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.pull_requests[0].number > 0 &&
       github.event.workflow_run.repository.owner.login == 'ThanhNguyxnOrg'
     uses: ThanhNguyxnOrg/.github/.github/workflows/agent-pr-worker.yml@main
     with:
       repository_owner: ${{ github.event.workflow_run.repository.owner.login }}
       repository_name: ${{ github.event.workflow_run.repository.name }}
-      pr_number: ${{ github.event.workflow_run.pull_requests[0].number }}
-    secrets: inherit
+      workflow_run_id: ${{ github.event.workflow_run.id }}
+    secrets:
+      BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+      BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
