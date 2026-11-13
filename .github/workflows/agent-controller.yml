@@ -11,6 +11,7 @@ on:
       - '.github/templates/agent-pr-signal.yml'
       - '.github/templates/agent-pr-worker.yml'
       - '.github/workflows/agent-pr-worker.yml'
+      - '.github/workflows/agent-policy-tests.yml'
       - '.github/scripts/check-policy.mjs'
       - '.github/scripts/check-policy.test.mjs'
       - '.github/scripts/stale-controller.mjs'
