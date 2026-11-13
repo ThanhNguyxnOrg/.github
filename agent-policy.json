@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "organization": "ThanhNguyxnOrg",
-  "pollIntervalMinutes": 10,
+  "pollIntervalMinutes": 360,
   "reviewers": [
     "RealThanhNguyxn"
   ],
