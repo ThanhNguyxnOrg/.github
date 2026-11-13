@@ -6,6 +6,11 @@ on:
     paths:
       - '.github/scripts/agent-controller.mjs'
       - '.github/scripts/agent-controller.test.mjs'
+      - '.github/scripts/agent-onboard.mjs'
+      - '.github/scripts/agent-onboard.test.mjs'
+      - '.github/templates/agent-pr-signal.yml'
+      - '.github/templates/agent-pr-worker.yml'
+      - '.github/workflows/agent-pr-worker.yml'
       - '.github/scripts/check-policy.mjs'
       - '.github/scripts/check-policy.test.mjs'
       - '.github/scripts/stale-controller.mjs'
@@ -15,7 +20,7 @@ on:
       - 'agent-policy.json'
       - '.github/workflows/agent-controller.yml'
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -43,8 +48,24 @@ jobs:
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
+      - name: Create organization-wide workflow-onboarding token
+        id: onboarding
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          client-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+          permission-workflows: write
+
       - name: Test central policy helpers
-        run: node --test .github/scripts/agent-controller.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/stale-controller.test.mjs
+        run: node --test .github/scripts/agent-controller.test.mjs .github/scripts/agent-onboard.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/stale-controller.test.mjs
+
+      - name: Auto-onboard active organization repositories
+        env:
+          GH_TOKEN: ${{ steps.onboarding.outputs.token }}
+          ORG: ${{ github.repository_owner }}
+        run: node .github/scripts/agent-onboard.mjs
 
       - name: Reconcile open pull requests and issues
         env:
