@@ -7,7 +7,8 @@ import {
   classifyVersionUpdate,
   evaluateCheckRollup,
   isDependencyManifestPath,
-  pullRequestCheckSha
+  pullRequestCheckSha,
+  resolvePullRequestEvent
 } from './agent-controller.mjs';
 
 test('dependency labels stay descriptive and do not themselves force review', () => {
@@ -205,4 +206,16 @@ test('dependency manifest detection excludes runtime source and GitHub workflows
   assert.equal(isDependencyManifestPath('src-tauri/Cargo.toml'), true);
   assert.equal(isDependencyManifestPath('.github/workflows/ci.yml'), false);
   assert.equal(isDependencyManifestPath('src/main.ts'), false);
+});
+
+
+test('event targets accept only valid PRs in the configured organization', () => {
+  assert.deepEqual(
+    resolvePullRequestEvent('ThanhNguyxnOrg/blendops', '8', 'ThanhNguyxnOrg'),
+    { fullName: 'ThanhNguyxnOrg/blendops', number: 8, owner: 'ThanhNguyxnOrg', name: 'blendops' }
+  );
+  assert.throws(() => resolvePullRequestEvent('someone-else/repo', '8', 'ThanhNguyxnOrg'), /outside the configured organization/);
+  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo/extra', '8', 'ThanhNguyxnOrg'), /owner\/repository pair/);
+  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '0', 'ThanhNguyxnOrg'), /positive integer/);
+  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '8.5', 'ThanhNguyxnOrg'), /positive integer/);
 });
