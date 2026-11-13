@@ -6,7 +6,7 @@ The organization uses one central GitHub App control plane in this repository. D
 
 The central control plane owns organization-wide policy and decisions:
 
-- `.github/workflows/agent-controller.yml`: organization-wide issue and PR classification, labels, human assignment, reviewer requests and CI/conflict status routing (10-minute polling).
+- `.github/workflows/agent-controller.yml`: six-hour organization reconciliation, automatic PR-trigger onboarding, and missed-event recovery. PR lifecycle events are processed immediately through repository-local signal workflows and the central reusable worker.
 - `.github/workflows/release-controller.yml`: Conventional Commit classification, version/changelog commits, tags, draft releases, build-result checks and asset verification (15-minute polling).
 - `.github/workflows/stale.yml`: organization-wide stale issue/PR lifecycle (daily).
 - `agent-policy.json`, `ci-policy.json` and `release-policy.json`: central policy registries.
@@ -18,13 +18,13 @@ Product repositories keep their native adapters for stack-specific tests, compil
 
 **Required checks are declared once in `ci-policy.json` in this repository. No CI-policy file is uploaded into each product repository.**
 
-Each profile records the default branch and exact required GitHub Actions check/job names. Dependency auto-merge is disabled across the organization.
+Each profile records the default branch and exact required GitHub Actions check/job names. Dependency auto-merge is disabled by default and enabled only by explicit repository profiles with exact required checks.
 
 A required check must exist on the commit and finish with the exact `success` conclusion. The newest attempt for each exact check name is authoritative, so a successful rerun supersedes an older failed attempt. Missing checks, skipped/neutral required checks, pending jobs and failures all hold the gate. Unconfigured repositories fail closed and require human review. A green unrelated check cannot substitute for a missing required job.
 
 Path-scoped entries live only in this central registry and mirror the native workflow's `paths` filters. For pull requests, the controller checks the current synthetic merge commit SHA—not only the contributor head SHA—and defers if the head changes during evaluation.
 
-PR labels are routing metadata, not merge authorization. The Agent never merges pull requests, including Dependabot or Renovate updates. Every non-draft PR receives classification labels, `needs-review`, maintainer assignment and a review request. Major, downgrade, unknown, malformed and security-sensitive dependency updates are clearly labeled for human review.
+PR labels are routing metadata, not merge authorization. The Agent never merges pull requests, including Dependabot or Renovate updates. PR opened, reopened, synchronize, ready-for-review, and edited events are routed to the central controller. All non-draft PRs receive classification labels. High-risk changes, failed/missing required checks, workflow edits, sensitive paths, and major/downgrade/unknown/security dependency updates receive `needs-review` and maintainer routing. Low-risk changes stay out of the human-review queue; only Dependabot patch/minor updates in explicitly opted-in repositories can enter the guarded auto-merge path.
 
 ## Pull request safety
 
