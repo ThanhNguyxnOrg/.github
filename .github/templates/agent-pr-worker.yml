@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: agent-pr-event-${{ github.event.workflow_run.repository.id }}-${{ github.event.workflow_run.head_sha }}
+  group: agent-pr-event-${{ github.event.workflow_run.id }}
   cancel-in-progress: false
 
 jobs:
