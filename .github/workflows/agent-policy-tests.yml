@@ -1,0 +1,21 @@
+name: Agent Policy Tests
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-policy-tests-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Run central Agent policy tests
+        run: node --test .github/scripts/agent-controller.test.mjs .github/scripts/agent-onboard.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/stale-controller.test.mjs
