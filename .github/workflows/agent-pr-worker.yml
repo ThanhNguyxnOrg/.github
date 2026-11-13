@@ -1,0 +1,56 @@
+name: ThanhNguyxnAgent — Process one PR
+
+on:
+  workflow_call:
+    inputs:
+      repository_owner:
+        description: Organization that owns the PR repository.
+        required: true
+        type: string
+      repository_name:
+        description: Repository name containing the PR.
+        required: true
+        type: string
+      pr_number:
+        description: Pull request number to process.
+        required: true
+        type: number
+    secrets:
+      BOT_APP_ID:
+        required: true
+      BOT_PRIVATE_KEY:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  process:
+    if: inputs.repository_owner == 'ThanhNguyxnOrg' && inputs.pr_number > 0
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout central Agent policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ThanhNguyxnOrg/.github
+          ref: main
+          persist-credentials: false
+
+      - name: Create repository-scoped Agent token
+        id: agent
+        uses: ./.github/actions/agent-token
+        with:
+          profile: remediation
+          client-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ inputs.repository_owner }}
+          repositories: ${{ inputs.repository_name }}
+
+      - name: Process the event PR using central policy
+        env:
+          GH_TOKEN: ${{ steps.agent.outputs.token }}
+          ORG: ${{ inputs.repository_owner }}
+          EVENT_REPOSITORY: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
+          EVENT_PR_NUMBER: ${{ inputs.pr_number }}
+        run: node .github/scripts/agent-controller.mjs
