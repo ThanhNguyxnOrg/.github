@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MANAGED_MARKER,
+  assertOnboardingSuccess,
   decideWorkflowWrite,
   isEligibleRepository,
   normalizeTargetRepository,
@@ -213,4 +214,11 @@ test('scoped onboarding fails before API access when the target belongs to anoth
     /outside the configured organization/
   );
   assert.equal(calls, 0);
+});
+
+
+test('onboarding completion rejects failed writes and unresolved user-owned path conflicts', () => {
+  assert.doesNotThrow(() => assertOnboardingSuccess({ failed: 0, conflicts: 0 }));
+  assert.throws(() => assertOnboardingSuccess({ failed: 1, conflicts: 0 }), /failed for 1 managed workflow write/);
+  assert.throws(() => assertOnboardingSuccess({ failed: 0, conflicts: 2 }), /2 repository workflow conflict/);
 });
