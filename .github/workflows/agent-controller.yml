@@ -32,8 +32,108 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  discover:
+    name: Discover active organization repositories
+    runs-on: ubuntu-latest
+    outputs:
+      repositories: ${{ steps.list.outputs.repositories }}
+    steps:
+      - name: Create metadata-only organization inventory token
+        id: inventory
+        # zizmor: ignore[github-app] -- this token can read repository metadata only; all write tokens below are scoped to one repository.
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          client-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-metadata: read
+      - name: List active repositories for the onboarding matrix
+        id: list
+        env:
+          GH_TOKEN: ${{ steps.inventory.outputs.token }}
+          ORG: ${{ github.repository_owner }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const org = process.env.ORG;
+          const token = process.env.GH_TOKEN;
+          if (!org || !token) throw new Error('ORG and GH_TOKEN are required');
+
+          const repositories = [];
+          for (let page = 1; page <= 50; page += 1) {
+            const response = await fetch(
+              `https://api.github.com/orgs/${encodeURIComponent(org)}/repos?type=all&per_page=100&page=${page}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  Accept: 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28'
+                }
+              }
+            );
+            const body = await response.json();
+            if (!response.ok) {
+              throw new Error(`Repository discovery failed (${response.status}): ${body.message || response.statusText}`);
+            }
+            if (!Array.isArray(body)) throw new Error('Expected repository array from GitHub');
+            repositories.push(...body);
+            if (body.length < 100) break;
+            if (page === 50) throw new Error('Repository discovery pagination limit reached');
+          }
+
+          const eligible = repositories
+            .filter(repo =>
+              repo.owner?.login?.toLowerCase() === org.toLowerCase() &&
+              !repo.archived &&
+              !repo.fork &&
+              repo.name !== '.github' &&
+              typeof repo.default_branch === 'string' &&
+              repo.default_branch.length > 0
+            )
+            .map(repo => repo.full_name)
+            .sort((a, b) => a.localeCompare(b));
+
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `repositories=${JSON.stringify(eligible)}\n`);
+          console.log(`[discover] found ${eligible.length} active repositories eligible for per-repository onboarding`);
+          NODE
+
+  onboard:
+    name: Onboard ${{ matrix.repository }}
+    needs: discover
+    if: needs.discover.outputs.repositories != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        repository: ${{ fromJson(needs.discover.outputs.repositories) }}
+    steps:
+      - name: Checkout central policy and onboarding templates
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Create a workflow-write token for this repository only
+        id: onboarding
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          client-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ matrix.repository }}
+          permission-contents: write
+          permission-workflows: write
+
+      - name: Install or update the managed PR event workflows
+        env:
+          GH_TOKEN: ${{ steps.onboarding.outputs.token }}
+          ORG: ${{ github.repository_owner }}
+          TARGET_REPOSITORY: ${{ matrix.repository }}
+        run: node .github/scripts/agent-onboard.mjs
+
   reconcile:
     name: Triage issues, auto-merge safe dependencies, and route risky PRs to humans
+    needs: [discover, onboard]
+    if: always() && needs.discover.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -49,24 +149,8 @@ jobs:
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
-      - name: Create organization-wide workflow-onboarding token
-        id: onboarding
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
-        with:
-          client-id: ${{ secrets.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          permission-contents: write
-          permission-workflows: write
-
       - name: Test central policy helpers
         run: node --test .github/scripts/agent-controller.test.mjs .github/scripts/agent-onboard.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/stale-controller.test.mjs
-
-      - name: Auto-onboard active organization repositories
-        env:
-          GH_TOKEN: ${{ steps.onboarding.outputs.token }}
-          ORG: ${{ github.repository_owner }}
-        run: node .github/scripts/agent-onboard.mjs
 
       - name: Reconcile open pull requests and issues
         env:
