@@ -11,8 +11,8 @@ on:
         description: Repository name containing the PR.
         required: true
         type: string
-      pr_number:
-        description: Pull request number to process.
+      workflow_run_id:
+        description: Completed metadata-signal workflow run ID.
         required: true
         type: number
     secrets:
@@ -22,20 +22,76 @@ on:
         required: true
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
   process:
-    if: inputs.repository_owner == 'ThanhNguyxnOrg' && inputs.pr_number > 0
+    if: inputs.repository_owner == 'ThanhNguyxnOrg' && inputs.workflow_run_id > 0
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout central Agent policy
+      - name: Create read-only token for central Agent policy
+        id: central
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          client-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ inputs.repository_owner }}
+          repositories: .github
+          permission-contents: read
+
+      - name: Checkout trusted central Agent policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ThanhNguyxnOrg/.github
           ref: main
+          token: ${{ steps.central.outputs.token }}
           persist-credentials: false
+
+      - name: Download the event metadata artifact
+        uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
+        with:
+          name: agent-pr-event-${{ inputs.workflow_run_id }}
+          path: agent-event
+          repository: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
+          run-id: ${{ inputs.workflow_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Validate the event metadata
+        id: event
+        env:
+          EXPECTED_REPOSITORY: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const payload = JSON.parse(fs.readFileSync('agent-event/agent-pr-event.json', 'utf8'));
+          const expectedRepository = String(process.env.EXPECTED_REPOSITORY || '').toLowerCase();
+          const repository = String(payload.repository || '').toLowerCase();
+          const prNumber = Number(payload.pr_number);
+          const headSha = String(payload.head_sha || '').toLowerCase();
+          const headRepository = String(payload.head_repository || '');
+
+          if (!expectedRepository || repository !== expectedRepository) {
+            throw new Error('Event artifact repository does not match the workflow_run repository');
+          }
+          if (!Number.isSafeInteger(prNumber) || prNumber < 1) {
+            throw new Error('Event artifact contains an invalid pull request number');
+          }
+          if (!/^[0-9a-f]{40}$/.test(headSha)) {
+            throw new Error('Event artifact contains an invalid pull request head SHA');
+          }
+          if (headRepository && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(headRepository)) {
+            throw new Error('Event artifact contains an invalid head repository');
+          }
+
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, [
+            'pr_number=' + prNumber,
+            'head_sha=' + headSha,
+            'head_repository=' + headRepository
+          ].join('\n') + '\n');
+          NODE
 
       - name: Create repository-scoped Agent token
         id: agent
@@ -52,5 +108,7 @@ jobs:
           GH_TOKEN: ${{ steps.agent.outputs.token }}
           ORG: ${{ inputs.repository_owner }}
           EVENT_REPOSITORY: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
-          EVENT_PR_NUMBER: ${{ inputs.pr_number }}
+          EVENT_PR_NUMBER: ${{ steps.event.outputs.pr_number }}
+          EVENT_PR_HEAD_SHA: ${{ steps.event.outputs.head_sha }}
+          EVENT_PR_HEAD_REPOSITORY: ${{ steps.event.outputs.head_repository }}
         run: node .github/scripts/agent-controller.mjs
