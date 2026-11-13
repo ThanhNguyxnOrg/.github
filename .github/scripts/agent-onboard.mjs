@@ -156,7 +156,14 @@ export async function onboardRepositories({
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  onboardRepositories().catch(error => {
+  onboardRepositories().then(summary => {
+    if (summary.failed > 0) {
+      throw new Error('Auto-onboarding failed for ' + summary.failed + ' managed workflow write(s)');
+    }
+    if (summary.conflicts > 0) {
+      console.warn('[onboard-warning] ' + summary.conflicts + ' user-owned workflow path conflict(s) were left untouched');
+    }
+  }).catch(error => {
     console.error('[onboard-fatal]', error);
     process.exitCode = 1;
   });
