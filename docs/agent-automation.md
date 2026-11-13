@@ -6,7 +6,7 @@ The organization uses one central GitHub App control plane in this repository. D
 
 The central control plane owns organization-wide policy and decisions:
 
-- `.github/workflows/agent-controller.yml`: six-hour organization reconciliation, automatic PR-trigger onboarding, and missed-event recovery. PR lifecycle events are processed immediately through repository-local signal workflows and the central reusable worker.
+- `.github/workflows/agent-controller.yml`: six-hour organization reconciliation, automatic PR-trigger onboarding, and missed-event recovery. PR lifecycle events enter through two managed workflows per repository: a metadata-only `pull_request_target` signal and a `workflow_run` relay to the central reusable worker. The signal uploads only a tiny JSON envelope containing repository, PR number, and head identity; the privileged worker validates it against the GitHub API before processing.
 - `.github/workflows/release-controller.yml`: Conventional Commit classification, version/changelog commits, tags, draft releases, build-result checks and asset verification (15-minute polling).
 - `.github/workflows/stale.yml`: organization-wide stale issue/PR lifecycle (daily).
 - `agent-policy.json`, `ci-policy.json` and `release-policy.json`: central policy registries.
@@ -24,20 +24,33 @@ A required check must exist on the commit and finish with the exact `success` co
 
 Path-scoped entries live only in this central registry and mirror the native workflow's `paths` filters. For pull requests, the controller checks the current synthetic merge commit SHA—not only the contributor head SHA—and defers if the head changes during evaluation.
 
-PR labels are routing metadata, not merge authorization. The Agent never merges pull requests, including Dependabot or Renovate updates. PR opened, reopened, synchronize, ready-for-review, and edited events are routed to the central controller. All non-draft PRs receive classification labels. High-risk changes, failed/missing required checks, workflow edits, sensitive paths, and major/downgrade/unknown/security dependency updates receive `needs-review` and maintainer routing. Low-risk changes stay out of the human-review queue; only Dependabot patch/minor updates in explicitly opted-in repositories can enter the guarded auto-merge path.
+PR labels are routing metadata, not merge authorization. PR opened, reopened, synchronize, ready-for-review, and edited events are routed to the central controller. All non-draft PRs receive classification labels. High-risk changes, failed/missing required checks, workflow edits, sensitive paths, and major/downgrade/unknown/security dependency updates receive `needs-review` and maintainer routing. Low-risk changes stay out of the human-review queue; only Dependabot patch/minor updates in explicitly opted-in repositories can enter the guarded auto-merge path.
 
 ## Pull request safety
 
 | Change | Agent behavior |
 |---|---|
 | Every non-draft pull request | Classify from title, author and changed files; apply type/area labels; add `needs-review`; assign maintainers and request review |
-| Dependabot/Renovate or other bot PR | Add `automated`; dependency bots also receive `dependencies`; keep the PR assigned for human review |
+| Dependabot/Renovate or other bot PR | Add `automated`; dependency bots also receive `dependencies`; use the same risk and CI rules as other PRs |
 | Major, downgrade, unknown or security-sensitive dependency update | Add the appropriate dependency/security labels and require human review |
 | GitHub Actions or repository workflow changes | Add `workflow-update`; require human review |
 | Failed, pending, missing, skipped or unconfigured required CI | Add the corresponding `ci-failed`, `ci-pending` or `ci-missing` label |
 | Merge conflict or protected path | Add `merge-conflict` or retain `needs-review`; require human resolution |
 
 The Agent is the organization's single decision and routing authority. It may enable guarded GitHub Auto-merge only for explicitly opted-in, low-risk Dependabot patch/minor updates after validating changed paths, required checks, repository settings and the current head SHA. All other risky changes are routed to a human maintainer. It does not check out or execute pull-request code; it reads PR metadata, changed-file names, mergeability, checks and commit statuses through the GitHub API.
+
+## Event security and automatic onboarding
+
+The auto-onboarder installs two managed workflows on each active, non-fork organization repository's default branch:
+
+1. `agent-pr-signal.yml` runs on `pull_request_target` from the base repository's default branch. It has no Actions secrets, no write permissions, no checkout, and no PR-code execution. It writes only the GitHub-supplied base repository, PR number, head SHA, and head repository into a short-lived JSON artifact.
+2. `agent-pr-worker.yml` runs on `workflow_run` after the signal completes. It downloads only that run's metadata artifact, checks repository identity and validates the PR number/head fields, then calls the central reusable workflow with only `BOT_APP_ID` and `BOT_PRIVATE_KEY`.
+
+The central reusable worker reads only trusted code from this `.github` repository, validates that the PR is still open and its head SHA/repository still match the event, and uses a GitHub App installation token scoped to the single target repository. It never checks out, downloads, builds, or executes pull-request source code. The two-step relay is intentional: GitHub restricts Actions secrets for Dependabot-triggered `pull_request_target` runs, while the subsequent `workflow_run` can safely perform the privileged step after the metadata-only workflow completes.
+
+The central bootstrapper creates missing workflow files and updates only files beginning with the Agent-managed marker. Existing user-owned files at those paths are left untouched and reported as conflicts. New repositories are enrolled on the next six-hour reconciliation; that same pass also classifies their already-open PRs.
+
+**Required GitHub App setup:** the Agent App installation needs `Contents: write`, `Workflows: write`, `Issues: write`, and `Pull requests: write` on repositories it manages. The `BOT_APP_ID` and `BOT_PRIVATE_KEY` Actions secrets must be available to all repositories that receive the managed worker workflow. Branch protection or rulesets can reject direct onboarding commits; those write failures make the onboarding workflow fail visibly instead of silently treating the repository as enrolled.
 
 ## Release safety
 
