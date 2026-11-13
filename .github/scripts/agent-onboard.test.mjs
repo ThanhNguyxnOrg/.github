@@ -4,6 +4,7 @@ import {
   MANAGED_MARKER,
   decideWorkflowWrite,
   isEligibleRepository,
+  normalizeTargetRepository,
   onboardRepositories
 } from './agent-onboard.mjs';
 
@@ -141,4 +142,75 @@ test('onboarding reports failed writes so the controller can fail visibly', asyn
 
   assert.equal(summary.failed, 1);
   assert.equal(summary.created, 0);
+});
+
+
+test('target repository validation rejects cross-organization and malformed names', () => {
+  assert.equal(normalizeTargetRepository('ThanhNguyxnOrg/demo', 'ThanhNguyxnOrg'), 'ThanhNguyxnOrg/demo');
+  assert.throws(() => normalizeTargetRepository('someone-else/demo', 'ThanhNguyxnOrg'), /outside the configured organization/);
+  assert.throws(() => normalizeTargetRepository('ThanhNguyxnOrg/demo/extra', 'ThanhNguyxnOrg'), /owner\/repository pair/);
+  assert.throws(() => normalizeTargetRepository('../demo', 'ThanhNguyxnOrg'), /owner\/repository pair/);
+});
+
+test('scoped onboarding only fetches and writes the requested organization repository', async () => {
+  const requests = [];
+  const repo = {
+    name: 'demo',
+    full_name: 'ThanhNguyxnOrg/demo',
+    owner: { login: 'ThanhNguyxnOrg' },
+    default_branch: 'main',
+    archived: false,
+    fork: false
+  };
+  const fetchImpl = async (url, options = {}) => {
+    requests.push({ url, method: options.method || 'GET', body: options.body ? JSON.parse(options.body) : null });
+    if (url.endsWith('/repos/ThanhNguyxnOrg/demo')) {
+      return new Response(JSON.stringify(repo), { status: 200 });
+    }
+    if (url.includes('/contents/') && !options.method) {
+      return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
+    }
+    if (options.method === 'PUT') return new Response(JSON.stringify({ content: { path: 'workflow.yml' } }), { status: 201 });
+    throw new Error('Unexpected request: ' + url);
+  };
+
+  const summary = await onboardRepositories({
+    token: 'single-repo-token',
+    organization: 'ThanhNguyxnOrg',
+    targetRepository: 'ThanhNguyxnOrg/demo',
+    fetchImpl,
+    workflows: [
+      { path: '.github/workflows/agent-pr-signal.yml', content: MANAGED_MARKER + '\\nname: signal\\n' },
+      { path: '.github/workflows/agent-pr-worker.yml', content: MANAGED_MARKER + '\\nname: worker\\n' }
+    ],
+    log: quietLog
+  });
+
+  assert.deepEqual(summary, {
+    repositories: 1,
+    created: 2,
+    updated: 0,
+    unchanged: 0,
+    conflicts: 0,
+    failed: 0,
+    skipped: 0
+  });
+  assert.ok(requests.every(request => !request.url.includes('/orgs/ThanhNguyxnOrg/repos')));
+  assert.equal(requests.filter(request => request.method === 'PUT').length, 2);
+});
+
+test('scoped onboarding fails before API access when the target belongs to another owner', async () => {
+  let calls = 0;
+  await assert.rejects(
+    () => onboardRepositories({
+      token: 'single-repo-token',
+      organization: 'ThanhNguyxnOrg',
+      targetRepository: 'someone-else/demo',
+      fetchImpl: async () => { calls += 1; throw new Error('must not call API'); },
+      workflows: [],
+      log: quietLog
+    }),
+    /outside the configured organization/
+  );
+  assert.equal(calls, 0);
 });
