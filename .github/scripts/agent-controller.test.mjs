@@ -8,7 +8,8 @@ import {
   evaluateCheckRollup,
   isDependencyManifestPath,
   pullRequestCheckSha,
-  resolvePullRequestEvent
+  resolvePullRequestEvent,
+  matchesPullRequestEvent
 } from './agent-controller.mjs';
 
 test('dependency labels stay descriptive and do not themselves force review', () => {
@@ -209,13 +210,42 @@ test('dependency manifest detection excludes runtime source and GitHub workflows
 });
 
 
-test('event targets accept only valid PRs in the configured organization', () => {
+test('event targets require a valid organization PR number and recorded head SHA', () => {
   assert.deepEqual(
-    resolvePullRequestEvent('ThanhNguyxnOrg/blendops', '8', 'ThanhNguyxnOrg'),
-    { fullName: 'ThanhNguyxnOrg/blendops', number: 8, owner: 'ThanhNguyxnOrg', name: 'blendops' }
+    resolvePullRequestEvent('ThanhNguyxnOrg/blendops', '8', 'ThanhNguyxnOrg', 'a'.repeat(40), 'dependabot/deps-bump-zod'),
+    {
+      fullName: 'ThanhNguyxnOrg/blendops',
+      number: 8,
+      owner: 'ThanhNguyxnOrg',
+      name: 'blendops',
+      headSha: 'a'.repeat(40),
+      headRepository: 'dependabot/deps-bump-zod'
+    }
   );
-  assert.throws(() => resolvePullRequestEvent('someone-else/repo', '8', 'ThanhNguyxnOrg'), /outside the configured organization/);
-  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo/extra', '8', 'ThanhNguyxnOrg'), /owner\/repository pair/);
-  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '0', 'ThanhNguyxnOrg'), /positive integer/);
-  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '8.5', 'ThanhNguyxnOrg'), /positive integer/);
+  assert.throws(() => resolvePullRequestEvent('someone-else/repo', '8', 'ThanhNguyxnOrg', 'a'.repeat(40)), /outside the configured organization/);
+  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo/extra', '8', 'ThanhNguyxnOrg', 'a'.repeat(40)), /owner\/repository pair/);
+  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '0', 'ThanhNguyxnOrg', 'a'.repeat(40)), /positive integer/);
+  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '8.5', 'ThanhNguyxnOrg', 'a'.repeat(40)), /positive integer/);
+  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '8', 'ThanhNguyxnOrg'), /40-character head SHA/);
+  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '8', 'ThanhNguyxnOrg', 'not-a-sha'), /40-character head SHA/);
+  assert.throws(() => resolvePullRequestEvent('ThanhNguyxnOrg/repo', '8', 'ThanhNguyxnOrg', 'a'.repeat(40), 'bad/name/with/slashes'), /head repository/);
+});
+
+test('event routing skips closed PRs and stale or mismatched head metadata', () => {
+  const target = resolvePullRequestEvent(
+    'ThanhNguyxnOrg/blendops',
+    '8',
+    'ThanhNguyxnOrg',
+    'a'.repeat(40),
+    'dependabot/deps-bump-zod'
+  );
+  const current = {
+    state: 'open',
+    head: { sha: 'a'.repeat(40), repo: { full_name: 'dependabot/deps-bump-zod' } }
+  };
+  assert.equal(matchesPullRequestEvent(current, target), true);
+  assert.equal(matchesPullRequestEvent({ ...current, state: 'closed' }, target), false);
+  assert.equal(matchesPullRequestEvent({ ...current, head: { ...current.head, sha: 'b'.repeat(40) } }, target), false);
+  assert.equal(matchesPullRequestEvent({ ...current, head: { ...current.head, repo: { full_name: 'attacker/other-repo' } } }, target), false);
+  assert.equal(matchesPullRequestEvent({ state: 'open', head: { sha: 'a'.repeat(40), repo: null } }, target), false);
 });
