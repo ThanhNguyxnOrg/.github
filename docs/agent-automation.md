@@ -22,7 +22,7 @@ Each profile records the default branch and exact required GitHub Actions check/
 
 A required check must exist on the commit and finish with the exact `success` conclusion. The newest attempt for each exact check name is authoritative, so a successful rerun supersedes an older failed attempt. Missing checks, skipped/neutral required checks, pending jobs and failures all hold the gate. Unconfigured repositories fail closed and require human review. A green unrelated check cannot substitute for a missing required job.
 
-Path-scoped entries live only in this central registry and mirror the native workflow's `paths` filters. For pull requests, the controller checks the current synthetic merge commit SHA—not only the contributor head SHA—and defers if the head changes during evaluation.
+Path-scoped entries live only in this central registry and mirror the native workflow's `paths` filters. For pull requests, the controller evaluates check runs and commit statuses on the current PR head SHA; the synthetic merge SHA is only a fallback when a head SHA is unavailable. It refreshes PR metadata before CI evaluation and defers when the head changed since the initial repository listing.
 
 PR labels are routing metadata, not merge authorization. PR opened, reopened, synchronize, ready-for-review, and edited events are routed to the central controller. All non-draft PRs receive classification labels. High-risk changes, failed/missing required checks, workflow edits, sensitive paths, and major/downgrade/unknown/security dependency updates receive `needs-review` and maintainer routing. Low-risk changes stay out of the human-review queue; only Dependabot patch/minor updates in explicitly opted-in repositories can enter the guarded auto-merge path.
 
