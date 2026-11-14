@@ -42,7 +42,7 @@ test('release notes are extracted from the exact generated changelog section', (
 });
 
 test('release publication requires the exact version changelog section', () => {
-  const changelog = '# Changelog\\n\\n## [1.4.0] - 2026-11-14\\n\\n### Features\\n\\n- Add platform-aware packaging.\\n';
+  const changelog = ['# Changelog', '', '## [1.4.0] - 2026-11-14', '', '### Features', '', '- Add platform-aware packaging.', ''].join('\\n');
   assert.match(releaseBodyFromChangelog(changelog, '1.4.0'), /Add platform-aware packaging/);
   assert.throws(
     () => releaseBodyFromChangelog(changelog, '1.3.9'),
