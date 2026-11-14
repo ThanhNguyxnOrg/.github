@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy, releaseMatchesTag, selectReleaseByTag, selectOrphanDraftForTag } from './release-controller.mjs';
+import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, releaseBodyFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy, releaseMatchesTag, selectReleaseByTag, selectOrphanDraftForTag } from './release-controller.mjs';
 
 const policy = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
@@ -39,6 +39,15 @@ test('release notes are extracted from the exact generated changelog section', (
   assert.match(notes, /### Features/);
   assert.match(notes, /Add a new view/);
   assert.doesNotMatch(notes, /Old release/);
+});
+
+test('release publication requires the exact version changelog section', () => {
+  const changelog = '# Changelog\\n\\n## [1.4.0] - 2026-11-14\\n\\n### Features\\n\\n- Add platform-aware packaging.\\n';
+  assert.match(releaseBodyFromChangelog(changelog, '1.4.0'), /Add platform-aware packaging/);
+  assert.throws(
+    () => releaseBodyFromChangelog(changelog, '1.3.9'),
+    /has no release section for version 1.3.9/
+  );
 });
 
 test('SemVer bump is deterministic', () => {
