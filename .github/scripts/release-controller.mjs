@@ -468,7 +468,7 @@ export function releaseNotesFromChangelog(changelog, version) {
   if (start < 0) return '';
   let end = lines.length;
   for (let index = start + 1; index < lines.length; index += 1) {
-    if (/^##\\s+/.test(lines[index])) {
+    if (/^##\s+/.test(lines[index])) {
       end = index;
       break;
     }
