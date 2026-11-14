@@ -465,6 +465,14 @@ export function releaseNotesFromChangelog(changelog, version) {
   const match = String(changelog || '').replace(/\r/g, '').match(pattern);
   return match ? match[1].trim() : '';
 }
+export function releaseBodyFromChangelog(changelog, version) {
+  const body = releaseNotesFromChangelog(changelog, version);
+  if (!body) {
+    throw new Error('CHANGELOG.md has no release section for version ' + version + '; publication is blocked');
+  }
+  return body;
+}
+
 
 async function getTagCommitSha(fullName, tag) {
   const ref = await api('/repos/' + fullName + '/git/ref/tags/' + encodeURIComponent(tag));
@@ -510,12 +518,8 @@ async function ensureTagRef(fullName, tag, targetSha) {
 }
 
 async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, rule) {
-  let changelog = await getFile(fullName, rule.changelogPath || 'CHANGELOG.md', targetSha);
-  let body = releaseNotesFromChangelog(changelog, version);
-  if (!body) {
-    body = 'Release ' + repoName + ' ' + tag + '\n\n' +
-      'See the repository changelog for details.';
-  }
+  const changelog = await getFile(fullName, rule.changelogPath || 'CHANGELOG.md', targetSha);
+  const body = releaseBodyFromChangelog(changelog, version);
 
   const prerelease = Boolean(parseSemver(version)?.prerelease);
   const name = repoName + ' ' + tag;
@@ -582,8 +586,8 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
     method: 'PATCH',
     body: { target_commitish: tagSha, name, body, draft: true, prerelease }
   });
-  if (!releaseMatchesTag(release, tag) || release.draft !== true) {
-    throw new Error('GitHub draft update failed tag/draft verification for ' + fullName + ' ' + tag);
+  if (!releaseMatchesTag(release, tag) || release.draft !== true || release.body !== body || release.name !== name) {
+    throw new Error('GitHub draft update failed tag, name, body, or draft verification for ' + fullName + ' ' + tag);
   }
   console.log('[release-draft-updated]', fullName, tag, release.html_url);
   return release;
@@ -606,7 +610,9 @@ async function publishReadyDrafts(repoName, rule) {
       }
       continue;
     }
-    await ensureTagRef(fullName, tag, release.target_commitish);
+    const headSha = await getTagCommitSha(fullName, tag);
+    const version = tag.replace(/^v/, '');
+    const canonicalDraft = await ensureDraftRelease(fullName, repoName, tag, version, headSha, rule);
     if (!rule.releaseWorkflowName) {
       await api('/repos/' + fullName + '/releases/' + release.id, {
         method: 'PATCH',
@@ -616,7 +622,6 @@ async function publishReadyDrafts(repoName, rule) {
       continue;
     }
 
-    const headSha = await getTagCommitSha(fullName, tag);
     const runs = await api('/repos/' + fullName + '/actions/runs?head_sha=' + encodeURIComponent(headSha) + '&per_page=100');
     const matching = (runs.workflow_runs || [])
       .filter(run => run.name === rule.releaseWorkflowName)
@@ -640,7 +645,7 @@ async function publishReadyDrafts(repoName, rule) {
       console.error('[release-assets-unconfigured]', fullName, tag, '— build workflow is configured but requiredAssets is empty; draft kept unpublished');
       continue;
     }
-    const missingAssets = missingRequiredAssets(release.assets || [], rule.requiredAssets, tag);
+    const missingAssets = missingRequiredAssets(canonicalDraft.assets || [], rule.requiredAssets, tag);
     if (missingAssets.length) {
       console.error('[release-assets-missing]', fullName, tag, '— draft kept unpublished; missing:', missingAssets.join(', '));
       continue;
@@ -785,8 +790,8 @@ async function run() {
   console.log('[release] evaluating ' + entries.length + ' configured repositories');
   for (const [repoName, rule] of entries) {
     try {
-      await publishReadyDrafts(repoName, rule);
       await reconcileRepository(repoName, rule);
+      await publishReadyDrafts(repoName, rule);
     } catch (error) {
       failures.push(repoName + ': ' + error.message);
       console.error('[release-error]', repoName, 'status=' + (error.status || 'unknown'), 'path=' + (error.path || 'unknown'), error.message);
