@@ -13,7 +13,7 @@ on:
         default: release-assets-*
         type: string
       artifact_directory:
-        description: Flat directory to collect final release assets into.
+        description: Directory used to collect downloaded platform artifacts before manifest validation.
         required: false
         default: dist/release
         type: string
