@@ -74,7 +74,7 @@ function isBot(login) {
 function textForRiskSignals(value) {
   return String(value || '')
     .replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, '$1')
-    .replace(/\[([^\]]+)\]\((?:<)?https?:\/\/[^)\s>]+(?:>)?\)/gi, '$1')
+    .replace(/\[([^\]]+)\]\((?:<)?https?:\/\/[^)\s>]+(?:>)?\)/gi, ' ')
     .replace(/https?:\/\/\S+/gi, ' ')
     .replace(/<[^>]*>/g, ' ')
     .replace(/&nbsp;/gi, ' ');
@@ -82,7 +82,7 @@ function textForRiskSignals(value) {
 
 function hasSecuritySignal(value) {
   const text = textForRiskSignals(value);
-  return /\b(?:security[\s-]+(?:update|fix|advisory|patch|vulnerabilit(?:y|ies)|issue)|vulnerabilit(?:y|ies)|CVE-\d{4}-\d+|GHSA-[\w-]+|remote code execution|privilege escalation|authentication bypass|exploit(?:s|ed|ation)?)\b/i.test(text);
+  return /\b(?:security[\s-]+(?:fix|advisory|patch|vulnerabilit(?:y|ies)|issue)|vulnerabilit(?:y|ies)|CVE-\d{4}-\d+|GHSA-[\w-]+|remote code execution|privilege escalation|authentication bypass|exploit(?:s|ed|ation)?)\b/i.test(text);
 }
 
 export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
@@ -219,6 +219,7 @@ export function isDependencyManifestPath(path) {
 
 export function analyzeDependencyUpdate(pullRequest, changedFiles = []) {
   const author = String(pullRequest?.user?.login || '').toLowerCase();
+  const title = String(pullRequest?.title || '');
   const summary = dependencySummary(pullRequest);
   const body = String(pullRequest?.body || '');
   const plainBody = body.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
@@ -229,7 +230,7 @@ export function analyzeDependencyUpdate(pullRequest, changedFiles = []) {
   if (!Array.isArray(changedFiles) || changedFiles.length === 0) reasons.push('changed-files-unavailable');
   else if (!changedFiles.every(isDependencyManifestPath)) reasons.push('non-dependency-files');
   if (!['patch', 'minor'].includes(versionRisk)) reasons.push('version-risk-' + versionRisk);
-  if (/\b(?:breaking(?:\s+changes?)?|backward[- ]incompatible)\b/i.test(body)) {
+  if (/\b(?:breaking(?:\s+changes?)?|backward[- ]incompatible)\b/i.test(plainBody)) {
     reasons.push('breaking-release-notes');
   }
   if (hasSecuritySignal(title + '\n' + body)) {
