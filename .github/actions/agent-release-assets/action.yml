@@ -1,5 +1,5 @@
 name: Upload and verify release assets as ThanhNguyxnAgent
-description: Upload a flat release asset directory to the central draft and validate it against release-policy.json.
+description: Upload platform artifacts to the central draft and validate the exact asset manifest.
 inputs:
   token:
     description: Repository-scoped Agent installation token with contents:write.
@@ -8,7 +8,7 @@ inputs:
     description: Existing version tag, e.g. v1.2.3.
     required: true
   path:
-    description: Flat directory containing the final release files.
+    description: Directory containing downloaded platform artifacts; nested folders are supported and duplicate filenames are rejected.
     required: false
     default: dist/release
   policy-ref:
