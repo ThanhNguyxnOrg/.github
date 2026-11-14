@@ -1,4 +1,4 @@
-name: Release Controller — Conventional Commits
+name: Release Controller
 
 on:
   push:
