@@ -463,7 +463,7 @@ export function releaseNotesFromChangelog(changelog, version) {
   const source = String(changelog || '').replace(/\r/g, '');
   const lines = source.split('\n');
   const normalizedVersion = String(version || '').replace(/^v/, '');
-  const heading = new RegExp('^##\\s+\\[?v?' + normalizedVersion.replace(/\\./g, '\\\\.') + '\\]?(?:\\s+-.*)?\\s*
+  const heading = new RegExp('^##\\s+\\[?v?' + normalizedVersion.replace(/\./g, '\\.') + '\\]?(?:\\s+-.*)?\\s*$');
   const start = lines.findIndex(line => heading.test(line));
   if (start < 0) return '';
   let end = lines.length;
