@@ -45,7 +45,7 @@ Details: [docs/stack.md](https://github.com/ThanhNguyxnOrg/.github/blob/main/doc
 <!-- AUTO-TOP6-START -->
 | Project | What it is | Stack | Stars |
 |---|---|---|---|
-| [blendops](https://github.com/ThanhNguyxnOrg/blendops) | AI-native Blender workflow and skill pack for non-Blender users, built around official Blender MCP,... | JavaScript | ★ 3 |
+| [blendops](https://github.com/ThanhNguyxnOrg/blendops) | AI-native Blender workflow and skill pack for non-Blender users, built around official Blender MCP,... | JavaScript | ★ 4 |
 | [lagvex](https://github.com/ThanhNguyxnOrg/lagvex) | Open-source game latency reducer & ping booster via WinTun and Go VPS Relay | Go | ★ 3 |
 | [lumeo](https://github.com/ThanhNguyxnOrg/lumeo) | Bilingual captions and live AI dubbing for YouTube. Three tiers, one click: free caption... | JavaScript | ★ 2 |
 | [apidex-hub](https://github.com/ThanhNguyxnOrg/apidex-hub) | 🌐 A curated collection of awesome free APIs for developers. Categorized, tested daily, and... | TypeScript | ★ 1 |
