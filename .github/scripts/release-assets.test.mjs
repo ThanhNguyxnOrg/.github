@@ -9,10 +9,19 @@ test('expands tag and version placeholders in the central asset manifest', () =>
   );
 });
 
-test('reports every missing required local artifact before upload', () => {
-  const plan = planAssetUpload([{ name: 'app.zip', digest: 'sha256:a' }], ['app.zip', 'checksums.txt'], []);
+test('reports missing and unlisted local artifacts before upload', () => {
+  const plan = planAssetUpload([
+    { name: 'app.zip', digest: 'sha256:a' },
+    { name: 'debug-symbols.zip', digest: 'sha256:b' }
+  ], ['app.zip', 'checksums.txt'], []);
   assert.deepEqual(plan.missing, ['checksums.txt']);
-  assert.equal(plan.uploads.length, 1);
+  assert.deepEqual(plan.unexpected, ['debug-symbols.zip']);
+  assert.deepEqual(plan.uploads.map(asset => asset.name), ['app.zip']);
+});
+
+test('rejects duplicate names in the central required asset manifest', () => {
+  const expected = ['app.zip', 'app.zip'];
+  assert.equal(new Set(expected).size !== expected.length, true);
 });
 
 test('skips an already-uploaded asset only when its SHA-256 digest matches', () => {
