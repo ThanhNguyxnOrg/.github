@@ -27,7 +27,7 @@ test('central profiles cover every active organization repository and fail close
   for (const name of names) {
     const profile = getRepositoryProfile(name);
     assert.ok(profile.defaultBranch, name + ' must declare its default branch');
-    assert.equal(profile.autoMergeDependabot, ['PurgeKit', 'WriteCanvas', 'blendops'].includes(name), name + ' has the expected explicit Dependabot Auto-merge opt-in');
+    assert.equal(profile.autoMergeDependabot, ['PurgeKit', 'WriteCanvas', 'blendops', 'LayoutLingua'].includes(name), name + ' has the expected explicit Dependabot Auto-merge opt-in');
   }
   assert.equal(getRepositoryProfile('ForgeHelm').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('ForgeHelm').requiredChecks, ['verify / Verify (ForgeHelm)']);
