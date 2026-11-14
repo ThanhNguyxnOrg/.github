@@ -71,6 +71,20 @@ function isBot(login) {
   return typeof login === 'string' && login.toLowerCase().endsWith('[bot]');
 }
 
+function textForRiskSignals(value) {
+  return String(value || '')
+    .replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, '$1')
+    .replace(/\[([^\]]+)\]\((?:<)?https?:\/\/[^)\s>]+(?:>)?\)/gi, '$1')
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ');
+}
+
+function hasSecuritySignal(value) {
+  const text = textForRiskSignals(value);
+  return /\b(?:security[\s-]+(?:update|fix|advisory|patch|vulnerabilit(?:y|ies)|issue)|vulnerabilit(?:y|ies)|CVE-\d{4}-\d+|GHSA-[\w-]+|remote code execution|privilege escalation|authentication bypass|exploit(?:s|ed|ation)?)\b/i.test(text);
+}
+
 export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
   const title = String(pullRequest?.title || '');
   const body = String(pullRequest?.body || '');
@@ -91,7 +105,7 @@ export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
   if (dependencyBot && /\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)/i.test(plainBody)) {
     labels.add('breaking');
   }
-  if (/\b(security|vulnerability|CVE-\d{4}-\d+|exploit|credential leak)\b/i.test(text)) {
+  if (hasSecuritySignal(text)) {
     labels.add('security');
   }
 
@@ -162,7 +176,7 @@ export function classifyVersionUpdate(value) {
   const pairs = [];
 
   // Dependabot single-package summaries and grouped release-note entries.
-  const fromToPattern = /\bfrom\s+v?(\d+(?:\.\d+){0,2})\s+to\s+v?(\d+(?:\.\d+){0,2})/gi;
+  const fromToPattern = /\bfrom\s+(?:[<>=!~^]+\s*)?v?(\d+(?:\.\d+){0,2})\s+to\s+(?:[<>=!~^]+\s*)?v?(\d+(?:\.\d+){0,2})(?![A-Za-z0-9.+-])/gi;
   for (const match of text.matchAll(fromToPattern)) {
     pairs.push([match[1], match[2]]);
   }
@@ -206,7 +220,8 @@ export function isDependencyManifestPath(path) {
 export function analyzeDependencyUpdate(pullRequest, changedFiles = []) {
   const author = String(pullRequest?.user?.login || '').toLowerCase();
   const summary = dependencySummary(pullRequest);
-  const body = String(pullRequest?.body || '').replace(/<[^>]*>/g, ' ');
+  const body = String(pullRequest?.body || '');
+  const plainBody = body.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
   const versionRisk = classifyVersionUpdate(summary);
   const reasons = [];
 
@@ -217,7 +232,7 @@ export function analyzeDependencyUpdate(pullRequest, changedFiles = []) {
   if (/\b(?:breaking(?:\s+changes?)?|backward[- ]incompatible)\b/i.test(body)) {
     reasons.push('breaking-release-notes');
   }
-  if (/\b(?:security update|security fix|vulnerability|CVE-\d{4}-\d+|GHSA-[\w-]+)\b/i.test(summary)) {
+  if (hasSecuritySignal(title + '\n' + body)) {
     reasons.push('security-update');
   }
 
@@ -462,7 +477,7 @@ async function syncCheckLabels(fullName, number, state) {
   const labels = ['ci-failed', 'ci-pending', 'ci-missing'];
   const current = state === 'failure' ? 'ci-failed'
     : (state === 'pending' ? 'ci-pending'
-      : (state === 'success' ? null : 'ci-missing'));
+      : (state === 'success' || state === 'not-applicable' ? null : 'ci-missing'));
   for (const label of labels) {
     if (label !== current) await removeLabel(fullName, number, label);
   }
@@ -492,6 +507,17 @@ async function processPullRequest(repo, pr) {
   if (!allowedBaseBranches.includes(pr.base.ref)) riskReasons.push('target-branch-outside-policy');
   if (!pathsAvailable) riskReasons.push('changed-files-unavailable');
   await addLabels(fullName, pr.number, [...labels]);
+
+  // Reconcile stale risk labels previously created by broad security/version heuristics.
+  // Only reconcile Dependabot PRs; preserve labels on human-authored PRs.
+  if (String(pr.user?.login || '').toLowerCase() === 'dependabot[bot]') {
+    const currentLabels = names(pr.labels);
+    for (const label of ['security', 'breaking', 'major-update', 'workflow-update', 'release']) {
+      if (currentLabels.has(label) && !labels.has(label)) {
+        await removeLabel(fullName, pr.number, label);
+      }
+    }
+  }
 
   let fresh;
   try {

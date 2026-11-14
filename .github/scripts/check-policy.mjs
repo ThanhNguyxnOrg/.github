@@ -116,8 +116,10 @@ export function evaluateRequiredChecks(checkRuns = [], statuses = {}, requiredCh
     }
   }
 
+  // A configured path-scoped check that does not match this PR is neutral,
+  // not missing evidence. Missing applies only when an applicable check has no run.
   if (!applicable.length && !cannotEvaluatePaths) {
-    missing.push('No required checks apply to the changed files');
+    return { state: 'not-applicable', missing: [], failed: [], pending: [], required: [] };
   }
 
   const unique = values => [...new Set(values)];

@@ -46,6 +46,20 @@ test('PR title and changed files produce useful type and area labels', () => {
   assert.ok(!labels.includes('triage-needed'));
 });
 
+test('Dependabot compatibility-score URLs do not create false security risk', () => {
+  const pr = {
+    title: 'chore(deps): bump dotenv from 18.0.9 to 18.0.10',
+    body: '[Dependabot compatibility score](https://docs.github.com/en/github/managing-security-vulnerabilities/about-security-updates)',
+    user: { login: 'dependabot[bot]' }
+  };
+  const labels = classifyPullRequestLabels(pr, ['package.json', 'package-lock.json']);
+  const risk = assessPullRequestRisk(pr, ['package.json', 'package-lock.json']);
+  assert.ok(!labels.includes('security'));
+  assert.equal(risk.requiresHumanReview, false);
+  assert.equal(risk.dependency.versionRisk, 'patch');
+  assert.deepEqual(risk.dependency.reasons, []);
+});
+
 test('security and workflow changes are explicitly classified', () => {
   const labels = classifyPullRequestLabels(
     { title: 'fix: patch CVE-2026-12345', body: 'Resolves a dependency vulnerability.', user: { login: 'contributor' } },
@@ -69,6 +83,9 @@ test('dependency update classification remains SemVer-aware across grouped summa
   assert.equal(classifyVersionUpdate('Bump foo from 1.2.3 to 1.4.0'), 'minor');
   assert.equal(classifyVersionUpdate('Bump foo from 1.2.3 to 2.0.0'), 'major');
   assert.equal(classifyVersionUpdate('Bump actions/checkout from 4 to 5'), 'major');
+  assert.equal(classifyVersionUpdate('chore(deps): update platformdirs requirement from >=4.3.0 to >=4.12.4'), 'minor');
+  assert.equal(classifyVersionUpdate('chore(deps): update numpy requirement from >=2.0.0 to >=2.2.6'), 'minor');
+  assert.equal(classifyVersionUpdate('chore(deps): update pymupdf requirement from >=1.25.0 to >=1.28.2'), 'minor');
   assert.equal(classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\nUpdates bar from 0.9.1 to 0.10.0'), 'major');
   assert.equal(classifyVersionUpdate('| Package | From | To |\n| [foo](https://example.com) | \x601.0.0\x60 | \x602.0.0\x60 |'), 'major');
   assert.equal(classifyVersionUpdate('| Package | From | To |\n| foo | \x602.0.0\x60 | \x601.9.0\x60 |'), 'downgrade');
@@ -117,6 +134,21 @@ test('breaking changes later in long Dependabot release-note bodies are not trun
   assert.ok(labels.includes('breaking'));
 });
 
+
+test('PEP 440 lower-bound updates are eligible when they are same-major patch/minor manifest changes', () => {
+  for (const update of [
+    'chore(deps): update platformdirs requirement from >=4.3.0 to >=4.12.4',
+    'chore(deps): update numpy requirement from >=2.0.0 to >=2.2.6',
+    'chore(deps): update pymupdf requirement from >=1.25.0 to >=1.28.2'
+  ]) {
+    const result = analyzeDependencyUpdate(
+      { title: update, body: update, user: { login: 'dependabot[bot]' } },
+      ['pyproject.toml', 'requirements.txt']
+    );
+    assert.equal(result.eligible, true, update);
+    assert.equal(result.versionRisk, 'minor', update);
+  }
+});
 
 test('safe Dependabot patch and stable minor lockfile updates pass the low-risk gate', () => {
   const patch = analyzeDependencyUpdate(

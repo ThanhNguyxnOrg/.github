@@ -98,7 +98,7 @@
     },
     "LayoutLingua": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
+      "autoMergeDependabot": true,
       "requiredChecks": [
         {
           "name": "test (ubuntu-latest) / Test (ubuntu-latest)",
@@ -128,6 +128,18 @@
             "requirements*.txt",
             ".github/workflows/test.yml",
             "*.py"
+          ]
+        },
+        {
+          "name": "verify / Node (Ubuntu)",
+          "paths": [
+            "package.json",
+            "package-lock.json",
+            "src/**",
+            "server.ts",
+            "vite.config.ts",
+            "tsconfig.json",
+            "index.html"
           ]
         }
       ]

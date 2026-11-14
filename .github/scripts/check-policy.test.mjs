@@ -123,10 +123,11 @@ test('path-scoped policy cannot be evaluated without changed-file context', () =
   assert.deepEqual(result.missing, ['docs (changed-file context unavailable)']);
 });
 
-test('a profile with no applicable required checks fails closed', () => {
+test('a profile with no applicable required checks is neutral, not missing', () => {
   const result = evaluateRequiredChecks([], {}, [{ name: 'docs', paths: ['**/*.md'] }], ['src/main.ts']);
-  assert.equal(result.state, 'missing');
-  assert.deepEqual(result.missing, ['No required checks apply to the changed files']);
+  assert.equal(result.state, 'not-applicable');
+  assert.deepEqual(result.missing, []);
+  assert.deepEqual(result.required, []);
 });
 
 
