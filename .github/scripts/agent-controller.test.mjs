@@ -5,6 +5,7 @@ import {
   analyzeDependencyUpdate,
   assessPullRequestRisk,
   classifyVersionUpdate,
+  isTransientAutoMergeError,
   evaluateCheckRollup,
   isDependencyManifestPath,
   pullRequestCheckSha,
@@ -106,6 +107,13 @@ test('grouped Dependabot summaries classify documented breaking changes', () => 
   assert.ok(labels.includes('maintenance'));
   assert.ok(labels.includes('breaking'));
   assert.ok(!labels.includes('triage-needed'));
+});
+
+test('GitHub transient unstable merge state waits instead of blocking Auto-merge', () => {
+  assert.equal(isTransientAutoMergeError(new Error('Pull request is in unstable status')), true);
+  assert.equal(isTransientAutoMergeError('Pull request Pull request is in unstable status'), true);
+  assert.equal(isTransientAutoMergeError(new Error('Validation failed: required status check failed')), false);
+  assert.equal(isTransientAutoMergeError(new Error('Auto-merge is disabled for this repository')), false);
 });
 
 test('check rollup requires evidence and rejects failed or incomplete checks', () => {

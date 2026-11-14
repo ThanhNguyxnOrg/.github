@@ -386,6 +386,11 @@ function mergeMethodFor(repository, policy) {
   return null;
 }
 
+export function isTransientAutoMergeError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return /pull request.*unstable status|mergeability.*comput(?:e|ing)|checks? (?:are )?still (?:pending|running)/i.test(message);
+}
+
 async function enablePullRequestAutoMerge(fullName, pullRequest, mergeMethod) {
   if (pullRequest.auto_merge) return;
   if (!pullRequest.node_id) throw new Error('PR node_id is unavailable for Auto-merge');
@@ -633,6 +638,11 @@ async function processPullRequest(repo, pr) {
       await removeLabel(fullName, pr.number, 'automerge');
       await removeLabel(fullName, pr.number, 'automerge-blocked');
       console.log('[auto-merged]', fullName + '#' + pr.number + ': required checks passed; merge=' + merged.sha);
+      return;
+    }
+    if (isTransientAutoMergeError(error)) {
+      await removeLabel(fullName, pr.number, 'automerge-blocked');
+      console.log('[auto-merge-wait]', fullName + '#' + pr.number + ': GitHub has not finalized mergeability yet; waiting for the next check or PR event');
       return;
     }
     await addLabels(fullName, pr.number, ['automerge-blocked']);
