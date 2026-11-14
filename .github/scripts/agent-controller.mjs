@@ -483,7 +483,7 @@ async function syncCheckLabels(fullName, number, state) {
     if (label !== current) await removeLabel(fullName, number, label);
   }
   if (current) await addLabels(fullName, number,
-    current === 'ci-failed' || current === 'ci-missing' ? [current, 'needs-review'] : [current]);
+    current === 'ci-failed' ? [current, 'needs-review'] : [current]);
 }
 
 async function processPullRequest(repo, pr) {
@@ -547,8 +547,8 @@ async function processPullRequest(repo, pr) {
     ? await getCheckState(fullName, checkSha, repoName, pathsAvailable ? paths : undefined)
     : 'unconfigured';
   await syncCheckLabels(fullName, pr.number, checkState);
-  if (['failure', 'missing', 'unconfigured'].includes(checkState)) {
-    riskReasons.push('required-checks-' + checkState);
+  if (checkState === 'failure') {
+    riskReasons.push('required-checks-failure');
   }
 
   const existingLabels = names(pr.labels);

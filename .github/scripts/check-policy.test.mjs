@@ -150,6 +150,7 @@ test('CI profiles match the real project gates and quarantine known failing or o
       'test (ubuntu-latest) / Test (ubuntu-latest)',
       'test (windows-latest) / Test (windows-latest)',
       'test (macos-latest) / Test (macos-latest)',
+      'verify / Node (Ubuntu)',
     ],
   );
   assert.deepEqual(getRepositoryProfile('apidex-hub').requiredChecks.find(check => typeof check === 'object' && check.name.startsWith('regression-tests')).name, 'regression-tests / Python Regression Tests');
