@@ -21,6 +21,28 @@ export function expandRequiredAssets(patterns, releaseTag) {
   );
 }
 
+export function collectReleaseAssets(directory) {
+  const files = [];
+  const seen = new Set();
+  function visit(current) {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const filePath = path.join(current, entry.name);
+      if (entry.isSymbolicLink()) fail('Symbolic links are not allowed in release artifacts: ' + filePath);
+      if (entry.isDirectory()) {
+        visit(filePath);
+      } else if (entry.isFile()) {
+        if (seen.has(entry.name)) fail('Duplicate release asset filename across platform artifacts: ' + entry.name);
+        seen.add(entry.name);
+        files.push({ name: entry.name, filePath });
+      } else {
+        fail('Unsupported release artifact entry: ' + filePath);
+      }
+    }
+  }
+  visit(directory);
+  return files.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export function planAssetUpload(localAssets, expectedNames, existingAssets) {
   const local = new Map(localAssets.map(item => [item.name, item]));
   const existing = new Map((existingAssets || []).map(item => [item.name, item]));
@@ -126,15 +148,11 @@ async function main() {
   if (!fs.existsSync(assetPath) || !fs.statSync(assetPath).isDirectory()) {
     fail(`Release asset directory does not exist: ${assetPath}`);
   }
-  const entries = fs.readdirSync(assetPath, { withFileTypes: true });
-  if (entries.some(entry => !entry.isFile())) {
-    fail('Release asset directory must be flat and contain regular files only (no nested directories or symlinks)');
-  }
-  const localAssets = entries.map(entry => {
-    const filePath = path.join(assetPath, entry.name);
+  const discoveredFiles = collectReleaseAssets(assetPath);
+  const localAssets = discoveredFiles.map(({ name, filePath }) => {
     const bytes = fs.readFileSync(filePath);
     return {
-      name: entry.name,
+      name,
       filePath,
       bytes,
       size: bytes.length,
