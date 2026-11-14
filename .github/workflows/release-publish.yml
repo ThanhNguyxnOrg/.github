@@ -1,4 +1,4 @@
-name: ThanhNguyxnAgent — Reusable Release Publisher
+name: Release Asset Publisher
 
 on:
   workflow_call:
@@ -36,7 +36,7 @@ permissions:
 
 jobs:
   publish:
-    name: Upload and verify assets as ThanhNguyxnAgent
+    name: Validate and upload release assets
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -48,7 +48,7 @@ jobs:
         with:
           pattern: ${{ inputs.artifact_pattern }}
           path: ${{ inputs.artifact_directory }}
-          merge-multiple: true
+          merge-multiple: false
 
       - name: Mint repository-scoped ThanhNguyxnAgent token
         id: agent
