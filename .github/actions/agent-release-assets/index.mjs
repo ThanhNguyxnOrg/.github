@@ -44,10 +44,15 @@ export function collectReleaseAssets(directory) {
 }
 
 export function planAssetUpload(localAssets, expectedNames, existingAssets) {
+  const allowed = new Set(expectedNames);
   const local = new Map(localAssets.map(item => [item.name, item]));
   const existing = new Map((existingAssets || []).map(item => [item.name, item]));
   const missing = expectedNames.filter(name => !local.has(name));
-  const uploads = localAssets.map(item => {
+  const unexpected = localAssets
+    .map(item => item.name)
+    .filter(name => !allowed.has(name))
+    .sort((a, b) => a.localeCompare(b));
+  const uploads = localAssets.filter(item => allowed.has(item.name)).map(item => {
     const previous = existing.get(item.name);
     return {
       ...item,
@@ -55,7 +60,7 @@ export function planAssetUpload(localAssets, expectedNames, existingAssets) {
       existingId: previous?.id ?? null
     };
   });
-  return { missing, uploads };
+  return { missing, unexpected, uploads };
 }
 
 export function selectDraftRelease(releases, releaseTag) {
@@ -144,6 +149,10 @@ async function main() {
   if (!profile) fail(`No central release-policy profile exists for ${repo}`);
   const required = expandRequiredAssets(profile.requiredAssets, tag);
   if (!required.length) fail(`No requiredAssets manifest is configured for ${repo}`);
+  if (new Set(required).size !== required.length) fail('Central requiredAssets manifest contains duplicate filenames');
+  if (required.some(name => !name || path.basename(name) !== name || name === '.' || name === '..')) {
+    fail('Central requiredAssets manifest must contain filenames only');
+  }
 
   if (!fs.existsSync(assetPath) || !fs.statSync(assetPath).isDirectory()) {
     fail(`Release asset directory does not exist: ${assetPath}`);
@@ -215,6 +224,9 @@ async function main() {
   if (!release.draft) fail(`Release ${tag} is already published; refusing to mutate published assets`);
 
   const plan = planAssetUpload(localAssets, required, release.assets || []);
+  if (plan.unexpected.length) {
+    fail(`Unlisted release assets are not allowed by the central manifest: ${plan.unexpected.join(', ')}`);
+  }
   if (plan.missing.length) fail(`Required assets missing from ${assetPath}: ${plan.missing.join(', ')}`);
 
   const uploadBase = String(release.upload_url || '').replace(/\{\?.*$/, '');
