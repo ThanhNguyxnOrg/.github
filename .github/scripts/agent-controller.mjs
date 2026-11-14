@@ -388,7 +388,7 @@ function mergeMethodFor(repository, policy) {
 
 export function isTransientAutoMergeError(error) {
   const message = String(error?.message || error || '').toLowerCase();
-  return /pull request.*unstable status|mergeability.*comput(?:e|ing)|checks? (?:are )?still (?:pending|running)/i.test(message);
+  return /pull request.*unstable status|mergeability.*comput(?:e|ing)|checks? (?:are )?still (?:pending|running)|merge already in progress/i.test(message);
 }
 
 async function enablePullRequestAutoMerge(fullName, pullRequest, mergeMethod) {

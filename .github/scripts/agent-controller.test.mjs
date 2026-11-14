@@ -112,6 +112,7 @@ test('grouped Dependabot summaries classify documented breaking changes', () => 
 test('GitHub transient unstable merge state waits instead of blocking Auto-merge', () => {
   assert.equal(isTransientAutoMergeError(new Error('Pull request is in unstable status')), true);
   assert.equal(isTransientAutoMergeError('Pull request Pull request is in unstable status'), true);
+  assert.equal(isTransientAutoMergeError(new Error('Merge already in progress')), true);
   assert.equal(isTransientAutoMergeError(new Error('Validation failed: required status check failed')), false);
   assert.equal(isTransientAutoMergeError(new Error('Auto-merge is disabled for this repository')), false);
 });
