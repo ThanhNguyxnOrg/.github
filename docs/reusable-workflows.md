@@ -24,7 +24,7 @@ These are configured once at organization scope; do not create a different copy 
 
 ```yaml
 secrets:
-  # Compatibility input on the current reusable workflow; the source is a variable, not a secret.
+  # Legacy workflow_call compatibility field; source is the non-sensitive org variable.
   BOT_APP_ID: ${{ vars.BOT_APP_ID }}
   BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
 ```
