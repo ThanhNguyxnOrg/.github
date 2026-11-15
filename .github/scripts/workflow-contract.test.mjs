@@ -123,8 +123,8 @@ test('the central .github repository uses a self-hosted PR signal and relay with
   );
   const signal = read('.github/workflows/agent-pr-signal.yml');
   assert.match(signal, /pull_request_target:/);
-  assert.match(signal, /permissions:\\s*\\{\\}/);
-  assert.doesNotMatch(signal, /BOT_PRIVATE_KEY|BOT_APP_ID|actions\\/checkout/);
+  assert.match(signal, /permissions:\s*\{\}/);
+  assert.doesNotMatch(signal, /BOT_PRIVATE_KEY|BOT_APP_ID|actions\/checkout/);
   const worker = read('.github/workflows/agent-pr-worker-relay.yml');
   assert.match(worker, /workflow_run:/);
   assert.match(worker, /ThanhNguyxnAgent PR Event Worker/);
