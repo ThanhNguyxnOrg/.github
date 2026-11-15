@@ -123,9 +123,23 @@ jobs:
           permission-contents: write
           permission-workflows: write
 
+      - name: Create a single-repository settings token for Allow auto-merge
+        id: repo-settings
+        # This token is scoped to one matrix repository and is used only to set allow_auto_merge.
+        # The step is soft-failed until the App's Administration: write permission is approved.
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ matrix.repository }}
+          permission-administration: write
+
       - name: Install or update the managed PR event workflows
         env:
           GH_TOKEN: ${{ steps.onboarding.outputs.token }}
+          SETTINGS_TOKEN: ${{ steps.repo-settings.outputs.token }}
           ORG: ${{ github.repository_owner }}
           TARGET_REPOSITORY: ${{ matrix.repository }}
         run: node .github/scripts/agent-onboard.mjs
