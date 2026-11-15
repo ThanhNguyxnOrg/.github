@@ -18,13 +18,13 @@ Product repositories keep their native adapters for stack-specific tests, compil
 
 **Required checks are declared once in `ci-policy.json` in this repository. No CI-policy file is uploaded into each product repository.**
 
-Each profile records the default branch and exact required GitHub Actions check/job names. Dependency auto-merge is disabled by default and enabled only by explicit repository profiles with exact required checks.
+Each profile records the default branch and exact required GitHub Actions check/job names. Low-risk Dependabot patch/minor auto-merge is enabled by default, but only repositories with a non-empty, correctly mapped requiredChecks list are eligible. Repositories with missing or unmapped CI gates fail closed and require manual review.
 
 A required check must exist on the commit and finish with the exact `success` conclusion. The newest attempt for each exact check name is authoritative, so a successful rerun supersedes an older failed attempt. Missing checks, skipped/neutral required checks, pending jobs and failures all hold the gate. Unconfigured repositories fail closed and require human review. A green unrelated check cannot substitute for a missing required job.
 
 Path-scoped entries live only in this central registry and mirror the native workflow's `paths` filters. For pull requests, the controller evaluates check runs and commit statuses on the current PR head SHA; the synthetic merge SHA is only a fallback when a head SHA is unavailable. It refreshes PR metadata before CI evaluation and defers when the head changed since the initial repository listing.
 
-PR labels are routing metadata, not merge authorization. PR opened, reopened, synchronize, ready-for-review, and edited events are routed to the central controller. All non-draft PRs receive classification labels. High-risk changes, failed/missing required checks, workflow edits, sensitive paths, and major/downgrade/unknown/security dependency updates receive `needs-review` and maintainer routing. Low-risk changes stay out of the human-review queue; only Dependabot patch/minor updates in explicitly opted-in repositories can enter the guarded auto-merge path.
+PR labels are routing metadata, not merge authorization. PR opened, reopened, synchronize, ready-for-review, and edited events are routed to the central controller. All non-draft PRs receive classification labels. High-risk changes, failed/missing required checks, workflow edits, sensitive paths, and major/downgrade/unknown/security dependency updates receive `needs-review` and maintainer routing. Low-risk changes stay out of the human-review queue; Dependabot patch/minor updates can enter the guarded auto-merge path only in repositories with mapped required CI checks.
 
 ## Pull request safety
 
@@ -37,7 +37,7 @@ PR labels are routing metadata, not merge authorization. PR opened, reopened, sy
 | Failed, pending, missing, skipped or unconfigured required CI | Add the corresponding `ci-failed`, `ci-pending` or `ci-missing` label |
 | Merge conflict or protected path | Add `merge-conflict` or retain `needs-review`; require human resolution |
 
-The Agent is the organization's single decision and routing authority. It may enable guarded GitHub Auto-merge only for explicitly opted-in, low-risk Dependabot patch/minor updates after validating changed paths, required checks, repository settings and the current head SHA. All other risky changes are routed to a human maintainer. It does not check out or execute pull-request code; it reads PR metadata, changed-file names, mergeability, checks and commit statuses through the GitHub API.
+The Agent is the organization's single decision and routing authority. It may enable guarded GitHub Auto-merge only for low-risk Dependabot patch/minor updates after validating changed paths, non-empty required checks, repository settings and the current head SHA. All other risky changes are routed to a human maintainer. It does not check out or execute pull-request code; it reads PR metadata, changed-file names, mergeability, checks and commit statuses through the GitHub API.
 
 ## Event security and automatic onboarding
 
@@ -71,7 +71,7 @@ The central stale controller scans active organization repositories daily. It ma
 ## Adding a new repository
 
 1. Keep the project's own CI workflow and make it run on pull requests to the default branch.
-2. Add one entry under `repositories` in central `ci-policy.json`: exact required job names, default branch, and the explicit `autoMergeDependabot` decision.
+2. Add one entry under `repositories` in central `ci-policy.json`: exact required job names and default branch. The organization default permits only eligible Dependabot patch/minor auto-merge; leave the required-check list empty only when a repository must remain manual-review-only.
 3. For automatic releases, add an entry in central `release-policy.json`: branch, baseline SHA, initial version, version files, changelog, release mode, build workflow name and required asset filenames.
 4. Keep the project release workflow as a build/package adapter only. It should build from the central tag and upload files to that tag's draft release; it must not independently bump versions or create a second release.
 5. Verify the first CI run, release build and asset manifest before enabling dependency auto-merge.
