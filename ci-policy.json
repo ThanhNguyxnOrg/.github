@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "organization": "ThanhNguyxnOrg",
   "defaults": {
-    "autoMergeDependabot": true,
+    "autoMergeDependabot": false,
     "requiredChecks": []
   },
   "repositories": {
