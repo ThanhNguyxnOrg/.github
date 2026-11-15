@@ -17,7 +17,8 @@ on:
         type: number
     secrets:
       BOT_APP_ID:
-        required: true
+        description: Legacy fallback; prefer the organization variable BOT_APP_ID.
+        required: false
       BOT_PRIVATE_KEY:
         required: true
 
@@ -35,7 +36,7 @@ jobs:
         id: central
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         with:
-          client-id: ${{ secrets.BOT_APP_ID }}
+          app-id: ${{ vars.BOT_APP_ID || secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ inputs.repository_owner }}
           repositories: .github
@@ -98,7 +99,7 @@ jobs:
         uses: $/.github/actions/agent-token
         with:
           profile: remediation
-          client-id: ${{ secrets.BOT_APP_ID }}
+          app-id: ${{ vars.BOT_APP_ID || secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ inputs.repository_owner }}
           repositories: ${{ inputs.repository_name }}
