@@ -186,3 +186,13 @@ test('CI profiles match the real project gates and quarantine known failing or o
   ]);
   assert.equal(getRepositoryProfile('ClipForge').requiredChecks.includes('🖥️ Qt 6 Quick (windows)'), false);
 });
+
+
+test('apidex-hub site dependency changes require the Website CI build', () => {
+  const checks = getRepositoryProfile('apidex-hub').requiredChecks;
+  const website = checks.find(check => typeof check === 'object' && check.name === 'website / Website Build');
+  assert.deepEqual(website, {
+    name: 'website / Website Build',
+    paths: ['site/**']
+  });
+});
