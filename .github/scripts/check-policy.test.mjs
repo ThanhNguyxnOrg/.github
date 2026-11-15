@@ -4,7 +4,7 @@ import { evaluateRequiredChecks, getRepositoryProfile, matchesPathPattern } from
 
 test('repository profiles inherit organization defaults and keep repository-specific CI gates', () => {
   assert.equal(getRepositoryProfile('WriteCanvas').defaultBranch, 'master');
-  assert.equal(getRepositoryProfile('WriteCanvas').autoMergeDependabot, true);
+  assert.equal(getRepositoryProfile('WriteCanvas').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('WriteCanvas').requiredChecks, [
     'tests (ubuntu-latest, 22.x) / ubuntu-latest / node 22.x',
     'tests (ubuntu-latest, 24.x) / ubuntu-latest / node 24.x',
@@ -13,10 +13,10 @@ test('repository profiles inherit organization defaults and keep repository-spec
     'syntax / syntax check'
   ]);
   assert.deepEqual(getRepositoryProfile('unregistered-repo'), {
-    autoMergeDependabot: true,
+    autoMergeDependabot: false,
     requiredChecks: []
   });
-  assert.equal(getRepositoryProfile('StepDSA').autoMergeDependabot, true);
+  assert.equal(getRepositoryProfile('StepDSA').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('StepDSA').requiredChecks, ['test / test']);
 });
 
@@ -32,12 +32,12 @@ test('central profiles inherit one organization-wide auto-merge policy and keep 
   for (const name of names) {
     const profile = getRepositoryProfile(name);
     assert.ok(profile.defaultBranch, name + ' must declare its default branch');
-    assert.equal(profile.autoMergeDependabot, true, name + ' must inherit the organization-wide auto-merge policy');
+    assert.equal(profile.autoMergeDependabot, false, name + ' must inherit the organization-wide auto-merge policy');
   }
-  assert.equal(getRepositoryProfile('ForgeHelm').autoMergeDependabot, true);
-  assert.equal(getRepositoryProfile('Snapbooth').autoMergeDependabot, true);
-  assert.equal(getRepositoryProfile('StepDSA').autoMergeDependabot, true);
-  assert.equal(getRepositoryProfile('SkillGauge').autoMergeDependabot, true);
+  assert.equal(getRepositoryProfile('ForgeHelm').autoMergeDependabot, false);
+  assert.equal(getRepositoryProfile('Snapbooth').autoMergeDependabot, false);
+  assert.equal(getRepositoryProfile('StepDSA').autoMergeDependabot, false);
+  assert.equal(getRepositoryProfile('SkillGauge').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('ForgeHelm').requiredChecks, ['verify / Verify (ForgeHelm)']);
   assert.deepEqual(getRepositoryProfile('ThanhNguyxnOrg.github.io').requiredChecks, ['verify / Verify (Website)']);
   assert.equal(getRepositoryProfile('SkillGauge').pendingLabel, 'skill-verification-pending');
@@ -162,14 +162,14 @@ test('CI profiles match the real project gates and quarantine known failing or o
     ],
   );
   assert.deepEqual(getRepositoryProfile('apidex-hub').requiredChecks.find(check => typeof check === 'object' && check.name.startsWith('regression-tests')).name, 'regression-tests / Python Regression Tests');
-  assert.equal(getRepositoryProfile('cogmint').autoMergeDependabot, true);
+  assert.equal(getRepositoryProfile('cogmint').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('chess-on-glass').requiredChecks, [],
     'repositories without mapped CI checks remain ineligible for auto-merge');
   assert.deepEqual(getRepositoryProfile('PurgeKit').requiredChecks, [
     'frontend / Frontend (Svelte & TypeScript)',
     'Rust Compiler Check',
   ]);
-  assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, true);
+  assert.equal(getRepositoryProfile('PurgeKit').autoMergeDependabot, false);
   assert.deepEqual(getRepositoryProfile('blendops').requiredChecks, ['verify / Verify (BlendOps)']);
   assert.deepEqual(getRepositoryProfile('lagvex').requiredChecks, [
     'verify / Verify (Lagvex Go)',
