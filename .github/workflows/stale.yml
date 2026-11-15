@@ -32,7 +32,7 @@ jobs:
         id: agent
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         with:
-          client-id: ${{ secrets.BOT_APP_ID }}
+          client-id: ${{ vars.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-issues: write
