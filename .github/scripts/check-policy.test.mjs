@@ -13,14 +13,14 @@ test('repository profiles inherit safe defaults while explicit repository settin
     'syntax / syntax check'
   ]);
   assert.deepEqual(getRepositoryProfile('unregistered-repo'), {
-    autoMergeDependabot: false,
+    autoMergeDependabot: true,
     requiredChecks: []
   });
   assert.equal(getRepositoryProfile('StepDSA').autoMergeDependabot, true);
   assert.deepEqual(getRepositoryProfile('StepDSA').requiredChecks, ['test / test']);
 });
 
-test('central profiles cover every active organization repository and fail closed by default', () => {
+test('central profiles inherit one organization-wide auto-merge policy and keep CI gates explicit', () => {
   const names = [
     'judgeloom-core', 'blendops', 'apidex-hub', 'lumeo', 'ForgeHelm',
     'cogmint', 'awesome-cert-sherpa', 'Snapbooth', 'Locsight', 'PurgeKit',
@@ -32,7 +32,7 @@ test('central profiles cover every active organization repository and fail close
   for (const name of names) {
     const profile = getRepositoryProfile(name);
     assert.ok(profile.defaultBranch, name + ' must declare its default branch');
-    assert.equal(profile.autoMergeDependabot, ['PurgeKit', 'WriteCanvas', 'blendops', 'LayoutLingua', 'StepDSA', 'SkillGauge', 'ForgeHelm', 'Snapbooth'].includes(name), name + ' has the expected explicit Dependabot Auto-merge opt-in');
+    assert.equal(profile.autoMergeDependabot, true, name + ' must inherit the organization-wide auto-merge policy');
   }
   assert.equal(getRepositoryProfile('ForgeHelm').autoMergeDependabot, true);
   assert.equal(getRepositoryProfile('Snapbooth').autoMergeDependabot, true);
@@ -162,7 +162,9 @@ test('CI profiles match the real project gates and quarantine known failing or o
     ],
   );
   assert.deepEqual(getRepositoryProfile('apidex-hub').requiredChecks.find(check => typeof check === 'object' && check.name.startsWith('regression-tests')).name, 'regression-tests / Python Regression Tests');
-  assert.equal(getRepositoryProfile('cogmint').autoMergeDependabot, false);
+  assert.equal(getRepositoryProfile('cogmint').autoMergeDependabot, true);
+  assert.deepEqual(getRepositoryProfile('chess-on-glass').requiredChecks, [],
+    'repositories without mapped CI checks remain ineligible for auto-merge');
   assert.deepEqual(getRepositoryProfile('PurgeKit').requiredChecks, [
     'frontend / Frontend (Svelte & TypeScript)',
     'Rust Compiler Check',
