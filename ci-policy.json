@@ -2,13 +2,12 @@
   "schemaVersion": 1,
   "organization": "ThanhNguyxnOrg",
   "defaults": {
-    "autoMergeDependabot": false,
+    "autoMergeDependabot": true,
     "requiredChecks": []
   },
   "repositories": {
     "judgeloom-core": {
       "defaultBranch": "master",
-      "autoMergeDependabot": false,
       "requiredChecks": [
         "Lint • Typecheck • Test (Python 3.12)",
         "go-test / Go worker test • vet"
@@ -16,14 +15,12 @@
     },
     "blendops": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
       "requiredChecks": [
         "verify / Verify (BlendOps)"
       ]
     },
     "apidex-hub": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
       "requiredChecks": [
         {
           "name": "check-links",
@@ -52,35 +49,30 @@
     },
     "lumeo": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
       "requiredChecks": [
         "verify / lint-and-syntax"
       ]
     },
     "cogmint": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
       "requiredChecks": [
         "verify / Typecheck"
       ]
     },
     "awesome-cert-sherpa": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
       "requiredChecks": [
         "build / Build & Validate"
       ]
     },
     "Snapbooth": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
       "requiredChecks": [
         "verify / Smoke & E2E"
       ]
     },
     "Locsight": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
       "requiredChecks": [
         "verify / Registry & Release Script",
         "build-tauri (windows-latest, x64)",
@@ -90,7 +82,6 @@
     },
     "PurgeKit": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
       "requiredChecks": [
         "frontend / Frontend (Svelte & TypeScript)",
         "Rust Compiler Check"
@@ -98,7 +89,6 @@
     },
     "LayoutLingua": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
       "requiredChecks": [
         {
           "name": "test (ubuntu-latest) / Test (ubuntu-latest)",
@@ -146,7 +136,6 @@
     },
     "lagvex": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
       "requiredChecks": [
         "verify / Verify (Lagvex Go)",
         "🔨 Cross-Compile Check (linux, amd64, bin/lagvex-client-linux-amd64)",
@@ -158,7 +147,6 @@
     },
     "git-account-switcher": {
       "defaultBranch": "master",
-      "autoMergeDependabot": false,
       "requiredChecks": [
         "Bash (ubuntu-latest)",
         "Windows PowerShell",
@@ -167,7 +155,6 @@
     },
     "ClipForge": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
       "requiredChecks": [
         "build-test-ubuntu / 🐧 g++ C++ backend (ubuntu)",
         "🪟 MSVC + NASM (windows)",
@@ -176,7 +163,6 @@
     },
     "WriteCanvas": {
       "defaultBranch": "master",
-      "autoMergeDependabot": true,
       "requiredChecks": [
         "tests (ubuntu-latest, 22.x) / ubuntu-latest / node 22.x",
         "tests (ubuntu-latest, 24.x) / ubuntu-latest / node 24.x",
@@ -187,21 +173,18 @@
     },
     "Techstack-Studio": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
       "requiredChecks": [
         "verify / Verify"
       ]
     },
     "StepDSA": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
       "requiredChecks": [
         "test / test"
       ]
     },
     "SkillGauge": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
       "pendingLabel": "skill-verification-pending",
       "requiredChecks": [
         {
@@ -215,28 +198,24 @@
     },
     "ForgeHelm": {
       "defaultBranch": "main",
-      "autoMergeDependabot": true,
       "requiredChecks": [
         "verify / Verify (ForgeHelm)"
       ]
     },
     "ThanhNguyxnOrg.github.io": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
       "requiredChecks": [
         "verify / Verify (Website)"
       ]
     },
     "AFTERFRAME-THE-LAST-LOOP": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
       "requiredChecks": [
         "verify / Verify (Bun)"
       ]
     },
     "chess-on-glass": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
       "requiredChecks": []
     }
   }
