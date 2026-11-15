@@ -4,8 +4,8 @@ inputs:
   profile:
     description: "Permission profile: content, issues, remediation, release, or read."
     required: true
-  client-id:
-    description: GitHub App client ID (organization secret BOT_APP_ID).
+  app-id:
+    description: Numeric GitHub App ID (organization variable BOT_APP_ID).
     required: true
   private-key:
     description: GitHub App private key (organization secret BOT_PRIVATE_KEY).
@@ -39,7 +39,7 @@ runs:
       if: inputs.profile == 'content'
       uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
       with:
-        client-id: ${{ inputs.client-id }}
+        app-id: ${{ inputs.app-id }}
         private-key: ${{ inputs.private-key }}
         owner: ${{ inputs.owner }}
         repositories: ${{ inputs.repositories }}
@@ -49,7 +49,7 @@ runs:
       if: inputs.profile == 'issues'
       uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
       with:
-        client-id: ${{ inputs.client-id }}
+        app-id: ${{ inputs.app-id }}
         private-key: ${{ inputs.private-key }}
         owner: ${{ inputs.owner }}
         repositories: ${{ inputs.repositories }}
@@ -63,7 +63,7 @@ runs:
       if: inputs.profile == 'remediation'
       uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
       with:
-        client-id: ${{ inputs.client-id }}
+        app-id: ${{ inputs.app-id }}
         private-key: ${{ inputs.private-key }}
         owner: ${{ inputs.owner }}
         repositories: ${{ inputs.repositories }}
@@ -78,7 +78,7 @@ runs:
       if: inputs.profile == 'release'
       uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
       with:
-        client-id: ${{ inputs.client-id }}
+        app-id: ${{ inputs.app-id }}
         private-key: ${{ inputs.private-key }}
         owner: ${{ inputs.owner }}
         repositories: ${{ inputs.repositories }}
@@ -92,7 +92,7 @@ runs:
       if: inputs.profile == 'read'
       uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
       with:
-        client-id: ${{ inputs.client-id }}
+        app-id: ${{ inputs.app-id }}
         private-key: ${{ inputs.private-key }}
         owner: ${{ inputs.owner }}
         repositories: ${{ inputs.repositories }}
