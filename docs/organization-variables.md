@@ -27,11 +27,13 @@ variable is paired with `EDGE_API_KEY`. `BOT_APP_ID` is paired with the
 `BOT_PRIVATE_KEY` secret. See [Organization Actions Secrets](organization-secrets.md)
 for the credential inventory and access policy.
 
-**Access policy:** prefer **Selected repositories**. Add a repository only
-after its Store submission workflow has been reviewed and is trusted to use the
-organization publisher identity. Do not grant all repositories access merely
-for convenience. The repository allowlist for these variables should match the
-allowlist for `MSSTORE_CLIENT_SECRET`.
+**Access policy:** prefer **Selected repositories** and maintain separate allowlists by purpose:
+
+- `BOT_APP_ID`: the central `.github` repository and every trusted repository that runs ThanhNguyxnAgent workflows. Its access should align with `BOT_PRIVATE_KEY`.
+- `AMO_API_KEY` and `EDGE_CLIENT_ID`: only extension repositories that publish through the corresponding AMO or Edge account (currently Lumeo).
+- `MSSTORE_TENANT_ID`, `MSSTORE_CLIENT_ID`, and `MSSTORE_SELLER_ID`: only repositories with a reviewed Microsoft Store submission workflow. Their allowlist should match `MSSTORE_CLIENT_SECRET`.
+
+Do not grant every organization variable to all repositories merely for convenience.
 
 ## Repository-level variables
 
@@ -42,6 +44,8 @@ differ by project.
 | Variable | Scope | Purpose | Current consumer |
 |---|---|---|---|
 | `MSSTORE_PRODUCT_ID` | Repository | Microsoft Store product ID targeted by that repository's submission workflow. Each Store app must set its own value. | [WriteCanvas](https://github.com/ThanhNguyxnOrg/WriteCanvas), using its existing Store listing. |
+| `EDGE_PRODUCT_ID` | Repository | Microsoft Edge Add-ons Product ID for the specific extension; never share it between extensions. | [Lumeo](https://github.com/ThanhNguyxnOrg/lumeo). |
+| `GECKO_ID` | Repository | Firefox AMO add-on ID; defaults to `lumeo@thanhnguyxn.org` in Lumeo and must remain per-extension. | [Lumeo](https://github.com/ThanhNguyxnOrg/lumeo). |
 | `ITCHIO_GAME` | Repository | itch.io destination in lowercase `account/project-slug` form; it is not a credential. | [AFTERFRAME](https://github.com/ThanhNguyxnOrg/AFTERFRAME-THE-LAST-LOOP). |
 
 Create repository-level variables under **Repository → Settings → Secrets
@@ -55,15 +59,21 @@ In GitHub Actions, read Actions variables through the `vars` context:
 
 ```yaml
 env:
+  APP_ID: ${{ vars.BOT_APP_ID }}
+  AMO_JWT_ISSUER: ${{ vars.AMO_API_KEY }}
+  EDGE_CLIENT_ID: ${{ vars.EDGE_CLIENT_ID }}
   STORE_TENANT_ID: ${{ vars.MSSTORE_TENANT_ID }}
   STORE_CLIENT_ID: ${{ vars.MSSTORE_CLIENT_ID }}
   STORE_SELLER_ID: ${{ vars.MSSTORE_SELLER_ID }}
   STORE_PRODUCT_ID: ${{ vars.MSSTORE_PRODUCT_ID }}
   STORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+  BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
+  AMO_JWT_SECRET: ${{ secrets.AMO_API_SECRET }}
+  EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
 ```
 
-The first four values are configuration. The last value is sensitive and must
-come from the Actions `secrets` context, not `vars`.
+Values under `vars` are non-sensitive configuration identifiers. Values under
+`secrets` are credentials and must never be copied into documentation or logs.
 
 ## Security and maintenance
 
