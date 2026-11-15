@@ -603,8 +603,57 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
   return release;
 }
 
+async function repairOrphanDraftReleases(fullName, repoName, releases, rule) {
+  const prefix = repoName + ' ';
+  for (const candidate of releases) {
+    if (!candidate?.draft || !/^untagged-[0-9a-f]{8,}$/i.test(String(candidate.tag_name || ''))) continue;
+    const name = String(candidate.name || '');
+    if (!name.startsWith(prefix)) continue;
+    const version = name.slice(prefix.length).replace(/^v/, '');
+    if (!parseSemver(version)) continue;
+
+    const tag = makeTagName(version);
+    let tagSha;
+    try {
+      tagSha = await getTagCommitSha(fullName, tag);
+    } catch (error) {
+      if (error instanceof GitHubError && error.status === 404) continue;
+      throw error;
+    }
+
+    const expectedName = repoName + ' ' + tag;
+    const exactOrphan = selectOrphanDraftForTag(releases, tag, tagSha, expectedName);
+    if (!exactOrphan || exactOrphan.id !== candidate.id) continue;
+
+    const changelog = await getFile(fullName, rule.changelogPath || 'CHANGELOG.md', tagSha);
+    const body = releaseBodyFromChangelog(changelog, version);
+    const prerelease = Boolean(parseSemver(version)?.prerelease);
+    const repaired = await api('/repos/' + fullName + '/releases/' + candidate.id, {
+      method: 'PATCH',
+      body: { tag_name: tag, target_commitish: tagSha, name: expectedName, body, draft: true, prerelease }
+    });
+    if (!releaseMatchesTag(repaired, tag) || repaired.draft !== true || repaired.target_commitish !== tagSha) {
+      throw new Error('Orphan release repair failed exact tag, target SHA, or draft verification for ' + fullName + ' ' + tag);
+    }
+    console.log('[release-orphan-repaired]', fullName, tag, 'matched exact name and target SHA', candidate.id);
+
+    if (!rule.releaseWorkflowName) {
+      const published = await api('/repos/' + fullName + '/releases/' + candidate.id, {
+        method: 'PATCH',
+        body: { draft: false }
+      });
+      if (!releaseMatchesTag(published, tag) || published.draft !== false) {
+        throw new Error('Orphan source-only release could not be published for ' + fullName + ' ' + tag);
+      }
+      console.log('[release-published]', fullName, tag, 'repaired source-only orphan draft');
+    }
+  }
+}
+
 async function publishReadyDrafts(repoName, rule) {
   const fullName = ORG + '/' + repoName;
+  const initialReleases = await api('/repos/' + fullName + '/releases?per_page=100');
+  await repairOrphanDraftReleases(fullName, repoName, initialReleases, rule);
   const releases = await api('/repos/' + fullName + '/releases?per_page=100');
   const pendingDrafts = pendingDraftReleases(releases);
   const pendingIds = new Set(pendingDrafts.map(release => release.id));
