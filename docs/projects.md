@@ -6,7 +6,7 @@
 
 <div align="center">
   <img src="https://img.shields.io/github/followers/ThanhNguyxnOrg?label=Followers&style=flat-square" alt="Followers" />
-  <img src="https://img.shields.io/badge/21-Repositories-8A2BE2?style=flat-square" alt="16 repositories" />
+  <img src="https://img.shields.io/badge/22-Repositories-8A2BE2?style=flat-square" alt="16 repositories" />
   <img src="https://img.shields.io/badge/developer--tools-00C853?style=flat-square" alt="developer-tools" />
   <img src="https://img.shields.io/badge/ai--agents-1E90FF?style=flat-square" alt="ai-agents" />
   <img src="https://img.shields.io/github/stars/ThanhNguyxnOrg/blendops?style=flat-square&label=blendops" alt="blendops stars" />
@@ -29,6 +29,7 @@ Every repository in the organization, auto-updated. The profile page shows the T
 | [StepDSA](https://github.com/ThanhNguyxnOrg/StepDSA) | Interactive DSA learning platform & visualizer with deterministic time-travel engine and playground. | TypeScript | algorithms, data-structures, dsa |
 | [.github](https://github.com/ThanhNguyxnOrg/.github) | Organization profile and community health files for ThanhNguyxnOrg | Python | community-health, docs, github |
 | [AFTERFRAME-THE-LAST-LOOP](https://github.com/ThanhNguyxnOrg/AFTERFRAME-THE-LAST-LOOP) | A third-person sci-fi action RPG built with React, TypeScript and Three.js. Explore Nadir-9 and... | TypeScript | 3d-game, action-rpg, browser-game |
+| [chess-on-glass](https://github.com/ThanhNguyxnOrg/chess-on-glass) | Cross-platform chess assistant that watches the board, tracks the game, and presents or speaks... | - | chess, chess-assistant, computer-vision |
 | [ClipForge](https://github.com/ThanhNguyxnOrg/ClipForge) | Offline audio inspection and batch-processing toolkit (C++23, NASM x86-64 SSE2, CMake, CLI) | C++ | audio, audio-processing, batch-processing |
 | [cogmint](https://github.com/ThanhNguyxnOrg/cogmint) | Dark-first control plane for Claude Code orchestration. Visual ops surface for agents, skills,... | Vue | agent-orchestration, ai-agents, anthropic |
 | [ForgeHelm](https://github.com/ThanhNguyxnOrg/ForgeHelm) | ⚒️ ForgeHelm — A powerful Chrome Extension for bulk GitHub repository management. Archive, delete,... | JavaScript | bulk-operations, chrome-extension, developer-tools |
