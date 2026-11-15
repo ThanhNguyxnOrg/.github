@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateRequiredChecks, getRepositoryProfile, matchesPathPattern } from './check-policy.mjs';
 
-test('repository profiles are centrally defined and unknown repositories fail closed', () => {
+test('repository profiles inherit safe defaults while explicit repository settings override them', () => {
   assert.equal(getRepositoryProfile('WriteCanvas').defaultBranch, 'master');
   assert.equal(getRepositoryProfile('WriteCanvas').autoMergeDependabot, true);
   assert.deepEqual(getRepositoryProfile('WriteCanvas').requiredChecks, [
@@ -12,7 +12,12 @@ test('repository profiles are centrally defined and unknown repositories fail cl
     'tests (macos-latest, 22.x) / macos-latest / node 22.x',
     'syntax / syntax check'
   ]);
-  assert.equal(getRepositoryProfile('unregistered-repo'), null);
+  assert.deepEqual(getRepositoryProfile('unregistered-repo'), {
+    autoMergeDependabot: false,
+    requiredChecks: []
+  });
+  assert.equal(getRepositoryProfile('StepDSA').autoMergeDependabot, true);
+  assert.deepEqual(getRepositoryProfile('StepDSA').requiredChecks, ['test / test']);
 });
 
 test('central profiles cover every active organization repository and fail closed by default', () => {
