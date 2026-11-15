@@ -11,6 +11,21 @@ on:
         required: false
         default: ubuntu-latest
         type: string
+      timeout_minutes:
+        description: Maximum job runtime.
+        required: false
+        default: 360
+        type: number
+      fetch_depth:
+        description: Git history depth for checkout; use 0 for full history.
+        required: false
+        default: 1
+        type: number
+      working_directory:
+        description: Project directory used for configure, build and test commands.
+        required: false
+        default: "."
+        type: string
       dependencies_command:
         required: false
         default: ""
@@ -47,34 +62,40 @@ jobs:
   verify:
     name: ${{ inputs.job_name }}
     runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout_minutes }}
     defaults:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          fetch-depth: ${{ inputs.fetch_depth }}
           persist-credentials: false
       - name: Install system dependencies
         if: inputs.dependencies_command != ''
         env:
           COMMAND: ${{ inputs.dependencies_command }}
+        working-directory: ${{ inputs.working_directory }}
         run: bash -euo pipefail -c "$COMMAND"
       - name: Configure
         env:
           COMMAND: ${{ inputs.configure_command }}
+        working-directory: ${{ inputs.working_directory }}
         run: bash -euo pipefail -c "$COMMAND"
       - name: Build
         env:
           COMMAND: ${{ inputs.build_command }}
+        working-directory: ${{ inputs.working_directory }}
         run: bash -euo pipefail -c "$COMMAND"
       - name: Test
         if: inputs.test_command != ''
         env:
           COMMAND: ${{ inputs.test_command }}
+        working-directory: ${{ inputs.working_directory }}
         run: bash -euo pipefail -c "$COMMAND"
       - name: Upload CI artifact
         if: inputs.artifact_name != '' && inputs.artifact_path != ''
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: ${{ inputs.artifact_name }}
           path: ${{ inputs.artifact_path }}
