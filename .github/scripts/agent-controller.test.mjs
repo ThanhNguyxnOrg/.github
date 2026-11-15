@@ -4,6 +4,7 @@ import {
   classifyPullRequestLabels,
   analyzeDependencyUpdate,
   assessPullRequestRisk,
+  assessReviewFeedback,
   classifyVersionUpdate,
   isTransientAutoMergeError,
   evaluateCheckRollup,
@@ -59,6 +60,71 @@ test('Dependabot compatibility-score URLs do not create false security risk', ()
   assert.equal(risk.requiresHumanReview, false);
   assert.equal(risk.dependency.versionRisk, 'patch');
   assert.deepEqual(risk.dependency.reasons, []);
+});
+
+test('Dependabot release-note history does not create false security or breaking holds', () => {
+  const pr = {
+    title: 'chore(deps): bump source-map-js from 1.2.1 to 1.2.2',
+    body: [
+      'Bumps source-map-js from 1.2.1 to 1.2.2.',
+      '<details>',
+      '<summary>Release notes</summary>',
+      'This historical release text mentions security fixes, vulnerabilities, CVE-2026-93749, and breaking changes.',
+      '</details>'
+    ].join('\\n'),
+    user: { login: 'dependabot[bot]' }
+  };
+  const files = ['package.json', 'package-lock.json'];
+  const labels = classifyPullRequestLabels(pr, files);
+  const risk = assessPullRequestRisk(pr, files);
+  const dependency = analyzeDependencyUpdate(pr, files);
+
+  assert.ok(!labels.includes('security'));
+  assert.ok(!labels.includes('breaking'));
+  assert.equal(risk.requiresHumanReview, false);
+  assert.equal(dependency.eligible, true);
+  assert.deepEqual(dependency.reasons, []);
+});
+
+test('explicit security and breaking signals in the Dependabot summary still require review', () => {
+  const security = {
+    title: 'Bump openssl to fix CVE-2026-12345',
+    body: 'Security update for CVE-2026-12345.<details><summary>Release notes</summary>History.</details>',
+    user: { login: 'dependabot[bot]' }
+  };
+  const breaking = {
+    title: 'Bump framework from 1.2.0 to 1.3.0',
+    body: 'Breaking: this update changes the public API.<details><summary>Release notes</summary>History.</details>',
+    user: { login: 'dependabot[bot]' }
+  };
+
+  assert.ok(classifyPullRequestLabels(security, ['package.json']).includes('security'));
+  assert.ok(classifyPullRequestLabels(breaking, ['package.json']).includes('breaking'));
+  assert.ok(assessPullRequestRisk(security, ['package.json']).requiresHumanReview);
+  assert.ok(assessPullRequestRisk(breaking, ['package.json']).requiresHumanReview);
+});
+
+test('unresolved review threads and changes-requested reviews keep PRs in human review', () => {
+  const unresolved = assessReviewFeedback(
+    [{ state: 'COMMENTED' }],
+    [{ isResolved: false }, { isResolved: true }]
+  );
+  const changesRequested = assessReviewFeedback(
+    [{ state: 'CHANGES_REQUESTED' }, { state: 'APPROVED' }],
+    [{ isResolved: true }]
+  );
+  const clean = assessReviewFeedback(
+    [{ state: 'APPROVED' }],
+    [{ isResolved: true }]
+  );
+
+  assert.equal(unresolved.requiresHumanReview, true);
+  assert.ok(unresolved.reasons.includes('unresolved-review-threads'));
+  assert.equal(unresolved.unresolvedThreads, 1);
+  assert.equal(changesRequested.requiresHumanReview, true);
+  assert.ok(changesRequested.reasons.includes('changes-requested'));
+  assert.equal(clean.requiresHumanReview, false);
+  assert.deepEqual(clean.reasons, []);
 });
 
 test('security and workflow changes are explicitly classified', () => {
