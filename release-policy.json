@@ -282,7 +282,7 @@
         "WriteCanvas-{version}-linux-x86_64.AppImage",
         "WriteCanvas-{version}-mac-arm64.dmg",
         "WriteCanvas-{version}-mac-x64.dmg",
-        "WriteCanvas Setup {version}.exe",
+        "WriteCanvas.Setup.{version}.exe",
         "writecanvas_{version}_amd64.deb"
       ]
     },
