@@ -110,7 +110,14 @@ test('unresolved review threads and changes-requested reviews keep PRs in human 
     [{ isResolved: false }, { isResolved: true }]
   );
   const changesRequested = assessReviewFeedback(
-    [{ state: 'CHANGES_REQUESTED' }, { state: 'APPROVED' }],
+    [{ user: { login: 'reviewer' }, state: 'CHANGES_REQUESTED', submitted_at: '2026-11-14T10:00:00Z' }],
+    [{ isResolved: true }]
+  );
+  const supersededRequest = assessReviewFeedback(
+    [
+      { user: { login: 'reviewer' }, state: 'CHANGES_REQUESTED', submitted_at: '2026-11-14T10:00:00Z' },
+      { user: { login: 'reviewer' }, state: 'APPROVED', submitted_at: '2026-11-14T11:00:00Z' }
+    ],
     [{ isResolved: true }]
   );
   const clean = assessReviewFeedback(
@@ -123,6 +130,7 @@ test('unresolved review threads and changes-requested reviews keep PRs in human 
   assert.equal(unresolved.unresolvedThreads, 1);
   assert.equal(changesRequested.requiresHumanReview, true);
   assert.ok(changesRequested.reasons.includes('changes-requested'));
+  assert.equal(supersededRequest.requiresHumanReview, false);
   assert.equal(clean.requiresHumanReview, false);
   assert.deepEqual(clean.reasons, []);
 });
