@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateRequiredChecks, getRepositoryProfile, matchesPathPattern } from './check-policy.mjs';
 
-test('repository profiles inherit safe defaults while explicit repository settings override them', () => {
+test('repository profiles inherit organization defaults and keep repository-specific CI gates', () => {
   assert.equal(getRepositoryProfile('WriteCanvas').defaultBranch, 'master');
   assert.equal(getRepositoryProfile('WriteCanvas').autoMergeDependabot, true);
   assert.deepEqual(getRepositoryProfile('WriteCanvas').requiredChecks, [
