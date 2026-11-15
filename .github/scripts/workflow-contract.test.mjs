@@ -75,9 +75,9 @@ test('workflow, template, and composite-action references use immutable SHAs or 
 
 test('Worker rejects untrusted pull_request workflow runs even if their name matches Signal', () => {
   const worker = read('.github/templates/agent-pr-worker.yml');
-  assert.match(worker, /github\\.event\\.workflow_run\\.event\\s*==\\s*'pull_request_target'/);
-  assert.match(worker, /github\\.event\\.workflow_run\\.event\\s*==\\s*'workflow_run'/);
-  assert.match(worker, /github\\.event\\.workflow_run\\.repository\\.owner\\.login\\s*==\\s*'ThanhNguyxnOrg'/);
+  assert.match(worker, /github\.event\.workflow_run\.event\\s*==\\s*'pull_request_target'/);
+  assert.match(worker, /github\.event\.workflow_run\.event\\s*==\\s*'workflow_run'/);
+  assert.match(worker, /github\.event\.workflow_run\.repository\.owner\.login\\s*==\\s*'ThanhNguyxnOrg'/);
 });
 
 test('central release policy does not claim chess-on-glass is private', () => {
