@@ -15,6 +15,10 @@ on:
         description: Completed metadata-signal workflow run ID.
         required: true
         type: number
+      policy_ref:
+        description: Immutable central commit used by both this workflow and its trusted policy checkout.
+        required: true
+        type: string
     secrets:
       BOT_PRIVATE_KEY:
         required: true
@@ -29,6 +33,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Validate trusted policy revision
+        env:
+          POLICY_REF: ${{ inputs.policy_ref }}
+        run: |
+          if [[ ! "$POLICY_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::policy_ref must be a full 40-character commit SHA" >&2
+            exit 1
+          fi
+
       - name: Create read-only token for central Agent policy
         id: central
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
@@ -43,7 +56,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ThanhNguyxnOrg/.github
-          ref: main
+          ref: ${{ inputs.policy_ref }}
           token: ${{ steps.central.outputs.token }}
           persist-credentials: false
 
