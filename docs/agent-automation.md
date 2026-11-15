@@ -41,6 +41,9 @@ The Agent is the organization's single decision and routing authority. It may en
 
 ## Event security and automatic onboarding
 
+The central `.github` repository uses the same two-step event boundary for its own pull requests. Its `.github/workflows/agent-pr-signal.yml` is the metadata-only Signal, and `.github/workflows/agent-pr-worker-relay.yml` is the privileged relay to the central reusable worker. These files mirror the two managed templates; the relay uses a separate filename because `.github/workflows/agent-pr-worker.yml` is reserved for the reusable `workflow_call` implementation. The central repository is therefore included in PR triage, but remains excluded from product-repository auto-onboarding.
+
+
 The auto-onboarder installs two managed workflows on each active, non-fork organization repository's default branch:
 
 1. `agent-pr-signal.yml` runs on `pull_request_target` and listens for completed workflows with the `workflow_run` filter `**`, including slash-bearing workflow names. Its job admits only completed runs associated with a pull request and excludes the Signal and Worker workflows themselves. It has no Actions secrets, no write permissions, no checkout, and no PR-code execution. It writes only GitHub-supplied repository, PR number, head SHA, and head repository metadata into a short-lived JSON artifact.

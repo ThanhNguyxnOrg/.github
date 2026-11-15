@@ -121,9 +121,7 @@
     "stale",
     "wontfix"
   ],
-  "ignoredRepositories": [
-    ".github"
-  ],
+  "ignoredRepositories": [],
   "repositories": {
     "WriteCanvas": {
       "sensitivePaths": [

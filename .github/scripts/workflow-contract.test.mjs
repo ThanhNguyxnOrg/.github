@@ -107,3 +107,25 @@ test('reusable Agent worker checks out the exact immutable policy revision passe
   assert.ok(reusable.includes('repository: ThanhNguyxnOrg/.github'));
   assert.doesNotMatch(reusable, /job\.workflow_(repository|sha)/);
 });
+
+test('the central .github repository uses a self-hosted PR signal and relay without being excluded from triage', () => {
+  const policy = JSON.parse(read('agent-policy.json'));
+  assert.equal(policy.ignoredRepositories.includes('.github'), false);
+  assert.equal(
+    read('.github/workflows/agent-pr-signal.yml'),
+    read('.github/templates/agent-pr-signal.yml'),
+    'the central metadata-only Signal must stay aligned with the managed template'
+  );
+  assert.equal(
+    read('.github/workflows/agent-pr-worker-relay.yml'),
+    read('.github/templates/agent-pr-worker.yml'),
+    'the central relay must stay aligned with the managed Worker template'
+  );
+  const signal = read('.github/workflows/agent-pr-signal.yml');
+  assert.match(signal, /pull_request_target:/);
+  assert.match(signal, /permissions:\\s*\\{\\}/);
+  assert.doesNotMatch(signal, /BOT_PRIVATE_KEY|BOT_APP_ID|actions\\/checkout/);
+  const worker = read('.github/workflows/agent-pr-worker-relay.yml');
+  assert.match(worker, /workflow_run:/);
+  assert.match(worker, /ThanhNguyxnAgent PR Event Worker/);
+});
