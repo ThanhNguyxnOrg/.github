@@ -741,8 +741,20 @@ async function reconcileRepository(repoName, rule) {
       console.log('[release-wait]', fullName, tag, '— CI state is ' + state);
       return;
     }
-    await ensureDraftRelease(fullName, repoName, tag, version, pending.sha, rule);
-    if (!rule.releaseWorkflowName) await publishReadyDrafts(repoName, rule);
+    const preparedRelease = await ensureDraftRelease(fullName, repoName, tag, version, pending.sha, rule);
+    if (!rule.releaseWorkflowName) {
+      // Source-only releases have no build matrix or asset manifest to wait for.
+      // Publish the exact verified draft returned by ensureDraftRelease rather than
+      // relying on a second list query that can observe stale release collection data.
+      const published = await api('/repos/' + fullName + '/releases/' + preparedRelease.id, {
+        method: 'PATCH',
+        body: { draft: false }
+      });
+      if (!releaseMatchesTag(published, tag) || published.draft !== false) {
+        throw new Error('Source-only release publication could not be verified for ' + fullName + ' ' + tag);
+      }
+      console.log('[release-published]', fullName, tag, 'source-only release; required CI passed');
+    }
     return;
   }
 
