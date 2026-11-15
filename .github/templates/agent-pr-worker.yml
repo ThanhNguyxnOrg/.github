@@ -84,7 +84,11 @@ jobs:
           const prNumber = Number(payload.pr_number);
           const headSha = String(payload.head_sha || '').toLowerCase();
           const headRepository = String(payload.head_repository || '');
+          const sourceEvent = String(payload.source_event || '');
 
+          if (!['pull_request', 'pull_request_target'].includes(sourceEvent)) {
+            throw new Error('Event artifact is not from a pull_request or pull_request_target event');
+          }
           if (!expectedRepository || repository !== expectedRepository) {
             throw new Error('Event artifact repository does not match this repository');
           }

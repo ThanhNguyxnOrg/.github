@@ -73,11 +73,20 @@ test('workflow, template, and composite-action references use immutable SHAs or 
   assert.deepEqual(unpinned, [], 'un-pinned workflow/action references: ' + JSON.stringify(unpinned));
 });
 
-test('Worker rejects untrusted pull_request workflow runs even if their name matches Signal', () => {
+test('Signal preserves original PR event provenance and both workers validate it', () => {
+  const signal = read('.github/templates/agent-pr-signal.yml');
   const worker = read('.github/templates/agent-pr-worker.yml');
-  assert.match(worker, /github\.event\.workflow_run\.event\s*==\s*'pull_request_target'/);
-  assert.match(worker, /github\.event\.workflow_run\.event\s*==\s*'workflow_run'/);
-  assert.match(worker, /github\.event\.workflow_run\.repository\.owner\.login\s*==\s*'ThanhNguyxnOrg'/);
+  const reusable = read('.github/workflows/agent-pr-worker.yml');
+
+  assert.ok(signal.includes('EVENT_SOURCE_EVENT: ${{ github.event_name == \'pull_request_target\' && \'pull_request_target\' || github.event.workflow_run.event }}'));
+  assert.ok(signal.includes("source_event: process.env.EVENT_SOURCE_EVENT || ''"));
+  assert.ok(signal.includes("github.event.workflow_run.event == 'pull_request'"));
+  assert.ok(signal.includes("github.event.workflow_run.event == 'pull_request_target'"));
+
+  for (const [name, source] of [['template worker', worker], ['central reusable worker', reusable]]) {
+    assert.ok(source.includes("const sourceEvent = String(payload.source_event || '');"), name + ' must read source_event');
+    assert.ok(source.includes("!['pull_request', 'pull_request_target'].includes(sourceEvent)"), name + ' must reject non-PR source events');
+  }
 });
 
 test('central release policy does not claim chess-on-glass is private', () => {
