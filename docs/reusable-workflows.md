@@ -8,23 +8,24 @@ The organization keeps repeated automation primitives in `.github`. Project repo
 - Use a composite action for a sequence of steps inside an existing job (Agent token creation, Git identity, comments, or asset upload).
 - Keep project-specific compiler, dependency, signing, packaging, and platform-matrix steps in the project adapter. A Qt/MSVC/CMake app, a Tauri app, a Go CLI, and an Electron app do not share the same build commands.
 - Pin calls into this repository to a full commit SHA. Update pins deliberately when the central library changes.
-- For Agent automation, do not pass all repository secrets to a called workflow; pass only `BOT_APP_ID` and `BOT_PRIVATE_KEY`.
+- For Agent automation, do not pass all repository secrets to a called workflow. `BOT_APP_ID` is an organization variable; only `BOT_PRIVATE_KEY` is a secret. Forward the variable through the current reusable-workflow compatibility field and pass the private key explicitly.
 - For third-party publishing, consult both [organization-secrets.md](organization-secrets.md) and [organization-variables.md](organization-variables.md). Keep platform-specific publishing in the project adapter until at least two repositories share the same build/publish contract. If a reusable publisher is introduced, declare each required credential explicitly under `workflow_call.secrets`; never use `secrets: inherit`.
 - The Agent-token action scopes tokens to the calling repository by default. Do not set `owner` without a repository allowlist unless organization-wide access is specifically required.
 - Every automated write must use the GitHub App installation token. The default `GITHUB_TOKEN` is read-only in project workflows and must not be used for bot commits, comments, tags, release edits, or package-registry writes.
 
 ## Shared identity and secrets
 
-Create the following as organization-level Actions secrets, available to the project repositories that use the automation:
+Configure the shared GitHub App identity at organization scope:
 
-- `BOT_APP_ID`: the GitHub App Client ID.
-- `BOT_PRIVATE_KEY`: the GitHub App private key.
+- `BOT_APP_ID`: Organization Actions **variable** containing the numeric GitHub App ID.
+- `BOT_PRIVATE_KEY`: Organization Actions **secret** containing the GitHub App private key.
 
 These are configured once at organization scope; do not create a different copy in each repository. In a caller workflow, explicitly pass these two secrets to a reusable workflow:
 
 ```yaml
 secrets:
-  BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+  # Compatibility input on the current reusable workflow; the source is a variable, not a secret.
+  BOT_APP_ID: ${{ vars.BOT_APP_ID }}
   BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
 ```
 
@@ -97,7 +98,7 @@ jobs:
       artifact_pattern: release-assets-*
       artifact_directory: dist/release
     secrets:
-      BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
+      BOT_APP_ID: ${{ vars.BOT_APP_ID }}
       BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
 ```
 
