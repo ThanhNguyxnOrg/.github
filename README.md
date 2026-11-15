@@ -35,6 +35,7 @@ It keeps the public-facing profile and default documentation clean, organized, a
 - `.github/workflows/` → central Agent, Release, Stale, and showcase-sync controllers
 - `docs/agent-automation.md` → control-plane rules, CI profiles, release adapters, and onboarding
 - `docs/organization-secrets.md` → canonical inventory, scope, and least-privilege access policy for organization Actions secrets
+- `docs/organization-variables.md` → canonical inventory and scope policy for organization and repository Actions variables
 - `docs/reusable-workflows.md` → shared CI/release workflow contracts and guidance for platform-specific publishing credentials
 - `scripts/sync-org.py` → auto-syncs showcase tables from live org data
 - `.github/workflows/sync-org.yml` → daily sync job (cron + manual dispatch)
