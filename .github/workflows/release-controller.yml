@@ -16,6 +16,7 @@ on:
       - '.github/workflows/release-publish.yml'
       - '.github/workflows/ci-*.yml'
       - '.github/actions/**'
+  # Project repository changes are reconciled on this cadence; release actions remain idempotent.
   schedule:
     - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
