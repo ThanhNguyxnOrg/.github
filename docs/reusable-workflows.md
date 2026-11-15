@@ -8,7 +8,8 @@ The organization keeps repeated automation primitives in `.github`. Project repo
 - Use a composite action for a sequence of steps inside an existing job (Agent token creation, Git identity, comments, or asset upload).
 - Keep project-specific compiler, dependency, signing, packaging, and platform-matrix steps in the project adapter. A Qt/MSVC/CMake app, a Tauri app, a Go CLI, and an Electron app do not share the same build commands.
 - Pin calls into this repository to a full commit SHA. Update pins deliberately when the central library changes.
-- For Agent automation, do not pass all repository secrets to a called workflow. `BOT_APP_ID` is an organization variable; only `BOT_PRIVATE_KEY` is a secret. Forward the variable through the current reusable-workflow compatibility field and pass the private key explicitly.
+- Pin third-party actions to verified full commit SHAs; Dependabot opens one PR per GitHub Actions dependency each week (no update groups).
+- For Agent automation, do not pass all repository secrets to a called workflow. `BOT_APP_ID` is read directly from the organization `vars` context; only `BOT_PRIVATE_KEY` is declared and passed through `workflow_call.secrets`.
 - For third-party publishing, consult both [organization-secrets.md](organization-secrets.md) and [organization-variables.md](organization-variables.md). Keep platform-specific publishing in the project adapter until at least two repositories share the same build/publish contract. If a reusable publisher is introduced, declare each required credential explicitly under `workflow_call.secrets`; never use `secrets: inherit`.
 - The Agent-token action scopes tokens to the calling repository by default. Do not set `owner` without a repository allowlist unless organization-wide access is specifically required.
 - Every automated write must use the GitHub App installation token. The default `GITHUB_TOKEN` is read-only in project workflows and must not be used for bot commits, comments, tags, release edits, or package-registry writes.
@@ -20,12 +21,10 @@ Configure the shared GitHub App identity at organization scope:
 - `BOT_APP_ID`: Organization Actions **variable** containing the numeric GitHub App ID.
 - `BOT_PRIVATE_KEY`: Organization Actions **secret** containing the GitHub App private key.
 
-These are configured once at organization scope; do not create a different copy in each repository. In a caller workflow, explicitly pass these two secrets to a reusable workflow:
+These are configured once at organization scope; do not create a different copy in each repository. The reusable workflow reads `vars.BOT_APP_ID` directly and declares only the private key as a secret. A caller therefore passes only:
 
 ```yaml
 secrets:
-  # Legacy workflow_call compatibility field; source is the non-sensitive org variable.
-  BOT_APP_ID: ${{ vars.BOT_APP_ID }}
   BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
 ```
 
@@ -56,7 +55,7 @@ Never put actual secret values in documentation, workflow inputs, artifacts, or 
 
 ## Reusable workflows
 
-- `ci-node.yml`: Node.js setup, npm/pnpm/yarn/Bun install, optional preparation, validation, lint, typecheck, test, build, post-build verification, and optional CI artifact upload. Supports explicit Node version or version files and lockfile-aware caching. All command steps use Bash explicitly, including on Windows runners, so caller commands behave consistently across operating systems.
+- `ci-node.yml`, `ci-python.yml`, `ci-go.yml`, and `ci-cmake.yml` share the optional baseline inputs `job_name`, `runner`, `timeout_minutes`, `fetch_depth`, `working_directory`, `artifact_name`, `artifact_path`, and `artifact_retention_days`. Defaults preserve existing check names and timeout behavior: Node remains 20 minutes; Python, Go, and CMake default to 360 minutes (the prior GitHub-hosted job limit). Callers may lower the timeout explicitly. Each workflow retains ecosystem-specific setup and commands, supports explicit Node versions or version files and lockfile-aware caching, and applies `working_directory` on each `run` step because GitHub does not allow expressions in `defaults.run`.
 - `ci-python.yml`: Python setup, pip caching, dependency installation, lint, typecheck, test, build, and optional CI artifact upload.
 - `ci-go.yml`: Go setup, module caching, optional lint-tool installation and lint command, test, vet, build, and optional CI artifact upload.
 - `ci-cmake.yml`: CMake configure, build, test, optional system dependencies, and optional CI artifact upload; use custom project adapters for extra Qt/MSVC/NASM or other system requirements.
@@ -64,7 +63,7 @@ Never put actual secret values in documentation, workflow inputs, artifacts, or 
 All shared CI workflows expose an explicit `job_name` so the check-run name can match `ci-policy.json`. Every reusable CI workflow defaults `run` steps to Bash, including Windows runners, so command inputs have consistent shell behavior. They default to read-only checkout credentials and `contents: read`. CI artifacts are optional; do not upload every intermediate build by default. Keep short-lived CI artifacts only when another job or a human reviewer consumes them.
 - `release-publish.yml`: downloads the caller's build artifacts, mints a repository-scoped Agent token, uploads to the central draft release, and verifies the required asset manifest from `release-policy.json`.
 
-Reusable workflow files must live directly under `.github/workflows/`; GitHub does not support nested directories in that folder.
+Reusable workflow files must live directly under `.github/workflows/`; GitHub does not support nested directories in that folder. The managed Agent worker pins its reusable-workflow `uses` reference to a full commit SHA and passes the identical SHA as `policy_ref`. The reusable worker validates that the value is a full SHA and checks out `ThanhNguyxnOrg/.github` at that exact commit, keeping the workflow implementation and trusted policy code aligned without relying on mutable refs.
 
 ## Standard release artifact contract
 
@@ -98,7 +97,6 @@ jobs:
       artifact_pattern: release-assets-*
       artifact_directory: dist/release
     secrets:
-      BOT_APP_ID: ${{ vars.BOT_APP_ID }}
       BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
 ```
 
