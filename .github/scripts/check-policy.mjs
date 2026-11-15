@@ -7,15 +7,19 @@ export function getRepositoryProfile(repoName) {
     ? config.defaults
     : {};
   const repository = config.repositories?.[repoName] || {};
+  const repositoryMetadata = { ...repository };
+  // Auto-merge is an organization-wide decision; repository profiles may only
+  // describe their CI check names/paths and default branch.
+  delete repositoryMetadata.autoMergeDependabot;
 
-  if (!Object.keys(defaults).length && !Object.keys(repository).length) return null;
+  if (!Object.keys(defaults).length && !Object.keys(repositoryMetadata).length) return null;
 
-  // New repositories inherit the centrally defined safe defaults. Repository-
-  // specific values always win, while an omitted requiredChecks list inherits
-  // the defaults (currently empty, so unconfigured repositories cannot auto-merge).
+  // New repositories inherit the organization default. An empty requiredChecks
+  // list still fails closed and prevents auto-merge until CI gates are mapped.
   return {
     ...defaults,
-    ...repository,
+    ...repositoryMetadata,
+    autoMergeDependabot: defaults.autoMergeDependabot === true,
     requiredChecks: repository.requiredChecks ?? defaults.requiredChecks ?? []
   };
 }
