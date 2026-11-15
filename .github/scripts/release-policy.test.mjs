@@ -48,6 +48,32 @@ test('automatic release profiles declare complete branch and version metadata', 
   }
 });
 
+test('BlendOps uses the central tag-only release contract from its verified v1.0.0 baseline', () => {
+  const rule = policy.repositories.blendops;
+  assert.ok(rule, 'BlendOps must be enabled in the automatic release policy');
+  assert.equal(policy.excluded?.blendops, undefined);
+  assert.equal(rule.branch, 'main');
+  assert.equal(rule.mode, 'tag');
+  assert.match(rule.baselineSha, /^[0-9a-f]{40}$/);
+  assert.equal(rule.initialVersion, '1.0.0');
+  assert.equal(rule.changelogPath, 'CHANGELOG.md');
+  assert.equal(rule.requireSuccessfulChecks, true);
+  assert.deepEqual(rule.versionFiles, [
+    {
+      path: 'package.json',
+      kind: 'json',
+      jsonPaths: [['version']]
+    },
+    {
+      path: 'package-lock.json',
+      kind: 'json',
+      jsonPaths: [['version'], ['packages', '', 'version']]
+    }
+  ]);
+  assert.equal(rule.releaseWorkflowName, undefined, 'source-only BlendOps releases do not need a binary build workflow');
+  assert.equal(rule.requiredAssets, undefined, 'source-only BlendOps releases must not claim distributable assets');
+});
+
 test('excluded repositories explain why automatic releases are disabled', () => {
   for (const [name, reason] of Object.entries(policy.excluded || {})) {
     assert.ok(typeof reason === 'string' && reason.trim().length > 10, name + ' needs a useful exclusion reason');
