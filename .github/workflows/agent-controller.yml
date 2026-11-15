@@ -1,5 +1,7 @@
 name: ThanhNguyxnAgent — Risk-Based PR Controller
 
+# Organization-level source of truth: ci-policy.json; repository profiles map required CI checks only.
+
 on:
   push:
     branches: [main]
