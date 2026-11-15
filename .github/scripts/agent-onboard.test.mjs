@@ -233,6 +233,7 @@ test('onboarding completion rejects failed writes and unresolved user-owned path
   assert.doesNotThrow(() => assertOnboardingSuccess({ failed: 0, conflicts: 0 }));
   assert.throws(() => assertOnboardingSuccess({ failed: 1, conflicts: 0 }), /failed for 1 managed workflow write/);
   assert.throws(() => assertOnboardingSuccess({ failed: 0, conflicts: 2 }), /2 repository workflow conflict/);
+  assert.throws(() => assertOnboardingSuccess({ failed: 0, conflicts: 0, settingsFailed: 1 }), /Repository settings sync failed/);
 });
 
 test('repository settings sync enables only Allow auto-merge on its validated single-repository target', async () => {
