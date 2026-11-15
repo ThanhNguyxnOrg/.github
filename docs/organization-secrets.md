@@ -1,6 +1,6 @@
-# Organization Secrets
+# Organization Actions Secrets
 
-Quick reference for the GitHub Actions secrets configured in [ThanhNguyxnOrg](https://github.com/ThanhNguyxnOrg). This file documents names, purpose, scope, and approved usage only; secret values must stay in GitHub settings.
+Quick reference for the GitHub Actions secrets configured in [ThanhNguyxnOrg](https://github.com/ThanhNguyxnOrg). This file documents names, purpose, scope, and approved usage only; secret values must stay in GitHub settings. Non-sensitive Actions variables are inventoried separately in [Organization Actions Variables](organization-variables.md).
 
 | Secret | Purpose |
 |---|---|
@@ -11,6 +11,7 @@ Quick reference for the GitHub Actions secrets configured in [ThanhNguyxnOrg](ht
 | `AMO_API_SECRET` | Matching AMO JWT secret used with `AMO_API_KEY` to authenticate with the AMO API. |
 | `EDGE_API_KEY` | Microsoft Edge Partner Center Publish API key used by extension release workflows. |
 | `EDGE_CLIENT_ID` | Partner Center client ID paired with `EDGE_API_KEY` for Microsoft Edge publishing. |
+| `MSSTORE_CLIENT_SECRET` | Microsoft Entra application client-secret value used by authorized repositories to authenticate Microsoft Store submissions through Partner Center. |
 | `BUTLER_API_KEY` | itch.io Butler CLI credential used by authorized game repositories to push verified builds to itch.io channels. Create it through Butler login; its itch.io API-key source must be `wharf`. |
 
 ## GitHub App
@@ -31,6 +32,16 @@ The organization-wide Agent Controller in [agent-controller.yml](../.github/work
 
 `EDGE_API_KEY` and `EDGE_CLIENT_ID` are account-level Partner Center Publish API credentials. Extension release workflows use them to authenticate when submitting updates to Microsoft Edge Add-ons.
 
+## Microsoft Store
+
+`MSSTORE_CLIENT_SECRET` is the **client secret Value** for the shared `ThanhNguyxnOrg-MicrosoftStore-Publisher` Entra application. It is used by approved product repositories when their Microsoft Store workflow authenticates with Partner Center. Do not use the Entra **Secret ID**, and never put the Value in this public repository, a workflow file, an artifact, a log, or a chat.
+
+The secret is paired with the organization-level variables `MSSTORE_TENANT_ID`, `MSSTORE_CLIENT_ID`, and `MSSTORE_SELLER_ID`. Those non-secret identifiers are documented in [organization-variables.md](organization-variables.md). Each app repository supplies its own `MSSTORE_PRODUCT_ID` repository variable because the Store product ID is specific to that app.
+
+The current consumer is [WriteCanvas's Microsoft Store workflow](https://github.com/ThanhNguyxnOrg/WriteCanvas/blob/master/.github/workflows/store.yml). Store publisher credentials must be available only to repositories with a reviewed, trusted submission workflow. Prefer **Selected repositories** and do not grant access to every repository by default; Partner Center publishing credentials can authorize submissions for the linked seller account.
+
+Rotate the organization secret before its Entra credential expires. Update the GitHub secret first, validate a controlled submission, and only then retire the previous credential.
+
 ## itch.io (Butler)
 
 `BUTLER_API_KEY` is an **organization-level Actions secret**, not a repository secret. It is the credential generated/authorized by Butler on behalf of the itch.io account and must appear in itch.io's API Keys page with source `wharf`. A key created directly from the itch.io web API-key page (source `web`) is not the Butler credential expected by the deployment workflow.
@@ -50,7 +61,7 @@ The current consumer is [AFTERFRAME's itch.io package/publish workflow](https://
 - Prefer **Selected repositories**. Grant access only to game repositories that are trusted to publish under this itch.io account. Add a repository to the allowlist when it adopts a reviewed publisher workflow.
 - Do not select **All repositories** merely for convenience; most repositories do not need publishing authority.
 - A future project should reuse this same organization secret after its repository has been explicitly authorized; do not duplicate the key in that repository.
-- Keep each project's destination as its own repository Actions variable named `ITCHIO_GAME` (lowercase `account/project-slug`). It is configuration, not a credential, and differs per game.
+- Keep each project's destination as its own repository Actions variable named `ITCHIO_GAME` (lowercase `account/project-slug`). It is configuration, not a credential, and differs per game; see [organization-variables.md](organization-variables.md) for the variable inventory and scope rules.
 - Keep project-specific build, browser-test, and release gates in that project's adapter. Factor Butler publishing into a central reusable workflow only after multiple projects share the same contract; do not prematurely force unrelated platform workflows into one adapter.
 
 The organization secret is consumed in the caller repository's own trusted workflow. If publishing is later moved to a reusable workflow, define an explicit `workflow_call` secret contract and pass only `BUTLER_API_KEY`; do not use `secrets: inherit`.
@@ -59,4 +70,4 @@ The organization secret is consumed in the caller repository's own trusted workf
 
 This repository is public. Never put secret values, private keys, API keys, or tokens in this file or in workflow source. Manage values under GitHub Organization → Settings → Secrets and variables → Actions.
 
-**Last reviewed:** November 10, 2026
+**Last reviewed:** November 15, 2026
