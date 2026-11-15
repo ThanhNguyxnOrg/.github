@@ -73,7 +73,7 @@
     },
     "Snapbooth": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
+      "autoMergeDependabot": true,
       "requiredChecks": [
         "verify / Smoke & E2E"
       ]
@@ -194,14 +194,14 @@
     },
     "StepDSA": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
+      "autoMergeDependabot": true,
       "requiredChecks": [
         "test / test"
       ]
     },
     "SkillGauge": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
+      "autoMergeDependabot": true,
       "pendingLabel": "skill-verification-pending",
       "requiredChecks": [
         {
@@ -215,7 +215,7 @@
     },
     "ForgeHelm": {
       "defaultBranch": "main",
-      "autoMergeDependabot": false,
+      "autoMergeDependabot": true,
       "requiredChecks": [
         "verify / Verify (ForgeHelm)"
       ]
