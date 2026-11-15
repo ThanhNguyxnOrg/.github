@@ -594,7 +594,7 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
 
   release = await api('/repos/' + fullName + '/releases/' + release.id, {
     method: 'PATCH',
-    body: { target_commitish: tagSha, name, body, draft: true, prerelease }
+    body: { tag_name: tag, target_commitish: tagSha, name, body, draft: true, prerelease }
   });
   if (!releaseMatchesTag(release, tag) || release.draft !== true || release.body !== body || release.name !== name) {
     throw new Error('GitHub draft update failed tag, name, body, or draft verification for ' + fullName + ' ' + tag);
