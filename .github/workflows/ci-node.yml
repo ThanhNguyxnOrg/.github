@@ -13,6 +13,11 @@ on:
         required: false
         default: ubuntu-latest
         type: string
+      fetch_depth:
+        description: Git history depth for checkout; use 0 for full history.
+        required: false
+        default: 1
+        type: number
       timeout_minutes:
         description: Maximum job runtime.
         required: false
@@ -130,6 +135,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          fetch-depth: ${{ inputs.fetch_depth }}
           persist-credentials: false
 
       - name: Enable Corepack
