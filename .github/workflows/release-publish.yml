@@ -23,9 +23,6 @@ on:
         default: main
         type: string
     secrets:
-      BOT_APP_ID:
-        description: Legacy fallback; prefer the organization variable BOT_APP_ID.
-        required: false
       BOT_PRIVATE_KEY:
         description: Organization-wide ThanhNguyxnAgent GitHub App private key.
         required: true
@@ -55,7 +52,7 @@ jobs:
         uses: ThanhNguyxnOrg/.github/.github/actions/agent-token@2b5c5cad571ee93fd091e16e1734ebd819191e68
         with:
           profile: content
-          app-id: ${{ vars.BOT_APP_ID || secrets.BOT_APP_ID }}
+          app-id: ${{ vars.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
 
       - name: Upload assets and verify central manifest
