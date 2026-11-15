@@ -8,19 +8,24 @@ Credentials, tokens, private keys, and client-secret values belong in
 
 ## Organization-level variables
 
-These values describe the shared Microsoft Store publisher identity. Configure
+These non-sensitive identifiers are shared by approved organization workflows. Configure
 them under **ThanhNguyxnOrg → Settings → Secrets and variables → Actions →
 Variables**.
 
-| Variable | Purpose | Consumer |
+| Variable | Expected format / validation | Purpose and consumer |
 |---|---|---|
-| `MSSTORE_TENANT_ID` | Microsoft Entra directory (tenant) ID containing the shared Store-publisher app registration. | Authorized Microsoft Store submission repositories. |
-| `MSSTORE_CLIENT_ID` | Application (client) ID of `ThanhNguyxnOrg-MicrosoftStore-Publisher`. This identifies the app; it is not a client secret. | Authorized Microsoft Store submission repositories. |
-| `MSSTORE_SELLER_ID` | Seller ID for the Partner Center account linked to the shared Entra application. | Authorized Microsoft Store submission repositories. |
+| `BOT_APP_ID` | Positive integer (current value validated: `4125740`). | GitHub App ID for `ThanhNguyxnAgent[bot]`; used as the `app-id` input. Required by the central Agent Controller and repositories using Agent workflows. |
+| `AMO_API_KEY` | JWT issuer in the form `user:<id>:<id>`; it is an identifier, not the JWT secret. | Firefox Add-ons API issuer for authorized extension repositories such as Lumeo. |
+| `EDGE_CLIENT_ID` | UUID. | Microsoft Edge Partner Center Publish API Client ID for authorized extension repositories such as Lumeo. |
+| `MSSTORE_TENANT_ID` | UUID. | Microsoft Entra directory (tenant) ID containing the shared Store-publisher app registration; authorized Microsoft Store submission repositories. |
+| `MSSTORE_CLIENT_ID` | UUID. | Application (client) ID of `ThanhNguyxnOrg-MicrosoftStore-Publisher`; authorized Microsoft Store submission repositories. |
+| `MSSTORE_SELLER_ID` | Partner Center Seller ID. | Seller ID for the linked Partner Center account; authorized Microsoft Store submission repositories. |
 
-These variables are paired with the organization secret `MSSTORE_CLIENT_SECRET`.
-See [Organization Actions Secrets](organization-secrets.md) for the credential
-and access policy.
+The Microsoft Store variables are paired with the organization secret `MSSTORE_CLIENT_SECRET`.
+The `AMO_API_KEY` variable is paired with `AMO_API_SECRET`; the `EDGE_CLIENT_ID`
+variable is paired with `EDGE_API_KEY`. `BOT_APP_ID` is paired with the
+`BOT_PRIVATE_KEY` secret. See [Organization Actions Secrets](organization-secrets.md)
+for the credential inventory and access policy.
 
 **Access policy:** prefer **Selected repositories**. Add a repository only
 after its Store submission workflow has been reviewed and is trusted to use the
