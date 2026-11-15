@@ -101,11 +101,13 @@ export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
   if (dependencyBot && ['major', 'downgrade'].includes(classifyVersionUpdate(dependencySummary(pullRequest)))) {
     labels.add('major-update');
   }
-  const plainBody = body.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
+  const riskBody = dependencyBot ? dependencySummary(pullRequest) : body;
+  const riskText = dependencyBot ? dependencySummary(pullRequest) : text;
+  const plainBody = riskBody.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
   if (dependencyBot && /\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)/i.test(plainBody)) {
     labels.add('breaking');
   }
-  if (hasSecuritySignal(text)) {
+  if (hasSecuritySignal(riskText)) {
     labels.add('security');
   }
 
@@ -222,7 +224,7 @@ export function analyzeDependencyUpdate(pullRequest, changedFiles = []) {
   const title = String(pullRequest?.title || '');
   const summary = dependencySummary(pullRequest);
   const body = String(pullRequest?.body || '');
-  const plainBody = body.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
+  const plainBody = summary.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
   const versionRisk = classifyVersionUpdate(summary);
   const reasons = [];
 
@@ -233,7 +235,7 @@ export function analyzeDependencyUpdate(pullRequest, changedFiles = []) {
   if (/\b(?:breaking(?:\s+changes?)?|backward[- ]incompatible)\b/i.test(plainBody)) {
     reasons.push('breaking-release-notes');
   }
-  if (hasSecuritySignal(title + '\n' + body)) {
+  if (hasSecuritySignal(summary)) {
     reasons.push('security-update');
   }
 
@@ -265,6 +267,59 @@ export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredCheck
   return evaluateRequiredChecks(checkRuns, statuses, requiredChecks).state;
 }
 
+export function assessReviewFeedback(reviews = [], reviewThreads = []) {
+  const changesRequested = reviews.some(review =>
+    String(review?.state || '').toUpperCase() === 'CHANGES_REQUESTED'
+  );
+  const unresolvedThreads = reviewThreads.filter(thread => thread?.isResolved !== true).length;
+  const reasons = [];
+  if (changesRequested) reasons.push('changes-requested');
+  if (unresolvedThreads > 0) reasons.push('unresolved-review-threads');
+  return {
+    requiresHumanReview: reasons.length > 0,
+    reasons,
+    unresolvedThreads
+  };
+}
+
+async function getReviewFeedback(fullName, number) {
+  const [owner, name] = fullName.split('/');
+  if (!owner || !name) throw new Error('Invalid repository name for review lookup');
+
+  const reviews = await listAll('/repos/' + fullName + '/pulls/' + number + '/reviews');
+  const threads = [];
+  let after = null;
+
+  for (let page = 1; page <= 10; page += 1) {
+    const response = await request('/graphql', {
+      method: 'POST',
+      body: {
+        query: `query($owner: String!, $name: String!, $number: Int!, $after: String) {
+          repository(owner: $owner, name: $name) {
+            pullRequest(number: $number) {
+              reviewThreads(first: 100, after: $after) {
+                nodes { isResolved }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+        }`,
+        variables: { owner, name, number, after }
+      }
+    });
+    if (Array.isArray(response.errors) && response.errors.length) {
+      throw new Error(response.errors.map(item => item.message || 'GraphQL review lookup failed').join('; '));
+    }
+    const connection = response.data?.repository?.pullRequest?.reviewThreads;
+    if (!connection) throw new Error('GitHub did not return pull request review threads');
+    threads.push(...(connection.nodes || []));
+    if (!connection.pageInfo?.hasNextPage) break;
+    after = connection.pageInfo.endCursor;
+    if (!after || page === 10) throw new Error('Review-thread pagination limit reached');
+  }
+
+  return assessReviewFeedback(reviews, threads);
+}
 
 function repositoryPolicy(repoName) {
   return config.repositories?.[repoName] || {};
@@ -554,6 +609,19 @@ async function processPullRequest(repo, pr) {
   await syncCheckLabels(fullName, pr.number, checkState);
   if (checkState === 'failure') {
     riskReasons.push('required-checks-failure');
+  }
+
+  // Successful CI does not override an outstanding human or CodeRabbit review thread.
+  // Query review state only when no earlier risk signal already requires human review.
+  if (!riskReasons.length) {
+    try {
+      const reviewFeedback = await getReviewFeedback(fullName, pr.number);
+      if (reviewFeedback.requiresHumanReview) riskReasons.push(...reviewFeedback.reasons);
+    } catch (error) {
+      // Fail closed rather than silently clearing a human-review hold when review state is unavailable.
+      riskReasons.push('review-feedback-unavailable');
+      console.warn('[review-feedback]', fullName + '#' + pr.number, error.message);
+    }
   }
 
   const existingLabels = names(pr.labels);
