@@ -3,7 +3,21 @@ import fs from 'node:fs';
 const config = JSON.parse(fs.readFileSync(new URL('../../ci-policy.json', import.meta.url), 'utf8'));
 
 export function getRepositoryProfile(repoName) {
-  return config.repositories?.[repoName] || null;
+  const defaults = config.defaults && typeof config.defaults === 'object'
+    ? config.defaults
+    : {};
+  const repository = config.repositories?.[repoName] || {};
+
+  if (!Object.keys(defaults).length && !Object.keys(repository).length) return null;
+
+  // New repositories inherit the centrally defined safe defaults. Repository-
+  // specific values always win, while an omitted requiredChecks list inherits
+  // the defaults (currently empty, so unconfigured repositories cannot auto-merge).
+  return {
+    ...defaults,
+    ...repository,
+    requiredChecks: repository.requiredChecks ?? defaults.requiredChecks ?? []
+  };
 }
 
 function globToRegExp(pattern) {
