@@ -6,6 +6,7 @@ import {
   decideWorkflowWrite,
   isEligibleRepository,
   normalizeTargetRepository,
+  ensureRepositoryAutoMerge,
   onboardRepositories
 } from './agent-onboard.mjs';
 
@@ -78,6 +79,10 @@ test('onboarding writes both managed templates to each eligible default branch',
     unchanged: 0,
     conflicts: 0,
     failed: 0,
+    settingsUpdated: 0,
+    settingsUnchanged: 0,
+    settingsSkipped: 1,
+    settingsFailed: 0,
     skipped: 0
   });
   const writes = requests.filter(request => request.method === 'PUT');
@@ -197,6 +202,10 @@ test('scoped onboarding only fetches and writes the requested organization repos
     unchanged: 0,
     conflicts: 0,
     failed: 0,
+    settingsUpdated: 0,
+    settingsUnchanged: 0,
+    settingsSkipped: 1,
+    settingsFailed: 0,
     skipped: 0
   });
   assert.ok(requests.every(request => !request.url.includes('/orgs/ThanhNguyxnOrg/repos')));
@@ -224,4 +233,66 @@ test('onboarding completion rejects failed writes and unresolved user-owned path
   assert.doesNotThrow(() => assertOnboardingSuccess({ failed: 0, conflicts: 0 }));
   assert.throws(() => assertOnboardingSuccess({ failed: 1, conflicts: 0 }), /failed for 1 managed workflow write/);
   assert.throws(() => assertOnboardingSuccess({ failed: 0, conflicts: 2 }), /2 repository workflow conflict/);
+});
+
+test('repository settings sync enables only Allow auto-merge on its validated single-repository target', async () => {
+  const requests = [];
+  const fetchImpl = async (url, options = {}) => {
+    const body = options.body ? JSON.parse(options.body) : null;
+    requests.push({ url, method: options.method || 'GET', body });
+    if ((options.method || 'GET') === 'GET') {
+      return new Response(JSON.stringify({
+        full_name: 'ThanhNguyxnOrg/demo',
+        archived: false,
+        fork: false,
+        allow_auto_merge: false
+      }), { status: 200 });
+    }
+    if (options.method === 'PATCH') {
+      return new Response(JSON.stringify({ allow_auto_merge: true }), { status: 200 });
+    }
+    throw new Error('Unexpected request: ' + url);
+  };
+
+  const result = await ensureRepositoryAutoMerge({
+    token: 'single-repo-settings-token',
+    repositoryFullName: 'ThanhNguyxnOrg/demo',
+    organization: 'ThanhNguyxnOrg',
+    fetchImpl
+  });
+
+  assert.deepEqual(result, { changed: true, skipped: false });
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].method, 'PATCH');
+  assert.deepEqual(requests[1].body, { allow_auto_merge: true });
+  assert.ok(requests.every(request => request.url.endsWith('/repos/ThanhNguyxnOrg/demo')));
+});
+
+test('repository settings sync leaves an already-enabled repository unchanged', async () => {
+  const result = await ensureRepositoryAutoMerge({
+    token: 'single-repo-settings-token',
+    repositoryFullName: 'ThanhNguyxnOrg/demo',
+    organization: 'ThanhNguyxnOrg',
+    fetchImpl: async () => new Response(JSON.stringify({
+      full_name: 'ThanhNguyxnOrg/demo',
+      archived: false,
+      fork: false,
+      allow_auto_merge: true
+    }), { status: 200 })
+  });
+  assert.deepEqual(result, { changed: false, skipped: false });
+});
+
+test('repository settings sync rejects targets outside the configured organization before API access', async () => {
+  let calls = 0;
+  await assert.rejects(
+    () => ensureRepositoryAutoMerge({
+      token: 'single-repo-settings-token',
+      repositoryFullName: 'someone-else/demo',
+      organization: 'ThanhNguyxnOrg',
+      fetchImpl: async () => { calls += 1; throw new Error('must not call API'); }
+    }),
+    /outside the configured organization/
+  );
+  assert.equal(calls, 0);
 });
