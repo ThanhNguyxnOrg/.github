@@ -43,7 +43,7 @@ jobs:
         # zizmor: ignore[github-app] -- this token can read repository metadata only; all write tokens below are scoped to one repository.
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         with:
-          client-id: ${{ vars.BOT_APP_ID }}
+          app-id: ${{ vars.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-metadata: read
@@ -116,7 +116,7 @@ jobs:
         id: onboarding
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         with:
-          client-id: ${{ vars.BOT_APP_ID }}
+          app-id: ${{ vars.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ matrix.repository }}
@@ -142,10 +142,10 @@ jobs:
 
       - name: Create organization-wide ThanhNguyxnAgent token
         id: agent
-        uses: ThanhNguyxnOrg/.github/.github/actions/agent-token@4546359b3efa22e883cb808c85f3b77859690f52
+        uses: ThanhNguyxnOrg/.github/.github/actions/agent-token@2b5c5cad571ee93fd091e16e1734ebd819191e68
         with:
           profile: remediation
-          client-id: ${{ vars.BOT_APP_ID }}
+          app-id: ${{ vars.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
