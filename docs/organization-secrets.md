@@ -4,19 +4,16 @@ Quick reference for the GitHub Actions secrets configured in [ThanhNguyxnOrg](ht
 
 | Secret | Purpose |
 |---|---|
-| `BOT_APP_ID` | Identifies the `ThanhNguyxnAgent[bot]` GitHub App used by organization workflows. |
 | `BOT_PRIVATE_KEY` | The GitHub App private key paired with the App ID. Workflows use it to authenticate the App and generate an installation access token. |
 | `CHOCO_API_KEY` | Chocolatey publishing credential used by the `git-account-switcher` release workflow to publish the `gswitch` package. |
-| `AMO_API_KEY` | Firefox Add-ons (AMO) JWT issuer used to authenticate extension signing and publishing requests. |
 | `AMO_API_SECRET` | Matching AMO JWT secret used with `AMO_API_KEY` to authenticate with the AMO API. |
 | `EDGE_API_KEY` | Microsoft Edge Partner Center Publish API key used by extension release workflows. |
-| `EDGE_CLIENT_ID` | Partner Center client ID paired with `EDGE_API_KEY` for Microsoft Edge publishing. |
 | `MSSTORE_CLIENT_SECRET` | Microsoft Entra application client-secret value used by authorized repositories to authenticate Microsoft Store submissions through Partner Center. |
 | `BUTLER_API_KEY` | itch.io Butler CLI credential used by authorized game repositories to push verified builds to itch.io channels. Create it through Butler login; its itch.io API-key source must be `wharf`. |
 
 ## GitHub App
 
-`BOT_APP_ID` and `BOT_PRIVATE_KEY` are used together by `actions/create-github-app-token`. The action creates a temporary installation token; later workflow steps use that token for bot operations.
+`BOT_PRIVATE_KEY` is the GitHub App private key used with the non-sensitive organization variable `BOT_APP_ID`. Workflows pass the variable as the action's `app-id` input and use this secret as `private-key`; the action creates a temporary installation token for later bot operations. The variable is inventoried in [organization-variables.md](organization-variables.md).
 
 The organization-wide Agent Controller in [agent-controller.yml](../.github/workflows/agent-controller.yml) uses these credentials for metadata-only triage and safe dependency PR governance. See [Agent automation policy](agent-automation.md) for the decision rules and APIDex exception.
 
@@ -26,11 +23,11 @@ The organization-wide Agent Controller in [agent-controller.yml](../.github/work
 
 ## Firefox Add-ons (AMO)
 
-`AMO_API_KEY` (JWT issuer) and `AMO_API_SECRET` (JWT secret) are paired credentials for Firefox Add-ons. They are intended for extension workflows that authenticate with AMO to sign or publish extensions. Grant access to all repositories only when all of them need AMO publishing; otherwise, select the extension repositories that use these credentials.
+`AMO_API_KEY` is the non-sensitive JWT issuer identifier stored as an organization variable; `AMO_API_SECRET` is the matching JWT secret stored here. They are used together by Firefox Add-ons workflows to authenticate signing and publishing requests. Grant the secret only to extension repositories that use these credentials; see [organization-variables.md](organization-variables.md) for the issuer variable.
 
 ## Microsoft Edge Add-ons
 
-`EDGE_API_KEY` and `EDGE_CLIENT_ID` are account-level Partner Center Publish API credentials. Extension release workflows use them to authenticate when submitting updates to Microsoft Edge Add-ons.
+`EDGE_API_KEY` is the account-level Partner Center Publish API credential stored as an organization secret. It is paired with the non-sensitive organization variable `EDGE_CLIENT_ID` (a UUID client identifier). Extension release workflows use both to authenticate Microsoft Edge Add-ons submissions. See [organization-variables.md](organization-variables.md) for the Client ID variable.
 
 ## Microsoft Store
 
