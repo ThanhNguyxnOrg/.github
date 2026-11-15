@@ -111,12 +111,49 @@ export function normalizeTargetRepository(value, organization = ORG) {
 export function assertOnboardingSuccess(summary) {
   const failed = Number(summary?.failed || 0);
   const conflicts = Number(summary?.conflicts || 0);
+  const settingsFailed = Number(summary?.settingsFailed || 0);
   if (failed > 0) {
     throw new Error('Auto-onboarding failed for ' + failed + ' managed workflow write(s)');
   }
   if (conflicts > 0) {
     throw new Error('Auto-onboarding found ' + conflicts + ' repository workflow conflict(s); user-owned files were left untouched');
   }
+  if (settingsFailed > 0) {
+    throw new Error('Repository settings sync failed for ' + settingsFailed + ' repository/repositories');
+  }
+}
+
+export async function ensureRepositoryAutoMerge({
+  token,
+  repositoryFullName,
+  organization = ORG,
+  fetchImpl = fetch
+} = {}) {
+  if (!token) throw new Error('SETTINGS_TOKEN is required');
+  const fullName = normalizeTargetRepository(repositoryFullName, organization);
+  const { request } = createClient(token, fetchImpl);
+  const repository = await request('/repos/' + fullName);
+
+  if (String(repository?.full_name || '').toLowerCase() !== fullName.toLowerCase()) {
+    throw new Error('GitHub returned a repository different from the requested target');
+  }
+  if (repository.archived || repository.fork) {
+    return { changed: false, skipped: true, reason: 'archived-or-fork' };
+  }
+  if (repository.allow_auto_merge === true) {
+    return { changed: false, skipped: false };
+  }
+
+  // The installation token is restricted to this one repository and this call
+  // changes only GitHub's native Allow auto-merge repository setting.
+  const updated = await request('/repos/' + fullName, {
+    method: 'PATCH',
+    body: { allow_auto_merge: true }
+  });
+  if (updated?.allow_auto_merge !== true) {
+    throw new Error('GitHub did not confirm that Allow auto-merge was enabled');
+  }
+  return { changed: true, skipped: false };
 }
 
 export async function onboardRepositories({
@@ -126,6 +163,7 @@ export async function onboardRepositories({
   workflows = loadWorkflowTemplates(),
   ignoredRepositories = ['.github'],
   targetRepository = process.env.TARGET_REPOSITORY,
+  settingsToken = process.env.SETTINGS_TOKEN,
   log = console
 } = {}) {
   if (!token) throw new Error('GH_TOKEN is required');
@@ -134,7 +172,19 @@ export async function onboardRepositories({
     ? [await request('/repos/' + encodedPath(normalizeTargetRepository(targetRepository, organization)))]
     : await listAll('/orgs/' + encodeURIComponent(organization) + '/repos?type=all');
   const eligible = repositories.filter(repo => isEligibleRepository(repo, organization, ignoredRepositories));
-  const summary = { repositories: eligible.length, created: 0, updated: 0, unchanged: 0, conflicts: 0, failed: 0, skipped: repositories.length - eligible.length };
+  const summary = {
+    repositories: eligible.length,
+    created: 0,
+    updated: 0,
+    unchanged: 0,
+    conflicts: 0,
+    failed: 0,
+    settingsUpdated: 0,
+    settingsUnchanged: 0,
+    settingsSkipped: 0,
+    settingsFailed: 0,
+    skipped: repositories.length - eligible.length
+  };
 
   log.log('[onboard] checking ' + eligible.length + ' active repositories for Agent event workflows');
 
@@ -174,6 +224,30 @@ export async function onboardRepositories({
       } catch (error) {
         summary.failed += 1;
         log.warn('[onboard-error] ' + fullName + ':' + workflow.path + ' ' + error.message);
+      }
+    }
+
+    if (!settingsToken) {
+      summary.settingsSkipped += 1;
+      log.log('[repo-settings-skipped] ' + repo.full_name + ': repository-scoped Administration: write token is not available yet');
+    } else if (!targetRepository) {
+      summary.settingsFailed += 1;
+      log.warn('[repo-settings-error] ' + repo.full_name + ': settings token must be scoped to exactly one TARGET_REPOSITORY');
+    } else {
+      try {
+        const result = await ensureRepositoryAutoMerge({
+          token: settingsToken,
+          repositoryFullName: repo.full_name,
+          organization,
+          fetchImpl
+        });
+        if (result.skipped) summary.settingsSkipped += 1;
+        else if (result.changed) summary.settingsUpdated += 1;
+        else summary.settingsUnchanged += 1;
+        log.log('[repo-settings-' + (result.changed ? 'updated' : (result.skipped ? 'skipped' : 'unchanged')) + '] ' + repo.full_name);
+      } catch (error) {
+        summary.settingsFailed += 1;
+        log.warn('[repo-settings-error] ' + repo.full_name + ' ' + error.message);
       }
     }
   }
