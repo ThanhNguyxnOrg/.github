@@ -106,7 +106,7 @@ jobs:
 
       - name: Create repository-scoped Agent token
         id: agent
-        uses: $/.github/actions/agent-token
+        uses: ./.github/actions/agent-token
         with:
           profile: remediation
           app-id: ${{ vars.BOT_APP_ID }}
