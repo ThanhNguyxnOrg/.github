@@ -44,6 +44,12 @@
             ".markdownlint.json",
             ".github/workflows/markdownlint.yml"
           ]
+        },
+        {
+          "name": "website / Website Build",
+          "paths": [
+            "site/**"
+          ]
         }
       ]
     },
