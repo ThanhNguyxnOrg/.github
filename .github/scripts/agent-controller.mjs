@@ -268,7 +268,19 @@ export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredCheck
 }
 
 export function assessReviewFeedback(reviews = [], reviewThreads = []) {
-  const changesRequested = reviews.some(review =>
+  // Only the latest submitted review from each reviewer is authoritative.
+  const latestByReviewer = new Map();
+  for (const review of reviews) {
+    const login = String(review?.user?.login || '');
+    if (!login) continue;
+    const previous = latestByReviewer.get(login);
+    const timestamp = Date.parse(review?.submitted_at || review?.submittedAt || '') || 0;
+    const previousTimestamp = previous
+      ? (Date.parse(previous?.submitted_at || previous?.submittedAt || '') || 0)
+      : -1;
+    if (!previous || timestamp >= previousTimestamp) latestByReviewer.set(login, review);
+  }
+  const changesRequested = [...latestByReviewer.values()].some(review =>
     String(review?.state || '').toUpperCase() === 'CHANGES_REQUESTED'
   );
   const unresolvedThreads = reviewThreads.filter(thread => thread?.isResolved !== true).length;
