@@ -29,7 +29,10 @@ test('central profiles cover every active organization repository and fail close
     assert.ok(profile.defaultBranch, name + ' must declare its default branch');
     assert.equal(profile.autoMergeDependabot, ['PurgeKit', 'WriteCanvas', 'blendops', 'LayoutLingua', 'StepDSA', 'SkillGauge', 'ForgeHelm', 'Snapbooth'].includes(name), name + ' has the expected explicit Dependabot Auto-merge opt-in');
   }
-  assert.equal(getRepositoryProfile('ForgeHelm').autoMergeDependabot, false);
+  assert.equal(getRepositoryProfile('ForgeHelm').autoMergeDependabot, true);
+  assert.equal(getRepositoryProfile('Snapbooth').autoMergeDependabot, true);
+  assert.equal(getRepositoryProfile('StepDSA').autoMergeDependabot, true);
+  assert.equal(getRepositoryProfile('SkillGauge').autoMergeDependabot, true);
   assert.deepEqual(getRepositoryProfile('ForgeHelm').requiredChecks, ['verify / Verify (ForgeHelm)']);
   assert.deepEqual(getRepositoryProfile('ThanhNguyxnOrg.github.io').requiredChecks, ['verify / Verify (Website)']);
   assert.equal(getRepositoryProfile('SkillGauge').pendingLabel, 'skill-verification-pending');
