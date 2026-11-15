@@ -9,7 +9,7 @@ The organization keeps repeated automation primitives in `.github`. Project repo
 - Keep project-specific compiler, dependency, signing, packaging, and platform-matrix steps in the project adapter. A Qt/MSVC/CMake app, a Tauri app, a Go CLI, and an Electron app do not share the same build commands.
 - Pin calls into this repository to a full commit SHA. Update pins deliberately when the central library changes.
 - For Agent automation, do not pass all repository secrets to a called workflow; pass only `BOT_APP_ID` and `BOT_PRIVATE_KEY`.
-- For third-party publishing, use the credential documented in [organization-secrets.md](organization-secrets.md). Keep platform-specific publishing in the project adapter until at least two repositories share the same build/publish contract. If a reusable publisher is introduced, declare each required credential explicitly under `workflow_call.secrets`; never use `secrets: inherit`.
+- For third-party publishing, consult both [organization-secrets.md](organization-secrets.md) and [organization-variables.md](organization-variables.md). Keep platform-specific publishing in the project adapter until at least two repositories share the same build/publish contract. If a reusable publisher is introduced, declare each required credential explicitly under `workflow_call.secrets`; never use `secrets: inherit`.
 - The Agent-token action scopes tokens to the calling repository by default. Do not set `owner` without a repository allowlist unless organization-wide access is specifically required.
 - Every automated write must use the GitHub App installation token. The default `GITHUB_TOKEN` is read-only in project workflows and must not be used for bot commits, comments, tags, release edits, or package-registry writes.
 
@@ -34,7 +34,15 @@ For Git commits, use `.github/actions/agent-git-identity` and check out the repo
 
 ## Platform publishing credentials
 
-Organization-level publishing credentials are shared only with explicitly authorized repositories; they do not belong in the game repository or in reusable-workflow source. The canonical inventory and access policy is [Organization Secrets](organization-secrets.md).
+Organization-level publishing credentials are shared only with explicitly authorized repositories; they do not belong in the game repository or in reusable-workflow source. The canonical inventories and access policies are [Organization Secrets](organization-secrets.md) and [Organization Variables](organization-variables.md).
+
+For the current Microsoft Store integration:
+- Shared organization variables: `MSSTORE_TENANT_ID`, `MSSTORE_CLIENT_ID`, and `MSSTORE_SELLER_ID`.
+- Shared organization secret: `MSSTORE_CLIENT_SECRET`.
+- Each product repository defines its own `MSSTORE_PRODUCT_ID` repository variable; never share one Store product ID between apps.
+- The current caller is [WriteCanvas's Store workflow](https://github.com/ThanhNguyxnOrg/WriteCanvas/blob/master/.github/workflows/store.yml). It listens for a published stable GitHub Release and retains manual dispatch for recovery.
+- Keep the shared variables' repository allowlist aligned with the secret allowlist, and grant access only to repositories with a reviewed Store submission workflow. The Entra app must be linked to the same Partner Center seller account that owns the product.
+- Keep each product's Store packaging and identity validation in its own adapter. A successful submission starts Microsoft's Store review; it does not bypass certification or immediately publish the update to every user.
 
 For the current itch.io integration:
 - `BUTLER_API_KEY` is the Organization Actions secret (itch.io key source: `wharf`).
