@@ -74,7 +74,7 @@ The central stale controller scans active organization repositories daily. It ma
 2. Add one entry under `repositories` in central `ci-policy.json`: exact required job names and default branch. The organization default permits only eligible Dependabot patch/minor auto-merge; leave the required-check list empty only when a repository must remain manual-review-only.
 3. For automatic releases, add an entry in central `release-policy.json`: branch, baseline SHA, initial version, version files, changelog, release mode, build workflow name and required asset filenames.
 4. Keep the project release workflow as a build/package adapter only. It should build from the central tag and upload files to that tag's draft release; it must not independently bump versions or create a second release.
-5. Verify the first CI run, release build and asset manifest before enabling dependency auto-merge.
+5. Verify the first CI run, release build and asset manifest before treating the repository as eligible for guarded Dependabot auto-merge.
 
 The worksheet is in `docs/repository-profile-template.md`. A plain-language note is a useful handoff; the machine-readable entry in this central repository is what the bot executes.
 
