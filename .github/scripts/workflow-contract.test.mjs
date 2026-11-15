@@ -129,3 +129,9 @@ test('the central .github repository uses a self-hosted PR signal and relay with
   assert.match(worker, /workflow_run:/);
   assert.match(worker, /ThanhNguyxnAgent PR Event Worker/);
 });
+
+test('central and managed Agent workers use the same verified download-artifact major release', () => {
+  const expected = 'actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2';
+  assert.ok(read('.github/workflows/agent-pr-worker.yml').includes(expected));
+  assert.ok(read('.github/templates/agent-pr-worker.yml').includes(expected));
+});
