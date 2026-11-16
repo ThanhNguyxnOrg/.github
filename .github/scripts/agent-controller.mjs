@@ -103,8 +103,8 @@ export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
   }
   const riskBody = dependencyBot ? dependencySummary(pullRequest) : body;
   const riskText = dependencyBot ? dependencySummary(pullRequest) : text;
-  const plainBody = riskBody.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
-  if (dependencyBot && /\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)/i.test(plainBody)) {
+  const plainText = riskText.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
+  if (/\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)/i.test(plainText)) {
     labels.add('breaking');
   }
   if (hasSecuritySignal(riskText)) {
@@ -898,6 +898,10 @@ async function processPullRequest(repo, pr) {
     riskReasons.push('domain-verification-review');
   }
   const freshAutoMergeCandidate = !dependencyBot && isPolicyAutoMergeCandidate(fresh, paths, profile);
+  if (freshAutoMergeCandidate && profile?.autoMerge?.allowTriageBypass === true) {
+    const triageIndex = riskReasons.indexOf('triage-needed');
+    if (triageIndex >= 0) riskReasons.splice(triageIndex, 1);
+  }
   if (!dependencyBot && autoMergeCandidate && !freshAutoMergeCandidate &&
       profile?.autoMerge?.allowTriageBypass === true &&
       !riskReasons.includes('triage-needed')) {
