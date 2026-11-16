@@ -178,7 +178,13 @@ function parseVersionCore(value, allowBuildMetadata = false) {
 }
 
 function extractVersionSpecifiers(value) {
-  const text = String(value || '').replace(/[\x60*_]/g, '').trim().replace(/\.$/, '');
+  let text = String(value || '')
+    .replace(/`/g, '')
+    // Strip paired Markdown emphasis only; preserve wildcard range markers and underscores.
+    .replace(/(\*\*|__|\*|_)([^*_]+?)\1/g, '$2')
+    .trim();
+  // Remove trailing sentence punctuation without erasing a terminal npm wildcard.
+  if (text.endsWith('.') && !text.endsWith('.*')) text = text.slice(0, -1);
   // PEP 440 epochs must never be partially consumed as a numeric prefix.
   if (/\b\d+!/.test(text)) return null;
 
