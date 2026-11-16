@@ -490,6 +490,27 @@ export function isPolicyAutoMergeCandidate(pullRequest, changedFiles = [], profi
     isPolicyAutoMergeScope(pullRequest, changedFiles, profile));
 }
 
+export function expandChangedFilePaths(files = []) {
+  return files.flatMap(file =>
+    [file?.filename, file?.previous_filename]
+      .filter(path => typeof path === 'string' && path.length > 0)
+  );
+}
+
+export function getBlockingPullRequestLabels(pullRequest, blockingLabels = config.blockingLabels || []) {
+  const present = names(pullRequest?.labels);
+  const configured = [
+    ...new Set([
+      ...blockingLabels,
+      'do-not-merge',
+      'breaking-change',
+      'wip',
+      'pinned'
+    ].map(label => String(label || '').trim().toLowerCase()).filter(Boolean))
+  ];
+  return configured.filter(label => present.has(label));
+}
+
 export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredChecks = []) {
   return evaluateRequiredChecks(checkRuns, statuses, requiredChecks).state;
 }
@@ -725,7 +746,7 @@ async function mergePullRequestNow(fullName, pullRequest, mergeMethod) {
 }
 
 async function getChangedFiles(fullName, number) {
-  return listAll('/repos/' + fullName + '/pulls/' + number + '/files').then(files => files.map(file => file.filename));
+  return listAll('/repos/' + fullName + '/pulls/' + number + '/files').then(expandChangedFilePaths);
 }
 
 function hasSensitivePath(paths, patterns) {
@@ -863,6 +884,12 @@ async function processPullRequest(repo, pr) {
   if (freshVerificationState === 'review' && !riskReasons.includes('domain-verification-review')) {
     riskReasons.push('domain-verification-review');
   }
+  const freshAutoMergeCandidate = !dependencyBot && isPolicyAutoMergeCandidate(fresh, paths, profile);
+  if (!dependencyBot && autoMergeCandidate && !freshAutoMergeCandidate &&
+      profile?.autoMerge?.allowTriageBypass === true &&
+      !riskReasons.includes('triage-needed')) {
+    riskReasons.push('triage-needed');
+  }
 
   if (fresh.mergeable === false || fresh.mergeable_state === 'dirty') {
     riskReasons.push('merge-conflict');
@@ -898,9 +925,8 @@ async function processPullRequest(repo, pr) {
     }
   }
 
-  const existingLabels = names(fresh.labels);
-  for (const label of ['do-not-merge', 'breaking-change', 'wip', 'pinned']) {
-    if (existingLabels.has(label)) riskReasons.push(label);
+  for (const label of getBlockingPullRequestLabels(fresh)) {
+    if (!riskReasons.includes(label)) riskReasons.push(label);
   }
   const uniqueReasons = [...new Set(riskReasons)];
 
@@ -942,11 +968,12 @@ async function processPullRequest(repo, pr) {
       console.log('[auto-merge-disabled]', fullName + '#' + pr.number + ': repository is not explicitly opted in with required checks');
       return;
     }
-  } else if (!autoMergeCandidate) {
+  } else if (!freshAutoMergeCandidate) {
     const optInLabel = String(profile?.autoMerge?.label || 'automerge');
+    await disablePullRequestAutoMerge(fullName, fresh);
     await removeLabel(fullName, pr.number, optInLabel);
     await removeLabel(fullName, pr.number, 'automerge-pending');
-    console.log('[triaged]', fullName + '#' + pr.number + ': no repository-authorized auto-merge opt-in; CodeRabbit and CI remain active');
+    console.log('[triaged]', fullName + '#' + pr.number + ': repository-specific auto-merge opt-in is no longer present on the latest PR state; native Auto-merge disabled');
     return;
   }
 
