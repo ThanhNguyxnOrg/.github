@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateRequiredChecks, getRepositoryProfile, matchesPathPattern } from './check-policy.mjs';
+import { isPolicyAutoMergeCandidate } from './agent-controller.mjs';
 
 test('repository profiles inherit organization defaults and keep repository-specific CI gates', () => {
   assert.equal(getRepositoryProfile('WriteCanvas').defaultBranch, 'master');
@@ -227,4 +228,24 @@ test('ApiDex confirmed-dead catalog remediation is scoped to bot PRs and require
   assert.deepEqual(profile.requiredChecks.map(check => typeof check === 'string' ? check : check.name), [
     'check-links', 'regression-tests / Python Regression Tests', 'lint', 'website / Website Build'
   ]);
+});
+
+test('ApiDex remediation admission enforces the real controller predicate', () => {
+  const repository = 'ThanhNguyxnOrg/apidex-hub';
+  const profile = getRepositoryProfile('apidex-hub');
+  const base = {
+    user: { login: 'thanhnguyxnagent[bot]' },
+    labels: [{ name: 'automerge' }],
+    head: { ref: 'agent-remediation/dead-api-incident-42', repo: { full_name: repository } },
+    base: { ref: 'main', repo: { full_name: repository } }
+  };
+  const allowedPaths = ['apis/vendor/api.md', 'README.md', 'site/index.html', 'site/src/data/apis.json'];
+
+  assert.equal(isPolicyAutoMergeCandidate(base, allowedPaths, profile), true);
+  assert.equal(isPolicyAutoMergeCandidate({ ...base, head: { ...base.head, ref: 'feature/cleanup' } }, allowedPaths, profile), false);
+  assert.equal(isPolicyAutoMergeCandidate({ ...base, head: { ...base.head, repo: { full_name: 'contributor/apidex-hub' } } }, allowedPaths, profile), false);
+  assert.equal(isPolicyAutoMergeCandidate({ ...base, labels: [] }, allowedPaths, profile), false);
+  assert.equal(isPolicyAutoMergeCandidate({ ...base, user: { login: 'alice' } }, allowedPaths, profile), false);
+  assert.equal(isPolicyAutoMergeCandidate(base, ['apis/vendor/api.md', '.github/workflows/link-checker.yml'], profile), false);
+  assert.equal(isPolicyAutoMergeCandidate(base, ['scripts/remove_dead_links.py'], profile), false);
 });
