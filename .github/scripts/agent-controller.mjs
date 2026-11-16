@@ -255,39 +255,56 @@ export function classifyVersionUpdate(value) {
   }
 
   // Dependabot grouped npm/Rust PRs commonly include a Markdown version table.
-  // Once a version table is identified, every data row must be parseable;
-  // an "unknown"/"latest" member cannot disappear behind another safe patch.
-  let inVersionTable = false;
+  // Parse contiguous table blocks as a unit. For headerless tables, first detect
+  // whether ANY row looks like a version row; only then classify every row.
+  // This prevents an unparseable first member (for example, "unknown | latest")
+  // from being silently dropped just because a later member is a valid patch.
+  const lines = text.split(/\\r?\\n/);
   const oldHeaders = new Set(['from', 'current', 'previous', 'old', 'installed']);
   const newHeaders = new Set(['to', 'latest', 'new', 'updated']);
-  for (const line of text.split(/\r?\n/)) {
-    if (!line.includes('|')) {
-      inVersionTable = false;
-      continue;
-    }
-    const cells = line.split('|').map(cell => cell.trim()).filter(Boolean);
-    if (cells.length < 3) continue;
-    const oldColumn = cells.at(-2).replace(/[\x60*_]/g, '').trim().toLowerCase();
-    const newColumn = cells.at(-1).replace(/[\x60*_]/g, '').trim().toLowerCase();
-    if (oldHeaders.has(oldColumn) && newHeaders.has(newColumn)) {
-      inVersionTable = true;
-      continue;
-    }
-    if (cells.every(cell => /^:?-{3,}:?$/.test(cell))) continue;
+  const isSeparatorRow = cells => cells.every(cell => /^:?-{3,}:?$/.test(cell));
+  const isUnknownVersionMarker = value =>
+    /^(?:unknown|latest|unavailable|not\\s+available|n\\/?a|undefined|null)$/i.test(
+      String(value || '').replace(/[\\x60*_]/g, '').trim()
+    );
 
-    if (inVersionTable) {
+  for (let lineIndex = 0; lineIndex < lines.length;) {
+    if (!lines[lineIndex].includes('|')) {
+      lineIndex += 1;
+      continue;
+    }
+
+    const tableRows = [];
+    while (lineIndex < lines.length && lines[lineIndex].includes('|')) {
+      const cells = lines[lineIndex].split('|').map(cell => cell.trim()).filter(Boolean);
+      if (cells.length >= 3) tableRows.push(cells);
+      lineIndex += 1;
+    }
+    if (!tableRows.length) continue;
+
+    const headerIndex = tableRows.findIndex(cells => {
+      const oldColumn = cells.at(-2).replace(/[\\x60*_]/g, '').trim().toLowerCase();
+      const newColumn = cells.at(-1).replace(/[\\x60*_]/g, '').trim().toLowerCase();
+      return oldHeaders.has(oldColumn) && newHeaders.has(newColumn);
+    });
+    const dataRows = headerIndex >= 0 ? tableRows.slice(headerIndex + 1) : tableRows;
+    if (!dataRows.length) continue;
+
+    const looksLikeVersionTable = headerIndex >= 0 || dataRows.some(cells => {
+      if (isSeparatorRow(cells)) return false;
+      const oldValue = cells.at(-2);
+      const newValue = cells.at(-1);
+      const rowRisk = classifySpecifierPair(oldValue, newValue, allowCargoBuildMetadata);
+      return rowRisk !== 'unknown' ||
+        isUnknownVersionMarker(oldValue) || isUnknownVersionMarker(newValue);
+    });
+    if (!looksLikeVersionTable) continue;
+
+    for (const cells of dataRows) {
+      if (isSeparatorRow(cells)) continue;
       classifications.push(
         classifySpecifierPair(cells.at(-2), cells.at(-1), allowCargoBuildMetadata)
       );
-    } else {
-      const rowRisk = classifySpecifierPair(
-        cells.at(-2), cells.at(-1), allowCargoBuildMetadata
-      );
-      if (rowRisk !== 'unknown') {
-        // Headerless version tables are also common in generated summaries.
-        inVersionTable = true;
-        classifications.push(rowRisk);
-      }
     }
   }
 
