@@ -171,6 +171,16 @@ test('dependency update classification remains SemVer-aware across grouped summa
     'patch'
   );
   assert.equal(
+    classifyVersionUpdate('Bump package requirement from >=1.2.0,<2.0.0 to >=1.2.1,<3.0.0'),
+    'unknown',
+    'changing more than one constraint bound must not be treated as a patch'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump package requirement from >=1.2.0,<2.0.0 to >=1.2.1,<2.0.0'),
+    'patch',
+    'a single lower-bound update with an unchanged upper bound can be classified'
+  );
+  assert.equal(
     classifyVersionUpdate('deps(cargo): bump toml from 1.2.0+spec-1.1.0 to 1.2.1+spec-1.1.0 in /src-tauri'),
     'patch'
   );
