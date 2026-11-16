@@ -428,6 +428,16 @@ test('Auto-merge is not admitted until every required check is successful', () =
   assert.equal(isAutoMergeCheckReady('success'), true);
 });
 
+test('SkillGauge requires a path-scoped commit status on the exact changed head', () => {
+  const profile = getRepositoryProfile('SkillGauge');
+  assert.ok(profile.requiredChecks.some(check =>
+    typeof check === 'object' &&
+    check.name === 'skillgauge/verification' &&
+    check.kind === 'status' &&
+    check.paths.includes('skills/**/*.md')
+  ));
+});
+
 test('domain verification defers before handoff, preserves review holds, and recognizes completed handoff', () => {
   const profile = {
     pendingLabel: 'skill-verification-pending',
