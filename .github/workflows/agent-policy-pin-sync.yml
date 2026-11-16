@@ -52,6 +52,13 @@ jobs:
         run: |
           set -euo pipefail
           head="$(git rev-parse HEAD)"
+          # A pin commit only moves the pin lines, never policy, so the pin
+          # already covers everything at HEAD. Without this guard every pin
+          # commit would retrigger this workflow and mint another pin commit.
+          if git log -1 --format=%s | grep -q '^chore(agent): advance worker policy pin to '; then
+            echo "[pin-sync] HEAD is a pin-sync commit; nothing to do"
+            exit 0
+          fi
           files=".github/workflows/agent-pr-worker-relay.yml .github/templates/agent-pr-worker.yml"
           for file in $files; do
             sed -i -E "s#agent-pr-worker\.yml@[0-9a-f]{40}#agent-pr-worker.yml@${head}#g" "$file"
