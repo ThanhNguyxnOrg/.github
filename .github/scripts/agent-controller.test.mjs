@@ -7,6 +7,9 @@ import {
   assessReviewFeedback,
   classifyVersionUpdate,
   requiredCheckReviewReason,
+  isAutoMergeCheckReady,
+  domainVerificationState,
+  isPolicyAutoMergeCandidate,
   isTransientAutoMergeError,
   evaluateCheckRollup,
   isDependencyManifestPath,
@@ -411,6 +414,49 @@ test('required check failures, missing gates and non-applicable profiles route t
   assert.equal(requiredCheckReviewReason('not-applicable'), 'required-checks-not-applicable');
   assert.equal(requiredCheckReviewReason('pending'), null);
   assert.equal(requiredCheckReviewReason('success'), null);
+});
+
+test('Auto-merge is not admitted until every required check is successful', () => {
+  assert.equal(isAutoMergeCheckReady('pending'), false);
+  assert.equal(isAutoMergeCheckReady('failure'), false);
+  assert.equal(isAutoMergeCheckReady('missing'), false);
+  assert.equal(isAutoMergeCheckReady('unconfigured'), false);
+  assert.equal(isAutoMergeCheckReady('success'), true);
+});
+
+test('domain verification labels defer SkillGauge PRs and preserve explicit review holds', () => {
+  const profile = {
+    pendingLabel: 'skill-verification-pending',
+    reviewHoldLabel: 'skill-verification-review'
+  };
+  assert.equal(domainVerificationState({ labels: [{ name: 'skill-verification-pending' }] }, profile), 'pending');
+  assert.equal(domainVerificationState({ labels: [{ name: 'skill-verification-review' }] }, profile), 'review');
+  assert.equal(domainVerificationState({ labels: [] }, profile), 'ready');
+});
+
+test('repository-authorized auto-merge requires the explicit label, allowed branch, same-repo head and only allowed paths', () => {
+  const profile = {
+    autoMerge: {
+      label: 'automerge',
+      branchPrefix: 'contrib-',
+      sameRepository: true,
+      paths: ['skills/**/*.md'],
+      allowTriageBypass: true
+    }
+  };
+  const repository = 'ThanhNguyxnOrg/SkillGauge';
+  const pr = {
+    user: { login: 'contributor' },
+    labels: [{ name: 'automerge' }],
+    head: { ref: 'contrib-add-skill', repo: { full_name: repository } },
+    base: { repo: { full_name: repository } }
+  };
+
+  assert.equal(isPolicyAutoMergeCandidate(pr, ['skills/new-skill.md'], profile), true);
+  assert.equal(isPolicyAutoMergeCandidate({ ...pr, labels: [] }, ['skills/new-skill.md'], profile), false);
+  assert.equal(isPolicyAutoMergeCandidate({ ...pr, head: { ...pr.head, ref: 'feature/add-skill' } }, ['skills/new-skill.md'], profile), false);
+  assert.equal(isPolicyAutoMergeCandidate({ ...pr, head: { ...pr.head, repo: { full_name: 'contributor/SkillGauge' } } }, ['skills/new-skill.md'], profile), false);
+  assert.equal(isPolicyAutoMergeCandidate(pr, ['skills/new-skill.md', 'README.md'], profile), false);
 });
 
 test('PR checks prefer the head SHA and fall back to the synthetic merge SHA', () => {
