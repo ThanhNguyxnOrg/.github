@@ -195,6 +195,26 @@ test('dependency update classification remains SemVer-aware across grouped summa
     'PEP 440 epoch prefixes must not be partially parsed as ordinary releases'
   );
   assert.equal(
+    classifyVersionUpdate('Bump foo requirement from ^1.0.0 >=1.2.0 to ^2.0.0 >=1.2.1'),
+    'unknown',
+    'unsupported npm range operators must not be discarded during extraction'
+  );
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\nUpdates bar from 1.0.0 to 2.0.0 || 3.0.0'),
+    'unknown',
+    'npm range alternatives in prose must not be removed as Markdown table syntax'
+  );
+  const unsafeNpmRange = analyzeDependencyUpdate(
+    {
+      title: 'Bump foo from 1.0.0 to 2.0.0',
+      body: 'Updates foo requirement from ^1.0.0 >=1.2.0 to ^2.0.0 >=1.2.1',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['package.json']
+  );
+  assert.equal(unsafeNpmRange.eligible, false);
+  assert.equal(unsafeNpmRange.versionRisk, 'unknown');
+  assert.equal(
     classifyVersionUpdate('| foo | 1.2.3 | 1.2.4 |\n| bar | unknown | latest |'),
     'unknown',
     'unparseable rows in a grouped version table must not be dropped'
