@@ -59,18 +59,18 @@ jobs:
             echo "[pin-sync] HEAD is a pin-sync commit; nothing to do"
             exit 0
           fi
-          files=".github/workflows/agent-pr-worker-relay.yml .github/templates/agent-pr-worker.yml"
-          for file in $files; do
+          files=(.github/workflows/agent-pr-worker-relay.yml .github/templates/agent-pr-worker.yml)
+          for file in "${files[@]}"; do
             sed -i -E "s#agent-pr-worker\.yml@[0-9a-f]{40}#agent-pr-worker.yml@${head}#g" "$file"
             sed -i -E "s#^([[:space:]]*policy_ref:[[:space:]]*)[0-9a-f]{40}#\1${head}#" "$file"
           done
-          if git diff --quiet -- $files; then
+          if git diff --quiet -- "${files[@]}"; then
             echo "[pin-sync] worker policy pin already at ${head}; nothing to do"
             exit 0
           fi
           git config user.name "thanhnguyxnagent[bot]"
           git config user.email "296222857+thanhnguyxnagent[bot]@users.noreply.github.com"
-          git add -- $files
+          git add -- "${files[@]}"
           git commit -m "chore(agent): advance worker policy pin to ${head}"
           git push origin HEAD:main
 
