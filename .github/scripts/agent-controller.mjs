@@ -311,7 +311,8 @@ export function classifyVersionUpdate(value) {
       .replace(/(^|[=><!~^,|\s])_([^,|\s]+?)_(?=$|[,|\s])/g, '$1$2');
     // Find npm X-range components anywhere in a comparator expression,
     // including compound constraints like ">=1.0,==1.2.*".
-    return /(?:^|[=><!~^,|_\s])(?:[vV]?\d+(?:\.\d+)*(?:\.(?:[xX*])|[xX*])|[xX*])_*(?=$|[,|\s])/i.test(normalized);
+    return /(?:^|[=><!~^,|_\s])(?:[vV]?(?:\d+|[xX*])(?:\.(?:\d+|[xX*]))*)_*(?=$|[,|\s])/i.test(normalized) &&
+      /[xX*]/i.test(normalized);
   };
 
   for (let lineIndex = 0; lineIndex < lines.length;) {
