@@ -270,6 +270,26 @@ test('dependency update classification remains SemVer-aware across grouped summa
   assert.equal(unsafeXRangeGroup.eligible, false);
   assert.equal(unsafeXRangeGroup.versionRisk, 'unknown');
   assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | >=1.0,==1.2.* | >=1.0,==2.0.* |'),
+    'unknown',
+    'wildcard components inside compound constraints must prevent table skipping'
+  );
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | >=1.0,==_1.2.*_ | >=1.0,==_2.0.*_ |'),
+    'unknown',
+    'emphasized wildcard components inside compound constraints must fail closed'
+  );
+  const unsafeCompoundWildcardGroup = analyzeDependencyUpdate(
+    {
+      title: 'chore(deps): bump grouped dependencies with 2 updates',
+      body: 'Updates foo from 1.2.3 to 1.2.4\n\n| bar | >=1.0,==1.2.* | >=1.0,==2.0.* |',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['requirements.txt']
+  );
+  assert.equal(unsafeCompoundWildcardGroup.eligible, false);
+  assert.equal(unsafeCompoundWildcardGroup.versionRisk, 'unknown');
+  assert.equal(
     classifyVersionUpdate('Bump foo requirement from ^1.0.0 >=1.2.0 to ^2.0.0 >=1.2.1'),
     'unknown',
     'unsupported npm range operators must not be discarded during extraction'
