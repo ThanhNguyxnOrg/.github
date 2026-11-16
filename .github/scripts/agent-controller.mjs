@@ -160,12 +160,16 @@ function pathMatches(path, pattern) {
   return path === pattern;
 }
 
-function parseVersionCore(value) {
+function parseVersionCore(value, allowBuildMetadata = false) {
   const normalized = String(value || '').trim().replace(/^[vV]/, '');
-  // PEP 440 epochs require their own ordering rules; fail closed rather than
-  // silently comparing the portion after the epoch as if it were SemVer.
+  // PEP 440 epochs, prereleases, post/dev releases and local versions need
+  // PEP 440 ordering. Fail closed instead of comparing only their release tuple.
+  // Cargo's SemVer build metadata is the exception: it does not affect precedence.
   if (/^\d+!/.test(normalized)) return null;
-  const match = normalized.match(/^(\d+(?:\.\d+){0,2})(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\+[0-9A-Za-z.-]+)?$/);
+  const pattern = allowBuildMetadata
+    ? /^(\d+(?:\.\d+){0,2})(?:\+[0-9A-Za-z.-]+)?$/
+    : /^(\d+(?:\.\d+){0,2})$/;
+  const match = normalized.match(pattern);
   if (!match) return null;
   const parts = match[1].split('.').map(Number);
   if (parts.some(part => !Number.isSafeInteger(part))) return null;
@@ -193,9 +197,9 @@ function selectSpecifierVersion(specifier) {
   return (lower.at(-1) || exact.at(-1) || unqualified[0] || upper.at(-1) || {}).version || null;
 }
 
-function classifyVersionPair(oldVersion, newVersion) {
-  const oldParts = parseVersionCore(oldVersion);
-  const newParts = parseVersionCore(newVersion);
+function classifyVersionPair(oldVersion, newVersion, allowBuildMetadata = false) {
+  const oldParts = parseVersionCore(oldVersion, allowBuildMetadata);
+  const newParts = parseVersionCore(newVersion, allowBuildMetadata);
   if (!oldParts || !newParts) return 'unknown';
   if (newParts.every((part, index) => part === oldParts[index])) return 'unchanged';
   if (newParts[0] > oldParts[0]) return 'major';
@@ -208,15 +212,19 @@ function classifyVersionPair(oldVersion, newVersion) {
 export function classifyVersionUpdate(value) {
   const text = String(value || '');
   const classifications = [];
+  const allowCargoBuildMetadata = /\b(?:cargo|rust|src-tauri)\b/i.test(text);
 
   // Supports ordinary SemVer pairs and compound Python constraints such as
   // "from <1.0,>=0.17.4 to >=0.17.5,<1.0".
   const fromToPattern = /\bfrom\s+(.+?)\s+to\s+(.+?)(?=\s+\b(?:in|for|with|which|that)\b|[\r\n]|$)/gi;
   for (const match of text.matchAll(fromToPattern)) {
+    // Dependabot Markdown tables may contain a "From | To" header. It is not
+    // a dependency update and must not poison the grouped version result.
+    if (/^\s*from\s*$/i.test(match[1]) && /^\s*to\s*$/i.test(match[2])) continue;
     const oldVersion = selectSpecifierVersion(match[1]);
     const newVersion = selectSpecifierVersion(match[2]);
     classifications.push(oldVersion && newVersion
-      ? classifyVersionPair(oldVersion, newVersion)
+      ? classifyVersionPair(oldVersion, newVersion, allowCargoBuildMetadata)
       : 'unknown');
   }
 
@@ -228,7 +236,7 @@ export function classifyVersionUpdate(value) {
     const oldVersion = selectSpecifierVersion(cells.at(-2));
     const newVersion = selectSpecifierVersion(cells.at(-1));
     if (oldVersion && newVersion) {
-      classifications.push(classifyVersionPair(oldVersion, newVersion));
+      classifications.push(classifyVersionPair(oldVersion, newVersion, allowCargoBuildMetadata));
     }
   }
 
