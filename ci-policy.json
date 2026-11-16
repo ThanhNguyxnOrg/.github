@@ -63,7 +63,8 @@
           "site/src/data/apis.json"
         ],
         "allowTriageBypass": true,
-        "allowSensitivePaths": true
+        "allowSensitivePaths": true,
+        "author": "thanhnguyxnagent[bot]"
       }
     },
     "lumeo": {
