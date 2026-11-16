@@ -12,6 +12,7 @@ import {
   domainVerificationState,
   isPolicyAutoMergeCandidate,
   reconcilePolicyTriageReason,
+  buildEnablePullRequestAutoMergeRequest,
   expandChangedFilePaths,
   getBlockingPullRequestLabels,
   shouldDisableAutoMergeForDeferredState,
@@ -478,6 +479,31 @@ test('domain verification defers before handoff, preserves review holds, and rec
   assert.equal(domainVerificationState(scopedPr, profile, ['skills/new-skill.md']), 'pending');
   assert.equal(domainVerificationState({ ...scopedPr, labels: [{ name: 'automerge' }] }, profile, ['skills/new-skill.md']), 'ready');
   assert.equal(domainVerificationState(scopedPr, profile, ['README.md']), 'ready');
+});
+
+test('Conventional Commit breaking marker applies to every type and optional scope', () => {
+  for (const title of [
+    'chore!: rename required skill inputs',
+    'docs(api)!: change response schema',
+    'feat!: change required skill inputs',
+    'fix(parser)!: reject legacy format'
+  ]) {
+    assert.ok(classifyPullRequestLabels({ user: { login: 'contributor' }, title, body: 'No other risk signals.' }, ['skills/new.md']).includes('breaking'), title);
+  }
+  assert.ok(!classifyPullRequestLabels({ user: { login: 'contributor' }, title: 'chore: update metadata', body: 'Routine maintenance.' }, ['skills/new.md']).includes('breaking'));
+});
+
+test('native Auto-merge mutation binds admission to the exact validated head SHA', () => {
+  const pullRequest = {
+    node_id: 'PR_kwDOExpectedHead',
+    head: { sha: 'b'.repeat(40) }
+  };
+  const request = buildEnablePullRequestAutoMergeRequest(pullRequest, 'squash');
+  assert.equal(request.variables.pullRequestId, pullRequest.node_id);
+  assert.equal(request.variables.mergeMethod, 'SQUASH');
+  assert.equal(request.variables.expectedHeadOid, pullRequest.head.sha);
+  assert.match(request.query, /expectedHeadOid:\s*\$expectedHeadOid/);
+  assert.throws(() => buildEnablePullRequestAutoMergeRequest({ node_id: pullRequest.node_id, head: {} }, 'squash'), /Validated PR head SHA is unavailable/);
 });
 
 test('renamed files are checked using both their previous and current paths', () => {
