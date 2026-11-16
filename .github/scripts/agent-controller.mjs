@@ -188,17 +188,6 @@ function stripMarkdownVersionEmphasis(value) {
   return text;
 }
 
-function stripMarkdownVersionEmphasis(value) {
-  let text = String(value || '').trim();
-  // Strip only a wrapper around the complete version token, never an internal wildcard.
-  for (const marker of ['**', '__', '*', '_']) {
-    if (text.startsWith(marker) && text.endsWith(marker) && text.length > marker.length * 2) {
-      return text.slice(marker.length, -marker.length);
-    }
-  }
-  return text;
-}
-
 function extractVersionSpecifiers(value) {
   const text = String(value || '').replace(new RegExp(String.fromCharCode(96), 'g'), '').trim();
   // PEP 440 epochs must never be partially consumed as a numeric prefix.
