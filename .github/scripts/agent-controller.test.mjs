@@ -174,9 +174,19 @@ test('dependency update classification remains SemVer-aware across grouped summa
     classifyVersionUpdate('deps(cargo): bump toml from 1.2.0+spec-1.1.0 to 1.2.1+spec-1.1.0 in /src-tauri'),
     'patch'
   );
+  assert.equal(
+    classifyVersionUpdate('Bump Python package from 1.2.0+local.1 to 1.2.1+local.1'),
+    'unknown',
+    'PEP 440 local versions must not be treated as Cargo build metadata'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump package from 1.2.3-rc.1 to 1.2.3'),
+    'unknown',
+    'prerelease transitions must fail closed until their ecosystem-specific ordering is parsed'
+  );
   assert.equal(classifyVersionUpdate('Bump golang.org/x/crypto from 0.58.0 to 0.59.0'), 'major');
   assert.equal(
-    classifyVersionUpdate('Bump foo from 1.2.3 to 1.2.4\\nBump bar from unknown to latest'),
+    classifyVersionUpdate('Bump foo from 1.2.3 to 1.2.4\nBump bar from 2.0.0 to latest'),
     'unknown',
     'unparseable members of a grouped update must fail closed'
   );
