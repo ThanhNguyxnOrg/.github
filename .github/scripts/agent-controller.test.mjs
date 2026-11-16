@@ -180,6 +180,11 @@ test('dependency update classification remains SemVer-aware across grouped summa
     'PEP 440 local versions must not be treated as Cargo build metadata'
   );
   assert.equal(
+    classifyVersionUpdate('Bump Python package from 1!9.0 to 1.1.0'),
+    'unknown',
+    'PEP 440 epoch prefixes must not be partially parsed as ordinary releases'
+  );
+  assert.equal(
     classifyVersionUpdate('Bump package from 1.2.3-rc.1 to 1.2.3'),
     'unknown',
     'prerelease transitions must fail closed until their ecosystem-specific ordering is parsed'
