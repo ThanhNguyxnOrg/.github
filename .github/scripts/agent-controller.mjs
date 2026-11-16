@@ -498,6 +498,19 @@ export function reconcilePolicyTriageReason(reasons = [], authorizedCandidate = 
   return next.filter(reason => reason !== 'triage-needed');
 }
 
+export function buildEnablePullRequestAutoMergeRequest(pullRequest, mergeMethod) {
+  if (!pullRequest?.node_id) throw new Error('PR node_id is unavailable for Auto-merge');
+  if (!pullRequest?.head?.sha) throw new Error('Validated PR head SHA is unavailable for Auto-merge');
+  return {
+    query: 'mutation($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!, $expectedHeadOid: GitObjectID!) { enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: $mergeMethod, expectedHeadOid: $expectedHeadOid }) { pullRequest { number autoMergeRequest { enabledAt mergeMethod } } } }',
+    variables: {
+      pullRequestId: pullRequest.node_id,
+      mergeMethod: String(mergeMethod || 'squash').toUpperCase(),
+      expectedHeadOid: pullRequest.head.sha
+    }
+  };
+}
+
 export function expandChangedFilePaths(files = []) {
   return files.flatMap(file =>
     [file?.filename, file?.previous_filename]
@@ -724,13 +737,10 @@ export function isTransientAutoMergeError(error) {
 
 async function enablePullRequestAutoMerge(fullName, pullRequest, mergeMethod) {
   if (pullRequest.auto_merge) return;
-  if (!pullRequest.node_id) throw new Error('PR node_id is unavailable for Auto-merge');
+  const autoMergeRequest = buildEnablePullRequestAutoMergeRequest(pullRequest, mergeMethod);
   const response = await request('/graphql', {
     method: 'POST',
-    body: {
-      query: 'mutation($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) { enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: $mergeMethod }) { pullRequest { number autoMergeRequest { enabledAt mergeMethod } } } }',
-      variables: { pullRequestId: pullRequest.node_id, mergeMethod: mergeMethod.toUpperCase() }
-    }
+    body: autoMergeRequest
   });
   if (Array.isArray(response.errors) && response.errors.length) {
     throw new Error(response.errors.map(item => item.message || 'GraphQL error').join('; '));
@@ -842,10 +852,10 @@ export async function processPullRequest(repo, pr) {
   const verificationState = domainVerificationState(pr, profile, paths);
 
   const autoMergeCandidate = !dependencyBot && isPolicyAutoMergeCandidate(pr, paths, profile);
-  const risk = assessPullRequestRisk(pr, paths, policy);
+  let risk = assessPullRequestRisk(pr, paths, policy);
   const labels = new Set(classifyPullRequestLabels(pr, paths));
   const allowedBaseBranches = policy.allowedBaseBranches || [profile?.defaultBranch || repo.default_branch].filter(Boolean);
-  const riskReasons = reconcilePolicyTriageReason(risk.reasons, autoMergeCandidate, profile);
+  let riskReasons = reconcilePolicyTriageReason(risk.reasons, autoMergeCandidate, profile);
   if (autoMergeCandidate && profile?.autoMerge?.allowSensitivePaths === true) {
     const sensitiveIndex = riskReasons.indexOf('sensitive-path');
     if (sensitiveIndex >= 0) riskReasons.splice(sensitiveIndex, 1);
@@ -898,12 +908,17 @@ export async function processPullRequest(repo, pr) {
     console.log('[domain-verification-wait]', fullName + '#' + pr.number + ': repository-specific verification is still pending; any stale native Auto-merge was disabled');
     return;
   }
-  if (freshVerificationState === 'review' && !riskReasons.includes('domain-verification-review')) {
-    riskReasons.push('domain-verification-review');
-  }
   const freshAutoMergeCandidate = !dependencyBot && isPolicyAutoMergeCandidate(fresh, paths, profile);
-  const reconciledFreshReasons = reconcilePolicyTriageReason(riskReasons, freshAutoMergeCandidate, profile);
-  riskReasons.splice(0, riskReasons.length, ...reconciledFreshReasons);
+  risk = assessPullRequestRisk(fresh, paths, policy);
+  const refreshedRiskReasons = reconcilePolicyTriageReason(risk.reasons, freshAutoMergeCandidate, profile);
+  if (freshAutoMergeCandidate && profile?.autoMerge?.allowSensitivePaths === true) {
+    const sensitiveIndex = refreshedRiskReasons.indexOf('sensitive-path');
+    if (sensitiveIndex >= 0) refreshedRiskReasons.splice(sensitiveIndex, 1);
+  }
+  if (freshVerificationState === 'review') refreshedRiskReasons.push('domain-verification-review');
+  if (!allowedBaseBranches.includes(fresh.base.ref)) refreshedRiskReasons.push('target-branch-outside-policy');
+  if (!pathsAvailable) refreshedRiskReasons.push('changed-files-unavailable');
+  riskReasons.splice(0, riskReasons.length, ...refreshedRiskReasons);
   if (!dependencyBot && autoMergeCandidate && !freshAutoMergeCandidate &&
       profile?.autoMerge?.allowTriageBypass === true &&
       !riskReasons.includes('triage-needed')) {
