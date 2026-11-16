@@ -188,15 +188,26 @@ function stripMarkdownVersionEmphasis(value) {
   return text;
 }
 
+function stripMarkdownVersionEmphasis(value) {
+  let text = String(value || '').trim();
+  // Strip only a wrapper around the complete version token, never an internal wildcard.
+  for (const marker of ['**', '__', '*', '_']) {
+    if (text.startsWith(marker) && text.endsWith(marker) && text.length > marker.length * 2) {
+      return text.slice(marker.length, -marker.length);
+    }
+  }
+  return text;
+}
+
 function extractVersionSpecifiers(value) {
-  const text = String(value || '').replace(/`/g, '').trim();
+  const text = String(value || '').replace(new RegExp(String.fromCharCode(96), 'g'), '').trim();
   // PEP 440 epochs must never be partially consumed as a numeric prefix.
-  if (/\\b\\d+!/.test(text)) return null;
+  if (/\b\d+!/.test(text)) return null;
 
   // Parse every comma-separated comparator completely. Unsupported npm range
   // operators and wildcard tokens must fail closed instead of being stripped.
-  const comparatorPattern = /^(===|==|~=|>=|<=|!=|>|<)?\\s*/;
-  const versionPattern = /^[vV]?(\\d+(?:\\.\\d+){0,2}(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\\+[0-9A-Za-z.-]+)?)$/;
+  const comparatorPattern = /^(===|==|~=|>=|<=|!=|>|<)?\s*/;
+  const versionPattern = /^[vV]?(\d+(?:\.\d+){0,2}(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\+[0-9A-Za-z.-]+)?)$/;
   const rawParts = text.split(',');
   if (!rawParts.length) return null;
 
