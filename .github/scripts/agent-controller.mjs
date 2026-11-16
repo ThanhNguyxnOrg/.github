@@ -177,27 +177,52 @@ function parseVersionCore(value, allowBuildMetadata = false) {
   return parts;
 }
 
-function selectSpecifierVersion(specifier) {
-  const text = String(specifier || '').replace(/[\x60*_]/g, '').trim();
-  // Do not let the numeric prefix of a PEP 440 epoch (for example, 1!9.0)
-  // be mistaken for a complete version token.
+function extractVersionSpecifiers(value) {
+  const text = String(value || '').replace(/[\x60*_]/g, '').trim();
+  // Reject PEP 440 epochs before the regex can mistake the epoch prefix
+  // for a complete release token.
   if (/\b\d+!/.test(text)) return null;
-  const pattern = /(?:^|[\s,])(?:\s*(===|==|~=|>=|<=|!=|>|<)\s*)?[vV]?(\d+(?:\.\d+){0,2}(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\+[0-9A-Za-z.-]+)?)/g;
+  const pattern = /(?:^|[\s,])\s*(===|==|~=|>=|<=|!=|>|<)?\s*[vV]?(\d+(?:\.\d+){0,2}(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\+[0-9A-Za-z.-]+)?)/g;
   const matches = [...text.matchAll(pattern)].map(match => ({
     operator: match[1] || '',
     version: match[2]
   }));
-  if (!matches.length) return null;
+  return matches.length ? matches : null;
+}
 
-  // For PEP 440 compound specifiers, compare the effective lower bound.
-  // If there is no lower bound, use an exact/compatible version, then an
-  // unqualified version, and finally an upper bound. Exclusions alone are
-  // insufficient evidence and remain unknown.
-  const lower = matches.filter(item => item.operator === '>=' || item.operator === '>');
-  const exact = matches.filter(item => item.operator === '===' || item.operator === '==' || item.operator === '~=');
-  const unqualified = matches.filter(item => !item.operator);
-  const upper = matches.filter(item => item.operator === '<=' || item.operator === '<');
-  return (lower.at(-1) || exact.at(-1) || unqualified[0] || upper.at(-1) || {}).version || null;
+function classifySpecifierPair(oldSpecifier, newSpecifier, allowBuildMetadata = false) {
+  const oldParts = extractVersionSpecifiers(oldSpecifier);
+  const newParts = extractVersionSpecifiers(newSpecifier);
+  if (!oldParts || !newParts || oldParts.length !== newParts.length) return 'unknown';
+
+  // A plain SemVer pair has no comparator.
+  if (oldParts.length === 1 && newParts.length === 1 &&
+      oldParts[0].operator === '' && newParts[0].operator === '') {
+    return classifyVersionPair(oldParts[0].version, newParts[0].version, allowBuildMetadata);
+  }
+
+  // Compound specifiers may be reordered. Match unchanged comparator/version
+  // pairs first, then allow exactly one supported bound to move. Changes to an
+  // upper bound, exclusion, or comparator shape are ambiguous and fail closed.
+  const unmatchedNew = [...newParts];
+  const unmatchedOld = [];
+  for (const oldPart of oldParts) {
+    const index = unmatchedNew.findIndex(newPart =>
+      newPart.operator === oldPart.operator && newPart.version === oldPart.version
+    );
+    if (index >= 0) unmatchedNew.splice(index, 1);
+    else unmatchedOld.push(oldPart);
+  }
+
+  if (unmatchedOld.length === 0 && unmatchedNew.length === 0) return 'unchanged';
+  if (unmatchedOld.length !== 1 || unmatchedNew.length !== 1) return 'unknown';
+  const oldPart = unmatchedOld[0];
+  const newPart = unmatchedNew[0];
+  if (oldPart.operator !== newPart.operator ||
+      !['>=', '>', '==', '===', '~='].includes(oldPart.operator)) {
+    return 'unknown';
+  }
+  return classifyVersionPair(oldPart.version, newPart.version, allowBuildMetadata);
 }
 
 function classifyVersionPair(oldVersion, newVersion, allowBuildMetadata = false) {
@@ -224,11 +249,9 @@ export function classifyVersionUpdate(value) {
   // the table header "From | To" can look like a malformed dependency pair.
   const proseText = text.split(/\r?\n/).filter(line => !line.includes('|')).join('\n');
   for (const match of proseText.matchAll(fromToPattern)) {
-    const oldVersion = selectSpecifierVersion(match[1]);
-    const newVersion = selectSpecifierVersion(match[2]);
-    classifications.push(oldVersion && newVersion
-      ? classifyVersionPair(oldVersion, newVersion, allowCargoBuildMetadata)
-      : 'unknown');
+    classifications.push(
+      classifySpecifierPair(match[1], match[2], allowCargoBuildMetadata)
+    );
   }
 
   // Dependabot grouped npm/Rust PRs commonly include a Markdown version table.
@@ -252,16 +275,19 @@ export function classifyVersionUpdate(value) {
     }
     if (cells.every(cell => /^:?-{3,}:?$/.test(cell))) continue;
 
-    const oldVersion = selectSpecifierVersion(cells.at(-2));
-    const newVersion = selectSpecifierVersion(cells.at(-1));
     if (inVersionTable) {
-      classifications.push(oldVersion && newVersion
-        ? classifyVersionPair(oldVersion, newVersion, allowCargoBuildMetadata)
-        : 'unknown');
-    } else if (oldVersion && newVersion) {
-      // Headerless version tables are also common in generated summaries.
-      inVersionTable = true;
-      classifications.push(classifyVersionPair(oldVersion, newVersion, allowCargoBuildMetadata));
+      classifications.push(
+        classifySpecifierPair(cells.at(-2), cells.at(-1), allowCargoBuildMetadata)
+      );
+    } else {
+      const rowRisk = classifySpecifierPair(
+        cells.at(-2), cells.at(-1), allowCargoBuildMetadata
+      );
+      if (rowRisk !== 'unknown') {
+        // Headerless version tables are also common in generated summaries.
+        inVersionTable = true;
+        classifications.push(rowRisk);
+      }
     }
   }
 
