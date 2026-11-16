@@ -930,6 +930,18 @@ async function processPullRequest(repo, pr) {
     ? await getCheckState(fullName, checkSha, repoName, pathsAvailable ? paths : undefined)
     : 'unconfigured';
   await syncCheckLabels(fullName, pr.number, checkState);
+  if (!dependencyBot && checkState === 'success' && freshVerificationState === 'review' && profile?.reviewHoldLabel) {
+    // The current head's commit-bound domain status is green. A review-hold
+    // label from an older, out-of-order workflow run is stale and can be cleared.
+    const staleVerificationHold = String(profile.reviewHoldLabel).trim().toLowerCase();
+    for (let index = riskReasons.length - 1; index >= 0; index -= 1) {
+      if (riskReasons[index] === staleVerificationHold || riskReasons[index] === 'domain-verification-review') {
+        riskReasons.splice(index, 1);
+      }
+    }
+    await removeLabel(fullName, pr.number, profile.reviewHoldLabel);
+  }
+
   const checkReviewReason = requiredCheckReviewReason(checkState);
   if (checkReviewReason) riskReasons.push(checkReviewReason);
 
