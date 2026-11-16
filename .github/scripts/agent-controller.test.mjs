@@ -15,6 +15,7 @@ import {
   buildEnablePullRequestAutoMergeRequest,
   expandChangedFilePaths,
   getBlockingPullRequestLabels,
+  getControllerOwnedStaleRiskLabels,
   shouldDisableAutoMergeForDeferredState,
   shouldDisableAutoMergeForKnownReviewHold,
   isTransientAutoMergeError,
@@ -128,6 +129,71 @@ test('explicit security and breaking signals in the Dependabot summary still req
   assert.ok(classifyPullRequestLabels(breaking, ['package.json']).includes('breaking'));
   assert.ok(assessPullRequestRisk(security, ['package.json']).requiresHumanReview);
   assert.ok(assessPullRequestRisk(breaking, ['package.json']).requiresHumanReview);
+});
+
+
+test('stale classification labels are removed only when the latest label event belongs to the controller bot', () => {
+  const pullRequest = {
+    labels: [{ name: 'security' }, { name: 'breaking' }, { name: 'major-update' }]
+  };
+  const events = [
+    {
+      id: 1, event: 'labeled', created_at: '2026-11-16T10:00:00Z',
+      label: { name: 'security' }, actor: { login: 'maintainer' }
+    },
+    {
+      id: 2, event: 'labeled', created_at: '2026-11-16T10:01:00Z',
+      label: { name: 'security' }, actor: { login: 'thanhnguyxnagent[bot]' }
+    },
+    {
+      id: 3, event: 'labeled', created_at: '2026-11-16T10:02:00Z',
+      label: { name: 'breaking' }, actor: { login: 'maintainer' }
+    },
+    {
+      id: 4, event: 'labeled', created_at: '2026-11-16T10:03:00Z',
+      label: { name: 'major-update' }, actor: { login: 'other-bot[bot]' }
+    }
+  ];
+
+  assert.deepEqual(
+    getControllerOwnedStaleRiskLabels(pullRequest, [], events),
+    ['security']
+  );
+});
+
+test('stale label cleanup fails closed for unknown provenance, missing history, and a later human veto', () => {
+  const pullRequest = {
+    labels: [{ name: 'security' }, { name: 'breaking' }, { name: 'major-update' }]
+  };
+  const events = [
+    {
+      id: 1, event: 'labeled', created_at: '2026-11-16T10:00:00Z',
+      label: { name: 'security' }, actor: { login: 'thanhnguyxnagent[bot]' }
+    },
+    {
+      id: 2, event: 'labeled', created_at: '2026-11-16T10:01:00Z',
+      label: { name: 'security' }, actor: { login: 'maintainer' }
+    },
+    {
+      id: 3, event: 'unlabeled', created_at: '2026-11-16T10:02:00Z',
+      label: { name: 'breaking' }, actor: { login: 'thanhnguyxnagent[bot]' }
+    }
+  ];
+
+  assert.deepEqual(getControllerOwnedStaleRiskLabels(pullRequest, [], events), []);
+  assert.deepEqual(getControllerOwnedStaleRiskLabels(pullRequest, [], []), []);
+});
+
+test('a risk label still supported by refreshed metadata is never considered stale', () => {
+  const pullRequest = { labels: [{ name: 'security' }, { name: 'breaking' }] };
+  const events = [{
+    id: 1, event: 'labeled', created_at: '2026-11-16T10:00:00Z',
+    label: { name: 'security' }, actor: { login: 'thanhnguyxnagent[bot]' }
+  }];
+  assert.deepEqual(
+    getControllerOwnedStaleRiskLabels(pullRequest, ['security'], events),
+    []
+  );
 });
 
 test('unresolved review threads and changes-requested reviews keep PRs in human review', () => {

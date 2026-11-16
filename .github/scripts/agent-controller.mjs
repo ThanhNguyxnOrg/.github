@@ -540,6 +540,87 @@ export function shouldDisableAutoMergeForKnownReviewHold(pullRequest, riskReason
   return Boolean(pullRequest?.auto_merge && pullRequest?.node_id && Array.isArray(riskReasons) && riskReasons.length > 0);
 }
 
+
+const CONTROLLER_CLASSIFICATION_LABELS = [
+  'security', 'breaking', 'major-update', 'workflow-update', 'release'
+];
+const CONTROLLER_BOT_LOGINS = new Set(['thanhnguyxnagent[bot]']);
+
+export function getControllerOwnedStaleRiskLabels(
+  pullRequest,
+  refreshedClassification = [],
+  labelEvents = [],
+  controllerLogins = [...CONTROLLER_BOT_LOGINS]
+) {
+  const present = names(pullRequest?.labels);
+  const classified = new Set(
+    [...refreshedClassification].map(label => String(label || '').trim().toLowerCase())
+  );
+  const allowedActors = new Set(
+    controllerLogins.map(login => String(login || '').trim().toLowerCase()).filter(Boolean)
+  );
+  const latestByLabel = new Map();
+  const orderedEvents = [...labelEvents].sort((left, right) => {
+    const timeDifference =
+      (Date.parse(left?.created_at || '') || 0) -
+      (Date.parse(right?.created_at || '') || 0);
+    if (timeDifference !== 0) return timeDifference;
+    return (Number(left?.id) || 0) - (Number(right?.id) || 0);
+  });
+
+  for (const event of orderedEvents) {
+    const eventType = String(event?.event || '').toLowerCase();
+    if (eventType !== 'labeled' && eventType !== 'unlabeled') continue;
+    const labelName = String(event?.label?.name || '').trim().toLowerCase();
+    if (!CONTROLLER_CLASSIFICATION_LABELS.includes(labelName)) continue;
+    latestByLabel.set(labelName, {
+      event: eventType,
+      actor: String(event?.actor?.login || '').trim().toLowerCase()
+    });
+  }
+
+  return CONTROLLER_CLASSIFICATION_LABELS.filter(label => {
+    if (!present.has(label) || classified.has(label)) return false;
+    const latest = latestByLabel.get(label);
+    return Boolean(
+      latest &&
+      latest.event === 'labeled' &&
+      allowedActors.has(latest.actor)
+    );
+  });
+}
+
+async function reconcileStaleControllerRiskLabels(fullName, number, pullRequest, refreshedClassification) {
+  const present = names(pullRequest?.labels);
+  const classified = new Set(
+    [...refreshedClassification].map(label => String(label || '').trim().toLowerCase())
+  );
+  const candidates = CONTROLLER_CLASSIFICATION_LABELS.filter(
+    label => present.has(label) && !classified.has(label)
+  );
+  const removed = [];
+
+  // Re-read the label event immediately before each deletion. If the latest actor
+  // is a maintainer, another bot, or cannot be identified, preserve the label.
+  for (const label of candidates) {
+    let events;
+    try {
+      events = await listAll('/repos/' + fullName + '/issues/' + number + '/events');
+    } catch (error) {
+      console.warn('[label-provenance]', fullName + '#' + number + ': preserving ' + label +
+        ' because label history could not be read: ' + error.message);
+      continue;
+    }
+    const owned = getControllerOwnedStaleRiskLabels(
+      { labels: [{ name: label }] }, [], events
+    );
+    if (!owned.includes(label)) continue;
+    await removeLabel(fullName, number, label);
+    removed.push(label);
+  }
+  return removed;
+}
+
 export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredChecks = []) {
   return evaluateRequiredChecks(checkRuns, statuses, requiredChecks).state;
 }
@@ -853,7 +934,6 @@ export async function processPullRequest(repo, pr) {
 
   const autoMergeCandidate = !dependencyBot && isPolicyAutoMergeCandidate(pr, paths, profile);
   let risk = assessPullRequestRisk(pr, paths, policy);
-  const labels = new Set(classifyPullRequestLabels(pr, paths));
   const allowedBaseBranches = policy.allowedBaseBranches || [profile?.defaultBranch || repo.default_branch].filter(Boolean);
   let riskReasons = reconcilePolicyTriageReason(risk.reasons, autoMergeCandidate, profile);
   if (autoMergeCandidate && profile?.autoMerge?.allowSensitivePaths === true) {
@@ -865,20 +945,7 @@ export async function processPullRequest(repo, pr) {
   }
   if (!allowedBaseBranches.includes(pr.base.ref)) riskReasons.push('target-branch-outside-policy');
   if (!pathsAvailable) riskReasons.push('changed-files-unavailable');
-  if (verificationState !== 'pending') {
-    await addLabels(fullName, pr.number, [...labels]);
-  }
-
-  // Reconcile stale risk labels previously created by broad security/version heuristics.
-  // Only reconcile Dependabot PRs; preserve labels on human-authored PRs.
-  if (String(pr.user?.login || '').toLowerCase() === 'dependabot[bot]') {
-    const currentLabels = names(pr.labels);
-    for (const label of ['security', 'breaking', 'major-update', 'workflow-update', 'release']) {
-      if (currentLabels.has(label) && !labels.has(label)) {
-        await removeLabel(fullName, pr.number, label);
-      }
-    }
-  }
+  // Classification labels are synchronized only after a fresh PR snapshot is verified.
 
   let fresh;
   try {
@@ -907,6 +974,24 @@ export async function processPullRequest(repo, pr) {
     }
     console.log('[domain-verification-wait]', fullName + '#' + pr.number + ': repository-specific verification is still pending; any stale native Auto-merge was disabled');
     return;
+  }
+
+  // Apply labels from the refreshed PR metadata, never from the pre-refresh snapshot.
+  const refreshedLabels = new Set(classifyPullRequestLabels(fresh, paths));
+  await addLabels(fullName, pr.number, [...refreshedLabels]);
+
+  // A stale risk label may be removed only when the latest GitHub label event proves
+  // that this controller bot set it. Unknown provenance and human-added labels fail closed.
+  const staleControllerLabels = await reconcileStaleControllerRiskLabels(
+    fullName, pr.number, fresh, refreshedLabels
+  );
+  if (staleControllerLabels.length) {
+    const removed = new Set(staleControllerLabels);
+    fresh.labels = (fresh.labels || []).filter(label =>
+      !removed.has(String(typeof label === 'string' ? label : label.name || '').toLowerCase())
+    );
+    console.log('[labels-reconciled]', fullName + '#' + pr.number +
+      ': removed stale controller-owned labels=' + staleControllerLabels.join(','));
   }
   const freshAutoMergeCandidate = !dependencyBot && isPolicyAutoMergeCandidate(fresh, paths, profile);
   risk = assessPullRequestRisk(fresh, paths, policy);
