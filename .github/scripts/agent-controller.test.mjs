@@ -295,6 +295,26 @@ test('dependency update classification remains SemVer-aware across grouped summa
   assert.equal(unsafeCompoundWildcardGroup.eligible, false);
   assert.equal(unsafeCompoundWildcardGroup.versionRisk, 'unknown');
   assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | 1.x.x | 2.x.x |'),
+    'unknown',
+    'multiple npm x-range components must not be ignored beside a safe prose patch'
+  );
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | 1.*.* | 2.*.* |'),
+    'unknown',
+    'multiple npm wildcard components must remain fail-closed'
+  );
+  const unsafeMultiWildcardGroup = analyzeDependencyUpdate(
+    {
+      title: 'chore(deps): bump grouped dependencies with 2 updates',
+      body: 'Updates foo from 1.2.3 to 1.2.4\n\n| bar | 1.x.x | 2.x.x |',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['package.json']
+  );
+  assert.equal(unsafeMultiWildcardGroup.eligible, false);
+  assert.equal(unsafeMultiWildcardGroup.versionRisk, 'unknown');
+  assert.equal(
     classifyVersionUpdate('Bump foo requirement from ^1.0.0 >=1.2.0 to ^2.0.0 >=1.2.1'),
     'unknown',
     'unsupported npm range operators must not be discarded during extraction'
