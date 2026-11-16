@@ -230,14 +230,14 @@ test('dependency update classification remains SemVer-aware across grouped summa
   assert.equal(unsafeWildcardRange.eligible, false);
   assert.equal(unsafeWildcardRange.versionRisk, 'unknown');
   assert.equal(
-    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\\n\\n| bar | 1.2.* | 2.0.* |'),
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | 1.2.* | 2.0.* |'),
     'unknown',
     'wildcard-only headerless table rows must not be ignored behind a safe prose patch'
   );
   const unsafeMixedWildcardGroup = analyzeDependencyUpdate(
     {
       title: 'chore(deps): bump grouped dependencies with 2 updates',
-      body: 'Updates foo from 1.2.3 to 1.2.4\\n\\n| bar | 1.2.* | 2.0.* |',
+      body: 'Updates foo from 1.2.3 to 1.2.4\n\n| bar | 1.2.* | 2.0.* |',
       user: { login: 'dependabot[bot]' }
     },
     ['package.json']
