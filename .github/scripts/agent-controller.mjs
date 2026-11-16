@@ -177,31 +177,41 @@ function parseVersionCore(value, allowBuildMetadata = false) {
   return parts;
 }
 
-function extractVersionSpecifiers(value) {
-  let text = String(value || '')
-    .replace(/`/g, '')
-    // Strip paired Markdown emphasis only; preserve wildcard range markers and underscores.
-    .replace(/(\*\*|__|\*|_)([^*_]+?)\1/g, '$2')
-    .trim();
-  // Remove trailing sentence punctuation without erasing a terminal npm wildcard.
-  if (text.endsWith('.') && !text.endsWith('.*')) text = text.slice(0, -1);
-  // PEP 440 epochs must never be partially consumed as a numeric prefix.
-  if (/\b\d+!/.test(text)) return null;
+function stripMarkdownVersionEmphasis(value) {
+  let text = String(value || '').trim();
+  // Strip only a wrapper around the complete version token, never an internal wildcard.
+  for (const marker of ['**', '__', '*', '_']) {
+    if (text.startsWith(marker) && text.endsWith(marker) && text.length > marker.length * 2) {
+      return text.slice(marker.length, -marker.length);
+    }
+  }
+  return text;
+}
 
-  // Parse the ENTIRE supported expression. Extracting only the comparator
-  // fragments is unsafe for npm ranges such as "^1.0.0 >=1.2.0" or "1 || 2":
-  // ignored operators can change the effective range dramatically. This
-  // intentionally supports simple versions and comma-separated PEP 440
-  // comparators only; unknown ecosystem syntax fails closed.
-  const tokenPattern = /^(===|==|~=|>=|<=|!=|>|<)?\s*[vV]?(\d+(?:\.\d+){0,2}(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\+[0-9A-Za-z.-]+)?)$/;
+function extractVersionSpecifiers(value) {
+  const text = String(value || '').replace(/`/g, '').trim();
+  // PEP 440 epochs must never be partially consumed as a numeric prefix.
+  if (/\\b\\d+!/.test(text)) return null;
+
+  // Parse every comma-separated comparator completely. Unsupported npm range
+  // operators and wildcard tokens must fail closed instead of being stripped.
+  const comparatorPattern = /^(===|==|~=|>=|<=|!=|>|<)?\\s*/;
+  const versionPattern = /^[vV]?(\\d+(?:\\.\\d+){0,2}(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\\+[0-9A-Za-z.-]+)?)$/;
   const rawParts = text.split(',');
   if (!rawParts.length) return null;
 
   const matches = [];
   for (const rawPart of rawParts) {
-    const match = rawPart.trim().match(tokenPattern);
-    if (!match) return null;
-    matches.push({ operator: match[1] || '', version: match[2] });
+    const part = rawPart.trim();
+    const prefix = part.match(comparatorPattern);
+    const operator = prefix?.[1] || '';
+    let version = part.slice(prefix?.[0].length || 0).trim();
+    version = stripMarkdownVersionEmphasis(version);
+    // Remove sentence punctuation, but leave a terminal X-range wildcard intact.
+    if (version.endsWith('.') && !version.endsWith('.*')) version = version.slice(0, -1);
+    const versionMatch = version.match(versionPattern);
+    if (!versionMatch) return null;
+    matches.push({ operator, version: versionMatch[1] || versionMatch[0] });
   }
   return matches.length ? matches : null;
 }
