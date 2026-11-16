@@ -302,10 +302,14 @@ export function classifyVersionUpdate(value) {
     /^(?:unknown|latest|unavailable|not\s+available|n\/?a|undefined|null)$/i.test(
       String(value || '').replace(/[\x60*_]/g, '').trim()
     );
-  const isWildcardVersionRange = value =>
-    /^(?:(?:===|==|~=|>=|<=|!=|>|<)\s*)?[vV]?\d+(?:\.\d+)*\.\*$/i.test(
-      String(value || '').replace(/`/g, '').trim()
+  const isWildcardVersionRange = value => {
+    const normalized = stripMarkdownVersionEmphasis(
+      String(value || '').replace(new RegExp(String.fromCharCode(96), 'g'), '').trim()
     );
+    // npm X-ranges include *, x, 1.x, 1.*, and 1.2.x forms.
+    return /^(?:(?:\^|~|===|==|~=|>=|<=|!=|>|<)\s*)?(?:[vV]?(?:\d+|[xX*])(?:\.(?:\d+|[xX*]))*|[xX*])$/i.test(normalized) &&
+      /[xX*]/.test(normalized);
+  };
 
   for (let lineIndex = 0; lineIndex < lines.length;) {
     if (!lines[lineIndex].includes('|')) {
