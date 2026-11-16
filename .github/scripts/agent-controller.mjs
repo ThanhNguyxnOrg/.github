@@ -491,6 +491,12 @@ export function isPolicyAutoMergeCandidate(pullRequest, changedFiles = [], profi
     isPolicyAutoMergeScope(pullRequest, changedFiles, profile));
 }
 
+export function reconcilePolicyTriageReason(reasons = [], authorizedCandidate = false, profile = {}) {
+  const next = [...reasons];
+  if (!authorizedCandidate || profile?.autoMerge?.allowTriageBypass !== true) return next;
+  return next.filter(reason => reason !== 'triage-needed');
+}
+
 export function expandChangedFilePaths(files = []) {
   return files.flatMap(file =>
     [file?.filename, file?.previous_filename]
@@ -838,11 +844,7 @@ async function processPullRequest(repo, pr) {
   const risk = assessPullRequestRisk(pr, paths, policy);
   const labels = new Set(classifyPullRequestLabels(pr, paths));
   const allowedBaseBranches = policy.allowedBaseBranches || [profile?.defaultBranch || repo.default_branch].filter(Boolean);
-  const riskReasons = [...risk.reasons];
-  if (autoMergeCandidate && profile?.autoMerge?.allowTriageBypass === true) {
-    const triageIndex = riskReasons.indexOf('triage-needed');
-    if (triageIndex >= 0) riskReasons.splice(triageIndex, 1);
-  }
+  const riskReasons = reconcilePolicyTriageReason(risk.reasons, autoMergeCandidate, profile);
   if (autoMergeCandidate && profile?.autoMerge?.allowSensitivePaths === true) {
     const sensitiveIndex = riskReasons.indexOf('sensitive-path');
     if (sensitiveIndex >= 0) riskReasons.splice(sensitiveIndex, 1);
@@ -899,10 +901,8 @@ async function processPullRequest(repo, pr) {
     riskReasons.push('domain-verification-review');
   }
   const freshAutoMergeCandidate = !dependencyBot && isPolicyAutoMergeCandidate(fresh, paths, profile);
-  if (freshAutoMergeCandidate && profile?.autoMerge?.allowTriageBypass === true) {
-    const triageIndex = riskReasons.indexOf('triage-needed');
-    if (triageIndex >= 0) riskReasons.splice(triageIndex, 1);
-  }
+  const reconciledFreshReasons = reconcilePolicyTriageReason(riskReasons, freshAutoMergeCandidate, profile);
+  riskReasons.splice(0, riskReasons.length, ...reconciledFreshReasons);
   if (!dependencyBot && autoMergeCandidate && !freshAutoMergeCandidate &&
       profile?.autoMerge?.allowTriageBypass === true &&
       !riskReasons.includes('triage-needed')) {
