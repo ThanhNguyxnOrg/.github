@@ -442,21 +442,9 @@ export function isAutoMergeCheckReady(state) {
   return state === 'success';
 }
 
-export function domainVerificationState(pullRequest, profile = {}) {
-  const labels = names(pullRequest?.labels);
-  const pendingLabel = String(profile.pendingLabel || '').trim().toLowerCase();
-  const reviewHoldLabel = String(profile.reviewHoldLabel || '').trim().toLowerCase();
-  if (pendingLabel && labels.has(pendingLabel)) return 'pending';
-  if (reviewHoldLabel && labels.has(reviewHoldLabel)) return 'review';
-  return 'ready';
-}
-
-export function isPolicyAutoMergeCandidate(pullRequest, changedFiles = [], profile = {}) {
+export function isPolicyAutoMergeScope(pullRequest, changedFiles = [], profile = {}) {
   const rule = profile?.autoMerge;
   if (!rule || typeof rule !== 'object') return false;
-
-  const requiredLabel = String(rule.label || '').trim().toLowerCase();
-  if (!requiredLabel || !names(pullRequest?.labels).has(requiredLabel)) return false;
 
   const author = String(pullRequest?.user?.login || '').toLowerCase();
   if (rule.author && author !== String(rule.author).trim().toLowerCase()) return false;
@@ -475,6 +463,31 @@ export function isPolicyAutoMergeCandidate(pullRequest, changedFiles = [], profi
   return changedFiles.every(path =>
     allowedPaths.some(pattern => matchesPathPattern(path, pattern))
   );
+}
+
+export function domainVerificationState(pullRequest, profile = {}, changedFiles = undefined) {
+  const labels = names(pullRequest?.labels);
+  const pendingLabel = String(profile.pendingLabel || '').trim().toLowerCase();
+  const reviewHoldLabel = String(profile.reviewHoldLabel || '').trim().toLowerCase();
+  if (pendingLabel && labels.has(pendingLabel)) return 'pending';
+  if (reviewHoldLabel && labels.has(reviewHoldLabel)) return 'review';
+
+  const rule = profile?.autoMerge;
+  const optInLabel = String(rule?.label || '').trim().toLowerCase();
+  if (rule?.deferUntilHandoff === true &&
+      optInLabel && !labels.has(optInLabel) &&
+      isPolicyAutoMergeScope(pullRequest, changedFiles, profile)) {
+    return 'pending';
+  }
+  return 'ready';
+}
+
+export function isPolicyAutoMergeCandidate(pullRequest, changedFiles = [], profile = {}) {
+  const rule = profile?.autoMerge;
+  const requiredLabel = String(rule?.label || '').trim().toLowerCase();
+  return Boolean(requiredLabel &&
+    names(pullRequest?.labels).has(requiredLabel) &&
+    isPolicyAutoMergeScope(pullRequest, changedFiles, profile));
 }
 
 export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredChecks = []) {
@@ -794,6 +807,12 @@ async function processPullRequest(repo, pr) {
     console.warn('[files]', fullName + '#' + pr.number, error.message);
   }
 
+  const verificationState = domainVerificationState(pr, profile, paths);
+  if (verificationState === 'pending') {
+    console.log('[domain-verification-wait]', fullName + '#' + pr.number + ': waiting for explicit repository-specific verification handoff');
+    return;
+  }
+
   const autoMergeCandidate = !dependencyBot && isPolicyAutoMergeCandidate(pr, paths, profile);
   const risk = assessPullRequestRisk(pr, paths, policy);
   const labels = new Set(classifyPullRequestLabels(pr, paths));
@@ -807,7 +826,7 @@ async function processPullRequest(repo, pr) {
     const sensitiveIndex = riskReasons.indexOf('sensitive-path');
     if (sensitiveIndex >= 0) riskReasons.splice(sensitiveIndex, 1);
   }
-  if (domainVerificationState(pr, profile) === 'review') {
+  if (verificationState === 'review') {
     riskReasons.push('domain-verification-review');
   }
   if (!allowedBaseBranches.includes(pr.base.ref)) riskReasons.push('target-branch-outside-policy');
@@ -836,7 +855,7 @@ async function processPullRequest(repo, pr) {
     console.log('[defer]', fullName + '#' + pr.number + ': PR head changed during evaluation; retrying next poll');
     return;
   }
-  const freshVerificationState = domainVerificationState(fresh, profile);
+  const freshVerificationState = domainVerificationState(fresh, profile, paths);
   if (freshVerificationState === 'pending') {
     console.log('[domain-verification-wait]', fullName + '#' + pr.number + ': repository-specific verification is still pending');
     return;
