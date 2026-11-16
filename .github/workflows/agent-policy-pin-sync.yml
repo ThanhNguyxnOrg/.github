@@ -18,7 +18,7 @@ on:
 permissions:
   contents: write
   actions: write
-    workflows: write
+  workflows: write
 
 concurrency:
   group: thanhnguyxnagent-policy-pin-sync
