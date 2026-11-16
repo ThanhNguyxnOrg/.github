@@ -254,6 +254,11 @@ test('dependency update classification remains SemVer-aware across grouped summa
     'unknown',
     'Markdown-emphasized npm wildcard endpoints must remain fail-closed'
   );
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | =1.x | =2.x |'),
+    'unknown',
+    'equality-prefixed npm X-ranges in grouped tables must fail closed'
+  );
   const unsafeXRangeGroup = analyzeDependencyUpdate(
     {
       title: 'chore(deps): bump grouped dependencies with 2 updates',
