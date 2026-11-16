@@ -105,7 +105,7 @@ export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
   const riskBody = dependencyBot ? dependencySummary(pullRequest) : body;
   const riskText = dependencyBot ? dependencySummary(pullRequest) : text;
   const plainText = riskText.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
-  if (/^(?:feat|feature|fix|refactor)(?:\([^)]*\))?!:/i.test(title) ||
+  if (/^[a-z][a-z0-9-]*(?:\([^)]*\))?!:/i.test(title) ||
       /\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)/i.test(plainText)) {
     labels.add('breaking');
   }
