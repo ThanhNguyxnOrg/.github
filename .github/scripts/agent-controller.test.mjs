@@ -21,7 +21,8 @@ import {
   isDependencyManifestPath,
   pullRequestCheckSha,
   resolvePullRequestEvent,
-  matchesPullRequestEvent
+  matchesPullRequestEvent,
+  processPullRequest
 } from './agent-controller.mjs';
 
 test('dependency labels stay descriptive and do not themselves force review', () => {
@@ -744,4 +745,77 @@ test('event routing skips closed PRs and stale or mismatched head metadata', () 
   assert.equal(matchesPullRequestEvent({ ...current, head: { ...current.head, sha: 'b'.repeat(40) } }, target), false);
   assert.equal(matchesPullRequestEvent({ ...current, head: { ...current.head, repo: { full_name: 'attacker/other-repo' } } }, target), false);
   assert.equal(matchesPullRequestEvent({ state: 'open', head: { sha: 'a'.repeat(40), repo: null } }, target), false);
+});
+
+test('processPullRequest disables native Auto-merge for a review hold when mergeability is unknown', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.GH_TOKEN;
+  const requests = [];
+  process.env.GH_TOKEN = 'test-agent-token';
+
+  const headSha = 'a'.repeat(40);
+  const pullRequest = {
+    number: 4321,
+    node_id: 'PR_kwDOTest123',
+    state: 'open',
+    draft: false,
+    title: 'Update skill definition',
+    body: '',
+    user: { login: 'contributor' },
+    labels: [{ name: 'skill-verification-review' }],
+    head: {
+      sha: headSha,
+      ref: 'contrib-test-skill',
+      repo: { full_name: 'ThanhNguyxnOrg/SkillGauge' }
+    },
+    base: {
+      ref: 'main',
+      repo: { full_name: 'ThanhNguyxnOrg/SkillGauge' }
+    },
+    mergeable: null,
+    mergeable_state: 'unknown',
+    auto_merge: { enabled_at: '2026-11-16T00:00:00Z' }
+  };
+
+  globalThis.fetch = async (url, options = {}) => {
+    const parsedUrl = new URL(url);
+    const requestPath = parsedUrl.pathname + parsedUrl.search;
+    const requestBody = options.body ? JSON.parse(options.body) : null;
+    requests.push({ path: requestPath, method: options.method || 'GET', body: requestBody });
+
+    if (requestPath.includes('/pulls/4321/files')) {
+      return new Response(JSON.stringify([
+        { filename: 'skills/example/SKILL.md', status: 'modified' }
+      ]), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (requestPath === '/repos/ThanhNguyxnOrg/SkillGauge/pulls/4321') {
+      return new Response(JSON.stringify(pullRequest), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (requestPath === '/graphql' && options.method === 'POST') {
+      return new Response(JSON.stringify({
+        data: { disablePullRequestAutoMerge: { pullRequest: { number: 4321 } } }
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return new Response('', { status: 200 });
+  };
+
+  try {
+    await processPullRequest(
+      { name: 'SkillGauge', full_name: 'ThanhNguyxnOrg/SkillGauge', default_branch: 'main' },
+      pullRequest
+    );
+
+    const disableRequest = requests.find(request =>
+      request.path === '/graphql' &&
+      request.method === 'POST' &&
+      request.body?.query?.includes('disablePullRequestAutoMerge')
+    );
+    assert.ok(disableRequest, 'controller must cancel native Auto-merge before deferring unknown mergeability');
+    assert.equal(disableRequest.body.variables.pullRequestId, 'PR_kwDOTest123');
+    assert.equal(requests.some(request => request.body?.query?.includes('enablePullRequestAutoMerge')), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.GH_TOKEN;
+    else process.env.GH_TOKEN = originalToken;
+  }
 });
