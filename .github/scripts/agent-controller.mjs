@@ -303,7 +303,7 @@ export function classifyVersionUpdate(value) {
       String(value || '').replace(/[\x60*_]/g, '').trim()
     );
   const isWildcardVersionRange = value =>
-    /^(?:(?:===|==|~=|>=|<=|!=|>|<)\\s*)?[vV]?\\d+(?:\\.\\d+)*\\.\\*$/i.test(
+    /^(?:(?:===|==|~=|>=|<=|!=|>|<)\s*)?[vV]?\d+(?:\.\d+)*\.\*$/i.test(
       String(value || '').replace(/`/g, '').trim()
     );
 
