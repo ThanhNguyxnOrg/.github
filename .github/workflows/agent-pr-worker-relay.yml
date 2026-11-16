@@ -118,11 +118,11 @@ jobs:
       group: agent-pr-events-${{ github.event.workflow_run.repository.full_name }}
       cancel-in-progress: false
       queue: max
-    uses: ThanhNguyxnOrg/.github/.github/workflows/agent-pr-worker.yml@f87286f907f22db3bd8b0038c49433fb4073bf8e
+    uses: ThanhNguyxnOrg/.github/.github/workflows/agent-pr-worker.yml@2556239955a8cf28b964855251d1019db758d3dd
     with:
       repository_owner: ${{ github.event.workflow_run.repository.owner.login }}
       repository_name: ${{ github.event.workflow_run.repository.name }}
       workflow_run_id: ${{ github.event.workflow_run.id }}
-      policy_ref: f87286f907f22db3bd8b0038c49433fb4073bf8e
+      policy_ref: 2556239955a8cf28b964855251d1019db758d3dd
     secrets:
       BOT_PRIVATE_KEY: ${{ secrets.BOT_PRIVATE_KEY }}
