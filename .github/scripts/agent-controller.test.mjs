@@ -11,6 +11,7 @@ import {
   isAutoMergeCheckReady,
   domainVerificationState,
   isPolicyAutoMergeCandidate,
+  reconcilePolicyTriageReason,
   expandChangedFilePaths,
   getBlockingPullRequestLabels,
   shouldDisableAutoMergeForDeferredState,
@@ -527,6 +528,13 @@ test('manual maintainer blocking labels veto policy-authorized auto-merge candid
   assert.deepEqual(getBlockingPullRequestLabels(pr, ['needs-review', 'security', 'breaking']), ['security', 'breaking']);
   assert.deepEqual(getBlockingPullRequestLabels({ labels: [{ name: 'automerge' }] }, ['needs-review', 'security']), []);
   assert.deepEqual(getBlockingPullRequestLabels({ labels: [{ name: 'needs-review' }] }, ['needs-review']), []);
+});
+
+test('freshly added policy opt-in clears the earlier triage-needed reason', () => {
+  const profile = { autoMerge: { allowTriageBypass: true } };
+  assert.deepEqual(reconcilePolicyTriageReason(['triage-needed'], true, profile), []);
+  assert.deepEqual(reconcilePolicyTriageReason(['triage-needed'], false, profile), ['triage-needed']);
+  assert.deepEqual(reconcilePolicyTriageReason(['triage-needed'], true, { autoMerge: { allowTriageBypass: false } }), ['triage-needed']);
 });
 
 test('repository-authorized auto-merge requires the explicit label, allowed branch, same-repo head and only allowed paths', () => {
