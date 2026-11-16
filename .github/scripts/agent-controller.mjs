@@ -179,14 +179,24 @@ function parseVersionCore(value, allowBuildMetadata = false) {
 
 function extractVersionSpecifiers(value) {
   const text = String(value || '').replace(/[\x60*_]/g, '').trim();
-  // Reject PEP 440 epochs before the regex can mistake the epoch prefix
-  // for a complete release token.
+  // PEP 440 epochs must never be partially consumed as a numeric prefix.
   if (/\b\d+!/.test(text)) return null;
-  const pattern = /(?:^|[\s,])\s*(===|==|~=|>=|<=|!=|>|<)?\s*[vV]?(\d+(?:\.\d+){0,2}(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\+[0-9A-Za-z.-]+)?)/g;
-  const matches = [...text.matchAll(pattern)].map(match => ({
-    operator: match[1] || '',
-    version: match[2]
-  }));
+
+  // Parse the ENTIRE supported expression. Extracting only the comparator
+  // fragments is unsafe for npm ranges such as "^1.0.0 >=1.2.0" or "1 || 2":
+  // ignored operators can change the effective range dramatically. This
+  // intentionally supports simple versions and comma-separated PEP 440
+  // comparators only; unknown ecosystem syntax fails closed.
+  const tokenPattern = /^(===|==|~=|>=|<=|!=|>|<)?\s*[vV]?(\d+(?:\.\d+){0,2}(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\+[0-9A-Za-z.-]+)?)$/;
+  const rawParts = text.split(',');
+  if (!rawParts.length) return null;
+
+  const matches = [];
+  for (const rawPart of rawParts) {
+    const match = rawPart.trim().match(tokenPattern);
+    if (!match) return null;
+    matches.push({ operator: match[1] || '', version: match[2] });
+  }
   return matches.length ? matches : null;
 }
 
@@ -247,7 +257,14 @@ export function classifyVersionUpdate(value) {
   const fromToPattern = /\bfrom\s+(.+?)\s+to\s+(.+?)(?=\s+\b(?:in|for|with|which|that)\b|[\r\n]|$)/gi;
   // Version-pair prose is parsed separately from Markdown tables; otherwise
   // the table header "From | To" can look like a malformed dependency pair.
-  const proseText = text.split(/\r?\n/).filter(line => !line.includes('|')).join('\n');
+  const proseText = text.split(/\r?\n/).filter(line => {
+    const trimmed = line.trim();
+    // Markdown table rows have multiple cell separators. Do not discard npm
+    // range alternatives ("||") in ordinary prose; their unsupported syntax
+    // must reach extractVersionSpecifiers and become unknown.
+    return !(trimmed.includes('|') && !trimmed.includes('||') &&
+      (trimmed.startsWith('|') && trimmed.endsWith('|') || trimmed.split('|').length >= 3));
+  }).join('\n');
   for (const match of proseText.matchAll(fromToPattern)) {
     classifications.push(
       classifySpecifierPair(match[1], match[2], allowCargoBuildMetadata)
