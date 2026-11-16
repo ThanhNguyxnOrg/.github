@@ -907,8 +907,6 @@ async function processPullRequest(repo, pr) {
   for (const label of getBlockingPullRequestLabels(fresh)) {
     if (!riskReasons.includes(label)) riskReasons.push(label);
   }
-  const uniqueReasons = [...new Set(riskReasons)];
-
   if (fresh.mergeable === false || fresh.mergeable_state === 'dirty') {
     riskReasons.push('merge-conflict');
     await addLabels(fullName, pr.number, ['merge-conflict']);
@@ -942,6 +940,18 @@ async function processPullRequest(repo, pr) {
     await removeLabel(fullName, pr.number, profile.reviewHoldLabel);
   }
 
+  if (!dependencyBot && checkState === 'success' && freshVerificationState === 'review' && profile?.reviewHoldLabel) {
+    // The current head's commit-bound domain status is green. Any remaining
+    // review-hold label is from an older/out-of-order verification attempt.
+    const staleVerificationHold = String(profile.reviewHoldLabel).trim().toLowerCase();
+    for (let index = riskReasons.length - 1; index >= 0; index -= 1) {
+      if (riskReasons[index] === staleVerificationHold || riskReasons[index] === 'domain-verification-review') {
+        riskReasons.splice(index, 1);
+      }
+    }
+    await removeLabel(fullName, pr.number, profile.reviewHoldLabel);
+  }
+
   const checkReviewReason = requiredCheckReviewReason(checkState);
   if (checkReviewReason) riskReasons.push(checkReviewReason);
 
@@ -958,6 +968,8 @@ async function processPullRequest(repo, pr) {
     }
   }
 
+
+  const uniqueReasons = [...new Set(riskReasons)];
 
   if (uniqueReasons.length) {
     await addLabels(fullName, pr.number, ['needs-review']);
