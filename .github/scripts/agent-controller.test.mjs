@@ -424,14 +424,29 @@ test('Auto-merge is not admitted until every required check is successful', () =
   assert.equal(isAutoMergeCheckReady('success'), true);
 });
 
-test('domain verification labels defer SkillGauge PRs and preserve explicit review holds', () => {
+test('domain verification defers before handoff, preserves review holds, and recognizes completed handoff', () => {
   const profile = {
     pendingLabel: 'skill-verification-pending',
-    reviewHoldLabel: 'skill-verification-review'
+    reviewHoldLabel: 'skill-verification-review',
+    autoMerge: {
+      label: 'automerge',
+      branchPrefix: 'contrib-',
+      sameRepository: true,
+      paths: ['skills/**/*.md'],
+      deferUntilHandoff: true
+    }
+  };
+  const repository = 'ThanhNguyxnOrg/SkillGauge';
+  const scopedPr = {
+    labels: [],
+    head: { ref: 'contrib-add-skill', repo: { full_name: repository } },
+    base: { repo: { full_name: repository } }
   };
   assert.equal(domainVerificationState({ labels: [{ name: 'skill-verification-pending' }] }, profile), 'pending');
   assert.equal(domainVerificationState({ labels: [{ name: 'skill-verification-review' }] }, profile), 'review');
-  assert.equal(domainVerificationState({ labels: [] }, profile), 'ready');
+  assert.equal(domainVerificationState(scopedPr, profile, ['skills/new-skill.md']), 'pending');
+  assert.equal(domainVerificationState({ ...scopedPr, labels: [{ name: 'automerge' }] }, profile, ['skills/new-skill.md']), 'ready');
+  assert.equal(domainVerificationState(scopedPr, profile, ['README.md']), 'ready');
 });
 
 test('repository-authorized auto-merge requires the explicit label, allowed branch, same-repo head and only allowed paths', () => {
