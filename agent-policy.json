@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "organization": "ThanhNguyxnOrg",
-  "pollIntervalMinutes": 360,
+  "pollIntervalMinutes": 60,
   "reviewers": [
     "RealThanhNguyxn"
   ],
@@ -101,6 +101,10 @@
     "automergeBlocked": {
       "color": "FBCA04",
       "description": "Low-risk update could not be queued for Auto-merge because repository settings or merge methods block it."
+    },
+    "automergePending": {
+      "color": "DDEBF7",
+      "description": "Low-risk Dependabot update is eligible for Auto-merge but GitHub is still finalizing mergeability or Auto-merge admission; automatically retried during hourly reconciliation."
     }
   },
   "blockingLabels": [
@@ -172,7 +176,8 @@
       "workflow-update",
       "wip",
       "pinned",
-      "skill-verification-pending"
+      "skill-verification-pending",
+      "automerge-pending"
     ],
     "activityTimestampToleranceMinutes": 5
   },

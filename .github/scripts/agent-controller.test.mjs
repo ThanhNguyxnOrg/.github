@@ -6,6 +6,7 @@ import {
   assessPullRequestRisk,
   assessReviewFeedback,
   classifyVersionUpdate,
+  requiredCheckReviewReason,
   isTransientAutoMergeError,
   evaluateCheckRollup,
   isDependencyManifestPath,
@@ -71,7 +72,7 @@ test('Dependabot release-note history does not create false security or breaking
       '<summary>Release notes</summary>',
       'This historical release text mentions security fixes, vulnerabilities, CVE-2026-93749, and breaking changes.',
       '</details>'
-    ].join('\\n'),
+    ].join('\n'),
     user: { login: 'dependabot[bot]' }
   };
   const files = ['package.json', 'package-lock.json'];
@@ -165,6 +166,85 @@ test('dependency update classification remains SemVer-aware across grouped summa
   assert.equal(classifyVersionUpdate('| Package | From | To |\n| [foo](https://example.com) | \x601.0.0\x60 | \x602.0.0\x60 |'), 'major');
   assert.equal(classifyVersionUpdate('| Package | From | To |\n| foo | \x602.0.0\x60 | \x601.9.0\x60 |'), 'downgrade');
   assert.equal(classifyVersionUpdate('Update dependencies'), 'unknown');
+  assert.equal(
+    classifyVersionUpdate('chore(deps-dev): update ruff requirement from <1.0,>=0.17.4 to >=0.17.5,<1.0 in /requirements'),
+    'patch'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump package requirement from >=1.2.0,<2.0.0 to >=1.2.1,<3.0.0'),
+    'unknown',
+    'changing more than one constraint bound must not be treated as a patch'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump package requirement from >=1.2.0,<2.0.0 to >=1.2.1,<2.0.0'),
+    'patch',
+    'a single lower-bound update with an unchanged upper bound can be classified'
+  );
+  assert.equal(
+    classifyVersionUpdate('deps(cargo): bump toml from 1.2.0+spec-1.1.0 to 1.2.1+spec-1.1.0 in /src-tauri'),
+    'patch'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump Python package from 1.2.0+local.1 to 1.2.1+local.1'),
+    'unknown',
+    'PEP 440 local versions must not be treated as Cargo build metadata'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump Python package from 1!9.0 to 1.1.0'),
+    'unknown',
+    'PEP 440 epoch prefixes must not be partially parsed as ordinary releases'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump foo requirement from ^1.0.0 >=1.2.0 to ^2.0.0 >=1.2.1'),
+    'unknown',
+    'unsupported npm range operators must not be discarded during extraction'
+  );
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\nUpdates bar from 1.0.0 to 2.0.0 || 3.0.0'),
+    'unknown',
+    'npm range alternatives in prose must not be removed as Markdown table syntax'
+  );
+  const unsafeNpmRange = analyzeDependencyUpdate(
+    {
+      title: 'chore(deps): update foo requirement',
+      body: 'Updates foo requirement from ^1.0.0 >=1.2.0 to ^2.0.0 >=1.2.1',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['package.json']
+  );
+  assert.equal(unsafeNpmRange.eligible, false);
+  assert.equal(unsafeNpmRange.versionRisk, 'unknown');
+  assert.equal(
+    classifyVersionUpdate('| foo | 1.2.3 | 1.2.4 |\n| bar | unknown | latest |'),
+    'unknown',
+    'unparseable rows in a grouped version table must not be dropped'
+  );
+  assert.equal(
+    classifyVersionUpdate('| foo | unknown | latest |\n| bar | 1.2.3 | 1.2.4 |'),
+    'unknown',
+    'an unparseable first row in a headerless grouped version table must fail closed'
+  );
+  const unsafeHeaderlessGroup = analyzeDependencyUpdate(
+    {
+      title: 'build(deps): bump grouped group with 2 updates',
+      body: '| foo | unknown | latest |\n| bar | 1.2.3 | 1.2.4 |',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['package-lock.json']
+  );
+  assert.equal(unsafeHeaderlessGroup.eligible, false);
+  assert.equal(unsafeHeaderlessGroup.versionRisk, 'unknown');
+  assert.equal(
+    classifyVersionUpdate('Bump package from 1.2.3-rc.1 to 1.2.3'),
+    'unknown',
+    'prerelease transitions must fail closed until their ecosystem-specific ordering is parsed'
+  );
+  assert.equal(classifyVersionUpdate('Bump golang.org/x/crypto from 0.58.0 to 0.59.0'), 'major');
+  assert.equal(
+    classifyVersionUpdate('Bump foo from 1.2.3 to 1.2.4\nBump bar from 2.0.0 to latest'),
+    'unknown',
+    'unparseable members of a grouped update must fail closed'
+  );
 });
 test('grouped Dependabot summaries classify documented breaking changes', () => {
   const labels = classifyPullRequestLabels(
@@ -197,6 +277,15 @@ test('check rollup requires evidence and rejects failed or incomplete checks', (
   assert.equal(evaluateCheckRollup([{ name: 'tests', status: 'completed', conclusion: 'failure' }], {}, ['tests']), 'failure');
   assert.equal(evaluateCheckRollup([{ name: 'tests', status: 'completed', conclusion: 'success' }], {}, ['tests']), 'success');
   assert.equal(evaluateCheckRollup([], {}, []), 'unconfigured');
+});
+
+test('required check failures, missing gates and non-applicable profiles route to human review', () => {
+  assert.equal(requiredCheckReviewReason('failure'), 'required-checks-failure');
+  assert.equal(requiredCheckReviewReason('missing'), 'required-checks-missing');
+  assert.equal(requiredCheckReviewReason('unconfigured'), 'required-checks-unconfigured');
+  assert.equal(requiredCheckReviewReason('not-applicable'), 'required-checks-not-applicable');
+  assert.equal(requiredCheckReviewReason('pending'), null);
+  assert.equal(requiredCheckReviewReason('success'), null);
 });
 
 test('PR checks prefer the head SHA and fall back to the synthetic merge SHA', () => {
