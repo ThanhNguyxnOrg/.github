@@ -127,8 +127,8 @@ jobs:
 
       - name: Create a single-repository settings token for Allow auto-merge
         id: repo-settings
-        # This token is scoped to one matrix repository and is used only to set allow_auto_merge.
-        # The step is soft-failed until the App's Administration: write permission is approved.
+        # Keep onboarding running so it can report per-repository settings failures in one summary.
+        # agent-onboard.mjs fails the job if this token is missing or settings synchronization is skipped.
         continue-on-error: true
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         with:
