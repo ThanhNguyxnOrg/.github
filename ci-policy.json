@@ -199,7 +199,14 @@
             "skills/**/*.md"
           ]
         },
-        "verify / Verify (SkillGauge)"
+        "verify / Verify (SkillGauge)",
+        {
+          "name": "skillgauge/verification",
+          "kind": "status",
+          "paths": [
+            "skills/**/*.md"
+          ]
+        }
       ],
       "reviewHoldLabel": "skill-verification-review",
       "autoMerge": {
