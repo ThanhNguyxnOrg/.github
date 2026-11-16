@@ -130,8 +130,8 @@ test('the central .github repository uses a self-hosted PR signal and relay with
   assert.match(worker, /ThanhNguyxnAgent PR Event Worker/);
 });
 
-test('stale controller uses the organization App ID variable rather than a secret', () => {
+test('stale controller uses the numeric organization App ID through app-id, not client-id', () => {
   const workflow = read('.github/workflows/stale.yml');
-  assert.match(workflow, /client-id:\s*\$\{\{\s*vars\.BOT_APP_ID\s*\}\}/);
-  assert.doesNotMatch(workflow, /client-id:\s*\$\{\{\s*secrets\.BOT_APP_ID\s*\}\}/);
-});
+  assert.match(workflow, /app-id:\s*\$\{\{\s*vars\.BOT_APP_ID\s*\}\}/);
+  assert.doesNotMatch(workflow, /client-id:\s*\$\{\{\s*vars\.BOT_APP_ID\s*\}\}/);
+});;
