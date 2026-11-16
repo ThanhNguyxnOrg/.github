@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { getRepositoryProfile } from './check-policy.mjs';
 import {
   classifyPullRequestLabels,
   analyzeDependencyUpdate,
@@ -7,12 +8,22 @@ import {
   assessReviewFeedback,
   classifyVersionUpdate,
   requiredCheckReviewReason,
+  isAutoMergeCheckReady,
+  domainVerificationState,
+  isPolicyAutoMergeCandidate,
+  reconcilePolicyTriageReason,
+  buildEnablePullRequestAutoMergeRequest,
+  expandChangedFilePaths,
+  getBlockingPullRequestLabels,
+  shouldDisableAutoMergeForDeferredState,
+  shouldDisableAutoMergeForKnownReviewHold,
   isTransientAutoMergeError,
   evaluateCheckRollup,
   isDependencyManifestPath,
   pullRequestCheckSha,
   resolvePullRequestEvent,
-  matchesPullRequestEvent
+  matchesPullRequestEvent,
+  processPullRequest
 } from './agent-controller.mjs';
 
 test('dependency labels stay descriptive and do not themselves force review', () => {
@@ -23,6 +34,20 @@ test('dependency labels stay descriptive and do not themselves force review', ()
   assert.ok(labels.includes('automated'));
   assert.ok(labels.includes('dependencies'));
   assert.ok(!labels.includes('needs-review'));
+});
+
+test('explicit breaking changes in human PR titles or bodies require the breaking label', () => {
+  const base = { user: { login: 'contributor' } };
+  assert.ok(classifyPullRequestLabels({
+    ...base,
+    title: 'feat: change skill inputs',
+    body: 'BREAKING CHANGE: rename required inputs'
+  }, ['skills/new-skill.md']).includes('breaking'));
+  assert.ok(classifyPullRequestLabels({
+    ...base,
+    title: 'feat!: change skill inputs',
+    body: 'This updates the contribution format.'
+  }, ['skills/new-skill.md']).includes('breaking'));
 });
 
 test('major and downgrade dependency updates receive the major-update label', () => {
@@ -413,6 +438,157 @@ test('required check failures, missing gates and non-applicable profiles route t
   assert.equal(requiredCheckReviewReason('success'), null);
 });
 
+test('Auto-merge is not admitted until every required check is successful', () => {
+  assert.equal(isAutoMergeCheckReady('pending'), false);
+  assert.equal(isAutoMergeCheckReady('failure'), false);
+  assert.equal(isAutoMergeCheckReady('missing'), false);
+  assert.equal(isAutoMergeCheckReady('unconfigured'), false);
+  assert.equal(isAutoMergeCheckReady('success'), true);
+});
+
+test('SkillGauge requires a path-scoped commit status on the exact changed head', () => {
+  const profile = getRepositoryProfile('SkillGauge');
+  assert.ok(profile.requiredChecks.some(check =>
+    typeof check === 'object' &&
+    check.name === 'skillgauge/verification' &&
+    check.kind === 'status' &&
+    check.paths.includes('skills/**/*.md')
+  ));
+});
+
+test('domain verification defers before handoff, preserves review holds, and recognizes completed handoff', () => {
+  const profile = {
+    pendingLabel: 'skill-verification-pending',
+    reviewHoldLabel: 'skill-verification-review',
+    autoMerge: {
+      label: 'automerge',
+      branchPrefix: 'contrib-',
+      sameRepository: true,
+      paths: ['skills/**/*.md'],
+      deferUntilHandoff: true
+    }
+  };
+  const repository = 'ThanhNguyxnOrg/SkillGauge';
+  const scopedPr = {
+    labels: [],
+    head: { ref: 'contrib-add-skill', repo: { full_name: repository } },
+    base: { repo: { full_name: repository } }
+  };
+  assert.equal(domainVerificationState({ labels: [{ name: 'skill-verification-pending' }] }, profile), 'pending');
+  assert.equal(domainVerificationState({ labels: [{ name: 'skill-verification-review' }] }, profile), 'review');
+  assert.equal(domainVerificationState(scopedPr, profile, ['skills/new-skill.md']), 'pending');
+  assert.equal(domainVerificationState({ ...scopedPr, labels: [{ name: 'automerge' }] }, profile, ['skills/new-skill.md']), 'ready');
+  assert.equal(domainVerificationState(scopedPr, profile, ['README.md']), 'ready');
+});
+
+test('Conventional Commit breaking marker applies to every type and optional scope', () => {
+  for (const title of [
+    'chore!: rename required skill inputs',
+    'docs(api)!: change response schema',
+    'feat!: change required skill inputs',
+    'fix(parser)!: reject legacy format'
+  ]) {
+    assert.ok(classifyPullRequestLabels({ user: { login: 'contributor' }, title, body: 'No other risk signals.' }, ['skills/new.md']).includes('breaking'), title);
+  }
+  assert.ok(!classifyPullRequestLabels({ user: { login: 'contributor' }, title: 'chore: update metadata', body: 'Routine maintenance.' }, ['skills/new.md']).includes('breaking'));
+});
+
+test('native Auto-merge mutation binds admission to the exact validated head SHA', () => {
+  const pullRequest = {
+    node_id: 'PR_kwDOExpectedHead',
+    head: { sha: 'b'.repeat(40) }
+  };
+  const request = buildEnablePullRequestAutoMergeRequest(pullRequest, 'squash');
+  assert.equal(request.variables.pullRequestId, pullRequest.node_id);
+  assert.equal(request.variables.mergeMethod, 'SQUASH');
+  assert.equal(request.variables.expectedHeadOid, pullRequest.head.sha);
+  assert.match(request.query, /expectedHeadOid:\s*\$expectedHeadOid/);
+  assert.throws(() => buildEnablePullRequestAutoMergeRequest({ node_id: pullRequest.node_id, head: {} }, 'squash'), /Validated PR head SHA is unavailable/);
+});
+
+test('renamed files are checked using both their previous and current paths', () => {
+  const changedPaths = expandChangedFilePaths([
+    { filename: 'skills/new/readme.md', previous_filename: 'README.md', status: 'renamed' },
+    { filename: 'skills/new/meta.json', status: 'added' }
+  ]);
+  assert.deepEqual(changedPaths, ['skills/new/readme.md', 'README.md', 'skills/new/meta.json']);
+
+  const profile = {
+    autoMerge: {
+      label: 'automerge',
+      branchPrefix: 'contrib-',
+      sameRepository: true,
+      paths: ['skills/**/*.md']
+    }
+  };
+  const repository = 'ThanhNguyxnOrg/SkillGauge';
+  const pr = {
+    user: { login: 'contributor' },
+    labels: [{ name: 'automerge' }],
+    head: { ref: 'contrib-add-skill', repo: { full_name: repository } },
+    base: { repo: { full_name: repository } }
+  };
+  assert.equal(isPolicyAutoMergeCandidate(pr, changedPaths, profile), false);
+});
+
+test('known review holds cancel an already queued native Auto-merge while mergeability is unknown', () => {
+  const queued = { node_id: 'PR_kwDOExample', auto_merge: { enabled_at: '2026-11-16T00:00:00Z' } };
+  const notQueued = { node_id: 'PR_kwDOExample', auto_merge: null };
+  assert.equal(shouldDisableAutoMergeForKnownReviewHold(queued, ['domain-verification-review']), true);
+  assert.equal(shouldDisableAutoMergeForKnownReviewHold(queued, ['security']), true);
+  assert.equal(shouldDisableAutoMergeForKnownReviewHold(queued, []), false);
+  assert.equal(shouldDisableAutoMergeForKnownReviewHold(notQueued, ['security']), false);
+});
+
+test('deferred verification or a changed head cancels an already queued native Auto-merge', () => {
+  const queued = { node_id: 'PR_kwDOExample', auto_merge: { enabled_at: '2026-11-16T00:00:00Z' } };
+  const notQueued = { node_id: 'PR_kwDOExample', auto_merge: null };
+  assert.equal(shouldDisableAutoMergeForDeferredState(queued, { verificationPending: true }), true);
+  assert.equal(shouldDisableAutoMergeForDeferredState(queued, { headChanged: true }), true);
+  assert.equal(shouldDisableAutoMergeForDeferredState(queued, { baseChanged: true }), true);
+  assert.equal(shouldDisableAutoMergeForDeferredState(queued), false);
+  assert.equal(shouldDisableAutoMergeForDeferredState(notQueued, { verificationPending: true }), false);
+});
+
+test('manual maintainer blocking labels veto policy-authorized auto-merge candidates', () => {
+  const pr = { labels: [{ name: 'automerge' }, { name: 'security' }, { name: 'breaking' }] };
+  assert.deepEqual(getBlockingPullRequestLabels(pr, ['needs-review', 'security', 'breaking']), ['security', 'breaking']);
+  assert.deepEqual(getBlockingPullRequestLabels({ labels: [{ name: 'automerge' }] }, ['needs-review', 'security']), []);
+  assert.deepEqual(getBlockingPullRequestLabels({ labels: [{ name: 'needs-review' }] }, ['needs-review']), []);
+});
+
+test('freshly added policy opt-in clears the earlier triage-needed reason', () => {
+  const profile = { autoMerge: { allowTriageBypass: true } };
+  assert.deepEqual(reconcilePolicyTriageReason(['triage-needed'], true, profile), []);
+  assert.deepEqual(reconcilePolicyTriageReason(['triage-needed'], false, profile), ['triage-needed']);
+  assert.deepEqual(reconcilePolicyTriageReason(['triage-needed'], true, { autoMerge: { allowTriageBypass: false } }), ['triage-needed']);
+});
+
+test('repository-authorized auto-merge requires the explicit label, allowed branch, same-repo head and only allowed paths', () => {
+  const profile = {
+    autoMerge: {
+      label: 'automerge',
+      branchPrefix: 'contrib-',
+      sameRepository: true,
+      paths: ['skills/**/*.md'],
+      allowTriageBypass: true
+    }
+  };
+  const repository = 'ThanhNguyxnOrg/SkillGauge';
+  const pr = {
+    user: { login: 'contributor' },
+    labels: [{ name: 'automerge' }],
+    head: { ref: 'contrib-add-skill', repo: { full_name: repository } },
+    base: { repo: { full_name: repository } }
+  };
+
+  assert.equal(isPolicyAutoMergeCandidate(pr, ['skills/new-skill.md'], profile), true);
+  assert.equal(isPolicyAutoMergeCandidate({ ...pr, labels: [] }, ['skills/new-skill.md'], profile), false);
+  assert.equal(isPolicyAutoMergeCandidate({ ...pr, head: { ...pr.head, ref: 'feature/add-skill' } }, ['skills/new-skill.md'], profile), false);
+  assert.equal(isPolicyAutoMergeCandidate({ ...pr, head: { ...pr.head, repo: { full_name: 'contributor/SkillGauge' } } }, ['skills/new-skill.md'], profile), false);
+  assert.equal(isPolicyAutoMergeCandidate(pr, ['skills/new-skill.md', 'README.md'], profile), false);
+});
+
 test('PR checks prefer the head SHA and fall back to the synthetic merge SHA', () => {
   const headSha = 'b'.repeat(40);
   const mergeSha = 'a'.repeat(40);
@@ -595,4 +771,77 @@ test('event routing skips closed PRs and stale or mismatched head metadata', () 
   assert.equal(matchesPullRequestEvent({ ...current, head: { ...current.head, sha: 'b'.repeat(40) } }, target), false);
   assert.equal(matchesPullRequestEvent({ ...current, head: { ...current.head, repo: { full_name: 'attacker/other-repo' } } }, target), false);
   assert.equal(matchesPullRequestEvent({ state: 'open', head: { sha: 'a'.repeat(40), repo: null } }, target), false);
+});
+
+test('processPullRequest disables native Auto-merge for a review hold when mergeability is unknown', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.GH_TOKEN;
+  const requests = [];
+  process.env.GH_TOKEN = 'test-agent-token';
+
+  const headSha = 'a'.repeat(40);
+  const pullRequest = {
+    number: 4321,
+    node_id: 'PR_kwDOTest123',
+    state: 'open',
+    draft: false,
+    title: 'Update skill definition',
+    body: '',
+    user: { login: 'contributor' },
+    labels: [{ name: 'skill-verification-review' }],
+    head: {
+      sha: headSha,
+      ref: 'contrib-test-skill',
+      repo: { full_name: 'ThanhNguyxnOrg/SkillGauge' }
+    },
+    base: {
+      ref: 'main',
+      repo: { full_name: 'ThanhNguyxnOrg/SkillGauge' }
+    },
+    mergeable: null,
+    mergeable_state: 'unknown',
+    auto_merge: { enabled_at: '2026-11-16T00:00:00Z' }
+  };
+
+  globalThis.fetch = async (url, options = {}) => {
+    const parsedUrl = new URL(url);
+    const requestPath = parsedUrl.pathname + parsedUrl.search;
+    const requestBody = options.body ? JSON.parse(options.body) : null;
+    requests.push({ path: requestPath, method: options.method || 'GET', body: requestBody });
+
+    if (requestPath.includes('/pulls/4321/files')) {
+      return new Response(JSON.stringify([
+        { filename: 'skills/example/SKILL.md', status: 'modified' }
+      ]), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (requestPath === '/repos/ThanhNguyxnOrg/SkillGauge/pulls/4321') {
+      return new Response(JSON.stringify(pullRequest), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (requestPath === '/graphql' && options.method === 'POST') {
+      return new Response(JSON.stringify({
+        data: { disablePullRequestAutoMerge: { pullRequest: { number: 4321 } } }
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return new Response('', { status: 200 });
+  };
+
+  try {
+    await processPullRequest(
+      { name: 'SkillGauge', full_name: 'ThanhNguyxnOrg/SkillGauge', default_branch: 'main' },
+      pullRequest
+    );
+
+    const disableRequest = requests.find(request =>
+      request.path === '/graphql' &&
+      request.method === 'POST' &&
+      request.body?.query?.includes('disablePullRequestAutoMerge')
+    );
+    assert.ok(disableRequest, 'controller must cancel native Auto-merge before deferring unknown mergeability');
+    assert.equal(disableRequest.body.variables.pullRequestId, 'PR_kwDOTest123');
+    assert.equal(requests.some(request => request.body?.query?.includes('enablePullRequestAutoMerge')), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.GH_TOKEN;
+    else process.env.GH_TOKEN = originalToken;
+  }
 });

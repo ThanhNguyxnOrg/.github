@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { parseStaleMarker, staleDecision } from './stale-controller.mjs';
 
 const day = 24 * 60 * 60 * 1000;
@@ -44,4 +45,10 @@ test('draft PRs and locked issues are exempt from stale handling', () => {
   const old = {updated_at:new Date(now.getTime()-40*day).toISOString(),labels:[]};
   assert.equal(staleDecision({...old,draft:true},null,now),'exempt');
   assert.equal(staleDecision({...old,locked:true},null,now),'exempt');
+});
+
+test('stale workflow passes the numeric BOT_APP_ID through app-id, not client-id', () => {
+  const workflow = fs.readFileSync(new URL('../workflows/stale.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /app-id:\s*\$\{\{\s*vars\.BOT_APP_ID\s*\}\}/);
+  assert.doesNotMatch(workflow, /client-id:\s*\$\{\{\s*vars\.BOT_APP_ID\s*\}\}/);
 });

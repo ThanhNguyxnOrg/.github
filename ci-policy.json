@@ -199,8 +199,26 @@
             "skills/**/*.md"
           ]
         },
-        "verify / Verify (SkillGauge)"
-      ]
+        "verify / Verify (SkillGauge)",
+        {
+          "name": "skillgauge/verification",
+          "kind": "status",
+          "paths": [
+            "skills/**/*.md"
+          ]
+        }
+      ],
+      "reviewHoldLabel": "skill-verification-review",
+      "autoMerge": {
+        "label": "automerge",
+        "branchPrefix": "contrib-",
+        "sameRepository": true,
+        "paths": [
+          "skills/**/*.md"
+        ],
+        "allowTriageBypass": true,
+        "deferUntilHandoff": true
+      }
     },
     "ForgeHelm": {
       "defaultBranch": "main",

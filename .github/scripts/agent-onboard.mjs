@@ -112,6 +112,7 @@ export function assertOnboardingSuccess(summary) {
   const failed = Number(summary?.failed || 0);
   const conflicts = Number(summary?.conflicts || 0);
   const settingsFailed = Number(summary?.settingsFailed || 0);
+  const settingsSkipped = Number(summary?.settingsSkipped || 0);
   if (failed > 0) {
     throw new Error('Auto-onboarding failed for ' + failed + ' managed workflow write(s)');
   }
@@ -120,6 +121,9 @@ export function assertOnboardingSuccess(summary) {
   }
   if (settingsFailed > 0) {
     throw new Error('Repository settings sync failed for ' + settingsFailed + ' repository/repositories');
+  }
+  if (settingsSkipped > 0) {
+    throw new Error('Repository settings sync was skipped for ' + settingsSkipped + ' repository/repositories; Allow auto-merge state is not verified');
   }
 }
 

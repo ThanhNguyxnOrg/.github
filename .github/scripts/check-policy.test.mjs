@@ -89,6 +89,18 @@ test('legacy commit statuses require their exact configured context', () => {
   assert.equal(evaluateRequiredChecks([], { statuses: [{ context: 'ci', state: 'success' }] }, [{ name: 'other', kind: 'status' }]).state, 'missing');
 });
 
+test('commit-status requirements are evaluated for the exact SkillGauge verification context and current SHA', () => {
+  const required = [{ name: 'skillgauge/verification', kind: 'status', paths: ['skills/**/*.md'] }];
+  assert.equal(evaluateRequiredChecks([], { statuses: [] }, required, ['skills/new.md']).state, 'missing');
+  assert.equal(evaluateRequiredChecks([], { statuses: [{ context: 'skillgauge/verification', state: 'pending' }] }, required, ['skills/new.md']).state, 'pending');
+  assert.equal(evaluateRequiredChecks([], { statuses: [{ context: 'skillgauge/verification', state: 'failure' }] }, required, ['skills/new.md']).state, 'failure');
+  assert.equal(evaluateRequiredChecks([], { statuses: [{ context: 'skillgauge/verification', state: 'success' }] }, required, ['skills/new.md']).state, 'success');
+  assert.equal(evaluateRequiredChecks([], { statuses: [{ context: 'unrelated', state: 'success' }] }, required, ['skills/new.md']).state, 'missing');
+  assert.equal(evaluateRequiredChecks([], { statuses: [] }, required, ['README.md']).state, 'not-applicable');
+});
+
+
+
 test('path globs support repository-root and nested paths', () => {
   assert.equal(matchesPathPattern('README.md', '**/*.md'), true);
   assert.equal(matchesPathPattern('docs/guide/setup.md', '**/*.md'), true);

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { evaluateRequiredChecks, getRepositoryProfile } from './check-policy.mjs';
+import { evaluateRequiredChecks, getRepositoryProfile, matchesPathPattern } from './check-policy.mjs';
 
 const TOKEN = process.env.GH_TOKEN;
 const ORG = process.env.ORG || 'ThanhNguyxnOrg';
@@ -17,11 +17,12 @@ class GitHubError extends Error {
 }
 
 async function request(path, options = {}) {
-  if (!TOKEN) throw new Error('GH_TOKEN is required');
+  const token = process.env.GH_TOKEN || TOKEN;
+  if (!token) throw new Error('GH_TOKEN is required');
   const response = await fetch(API + path, {
     method: options.method || 'GET',
     headers: {
-      Authorization: 'Bearer ' + TOKEN,
+      Authorization: 'Bearer ' + token,
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': API_VERSION,
       ...(options.headers || {})
@@ -103,8 +104,9 @@ export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
   }
   const riskBody = dependencyBot ? dependencySummary(pullRequest) : body;
   const riskText = dependencyBot ? dependencySummary(pullRequest) : text;
-  const plainBody = riskBody.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
-  if (dependencyBot && /\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)/i.test(plainBody)) {
+  const plainText = riskText.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
+  if (/^[a-z][a-z0-9-]*(?:\([^)]*\))?!:/i.test(title) ||
+      /\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)/i.test(plainText)) {
     labels.add('breaking');
   }
   if (hasSecuritySignal(riskText)) {
@@ -438,6 +440,106 @@ export function requiredCheckReviewReason(state) {
   return null;
 }
 
+export function isAutoMergeCheckReady(state) {
+  return state === 'success';
+}
+
+export function isPolicyAutoMergeScope(pullRequest, changedFiles = [], profile = {}) {
+  const rule = profile?.autoMerge;
+  if (!rule || typeof rule !== 'object') return false;
+
+  const author = String(pullRequest?.user?.login || '').toLowerCase();
+  if (rule.author && author !== String(rule.author).trim().toLowerCase()) return false;
+
+  const branch = String(pullRequest?.head?.ref || '');
+  if (rule.branchPrefix && !branch.startsWith(String(rule.branchPrefix))) return false;
+
+  if (rule.sameRepository === true) {
+    const headRepository = String(pullRequest?.head?.repo?.full_name || '').toLowerCase();
+    const baseRepository = String(pullRequest?.base?.repo?.full_name || '').toLowerCase();
+    if (!headRepository || !baseRepository || headRepository !== baseRepository) return false;
+  }
+
+  const allowedPaths = Array.isArray(rule.paths) ? rule.paths : [];
+  if (!allowedPaths.length || !Array.isArray(changedFiles) || !changedFiles.length) return false;
+  return changedFiles.every(path =>
+    allowedPaths.some(pattern => matchesPathPattern(path, pattern))
+  );
+}
+
+export function domainVerificationState(pullRequest, profile = {}, changedFiles = undefined) {
+  const labels = names(pullRequest?.labels);
+  const pendingLabel = String(profile.pendingLabel || '').trim().toLowerCase();
+  const reviewHoldLabel = String(profile.reviewHoldLabel || '').trim().toLowerCase();
+  if (pendingLabel && labels.has(pendingLabel)) return 'pending';
+  if (reviewHoldLabel && labels.has(reviewHoldLabel)) return 'review';
+
+  const rule = profile?.autoMerge;
+  const optInLabel = String(rule?.label || '').trim().toLowerCase();
+  if (rule?.deferUntilHandoff === true &&
+      optInLabel && !labels.has(optInLabel) &&
+      isPolicyAutoMergeScope(pullRequest, changedFiles, profile)) {
+    return 'pending';
+  }
+  return 'ready';
+}
+
+export function isPolicyAutoMergeCandidate(pullRequest, changedFiles = [], profile = {}) {
+  const rule = profile?.autoMerge;
+  const requiredLabel = String(rule?.label || '').trim().toLowerCase();
+  return Boolean(requiredLabel &&
+    names(pullRequest?.labels).has(requiredLabel) &&
+    isPolicyAutoMergeScope(pullRequest, changedFiles, profile));
+}
+
+export function reconcilePolicyTriageReason(reasons = [], authorizedCandidate = false, profile = {}) {
+  const next = [...reasons];
+  if (!authorizedCandidate || profile?.autoMerge?.allowTriageBypass !== true) return next;
+  return next.filter(reason => reason !== 'triage-needed');
+}
+
+export function buildEnablePullRequestAutoMergeRequest(pullRequest, mergeMethod) {
+  if (!pullRequest?.node_id) throw new Error('PR node_id is unavailable for Auto-merge');
+  if (!pullRequest?.head?.sha) throw new Error('Validated PR head SHA is unavailable for Auto-merge');
+  return {
+    query: 'mutation($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!, $expectedHeadOid: GitObjectID!) { enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: $mergeMethod, expectedHeadOid: $expectedHeadOid }) { pullRequest { number autoMergeRequest { enabledAt mergeMethod } } } }',
+    variables: {
+      pullRequestId: pullRequest.node_id,
+      mergeMethod: String(mergeMethod || 'squash').toUpperCase(),
+      expectedHeadOid: pullRequest.head.sha
+    }
+  };
+}
+
+export function expandChangedFilePaths(files = []) {
+  return files.flatMap(file =>
+    [file?.filename, file?.previous_filename]
+      .filter(path => typeof path === 'string' && path.length > 0)
+  );
+}
+
+export function getBlockingPullRequestLabels(pullRequest, blockingLabels = config.blockingLabels || []) {
+  const present = names(pullRequest?.labels);
+  const configured = [
+    ...new Set([
+      ...blockingLabels.filter(label => String(label || '').trim().toLowerCase() !== 'needs-review'),
+      'do-not-merge',
+      'breaking-change',
+      'wip',
+      'pinned'
+    ].map(label => String(label || '').trim().toLowerCase()).filter(Boolean))
+  ];
+  return configured.filter(label => present.has(label));
+}
+
+export function shouldDisableAutoMergeForDeferredState(pullRequest, { headChanged = false, baseChanged = false, verificationPending = false } = {}) {
+  return Boolean(pullRequest?.auto_merge && pullRequest?.node_id && (headChanged || baseChanged || verificationPending));
+}
+
+export function shouldDisableAutoMergeForKnownReviewHold(pullRequest, riskReasons = []) {
+  return Boolean(pullRequest?.auto_merge && pullRequest?.node_id && Array.isArray(riskReasons) && riskReasons.length > 0);
+}
+
 export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredChecks = []) {
   return evaluateRequiredChecks(checkRuns, statuses, requiredChecks).state;
 }
@@ -635,13 +737,10 @@ export function isTransientAutoMergeError(error) {
 
 async function enablePullRequestAutoMerge(fullName, pullRequest, mergeMethod) {
   if (pullRequest.auto_merge) return;
-  if (!pullRequest.node_id) throw new Error('PR node_id is unavailable for Auto-merge');
+  const autoMergeRequest = buildEnablePullRequestAutoMergeRequest(pullRequest, mergeMethod);
   const response = await request('/graphql', {
     method: 'POST',
-    body: {
-      query: 'mutation($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) { enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: $mergeMethod }) { pullRequest { number autoMergeRequest { enabledAt mergeMethod } } } }',
-      variables: { pullRequestId: pullRequest.node_id, mergeMethod: mergeMethod.toUpperCase() }
-    }
+    body: autoMergeRequest
   });
   if (Array.isArray(response.errors) && response.errors.length) {
     throw new Error(response.errors.map(item => item.message || 'GraphQL error').join('; '));
@@ -673,7 +772,7 @@ async function mergePullRequestNow(fullName, pullRequest, mergeMethod) {
 }
 
 async function getChangedFiles(fullName, number) {
-  return listAll('/repos/' + fullName + '/pulls/' + number + '/files').then(files => files.map(file => file.filename));
+  return listAll('/repos/' + fullName + '/pulls/' + number + '/files').then(expandChangedFilePaths);
 }
 
 function hasSensitivePath(paths, patterns) {
@@ -733,11 +832,12 @@ async function syncCheckLabels(fullName, number, state) {
     current === 'ci-failed' ? [current, 'needs-review'] : [current]);
 }
 
-async function processPullRequest(repo, pr) {
+export async function processPullRequest(repo, pr) {
   const fullName = repo.full_name;
   const repoName = repo.name;
   const dependencyBot = String(pr.user?.login || '').toLowerCase() === 'dependabot[bot]';
   const policy = repositoryPolicy(repoName);
+  const profile = getRepositoryProfile(repoName);
   if (pr.draft) return;
 
   let paths = [];
@@ -749,13 +849,25 @@ async function processPullRequest(repo, pr) {
     console.warn('[files]', fullName + '#' + pr.number, error.message);
   }
 
-  const risk = assessPullRequestRisk(pr, paths, policy);
+  const verificationState = domainVerificationState(pr, profile, paths);
+
+  const autoMergeCandidate = !dependencyBot && isPolicyAutoMergeCandidate(pr, paths, profile);
+  let risk = assessPullRequestRisk(pr, paths, policy);
   const labels = new Set(classifyPullRequestLabels(pr, paths));
-  const allowedBaseBranches = policy.allowedBaseBranches || [getRepositoryProfile(repoName)?.defaultBranch || repo.default_branch].filter(Boolean);
-  const riskReasons = [...risk.reasons];
+  const allowedBaseBranches = policy.allowedBaseBranches || [profile?.defaultBranch || repo.default_branch].filter(Boolean);
+  let riskReasons = reconcilePolicyTriageReason(risk.reasons, autoMergeCandidate, profile);
+  if (autoMergeCandidate && profile?.autoMerge?.allowSensitivePaths === true) {
+    const sensitiveIndex = riskReasons.indexOf('sensitive-path');
+    if (sensitiveIndex >= 0) riskReasons.splice(sensitiveIndex, 1);
+  }
+  if (verificationState === 'review') {
+    riskReasons.push('domain-verification-review');
+  }
   if (!allowedBaseBranches.includes(pr.base.ref)) riskReasons.push('target-branch-outside-policy');
   if (!pathsAvailable) riskReasons.push('changed-files-unavailable');
-  await addLabels(fullName, pr.number, [...labels]);
+  if (verificationState !== 'pending') {
+    await addLabels(fullName, pr.number, [...labels]);
+  }
 
   // Reconcile stale risk labels previously created by broad security/version heuristics.
   // Only reconcile Dependabot PRs; preserve labels on human-authored PRs.
@@ -775,21 +887,60 @@ async function processPullRequest(repo, pr) {
     console.warn('[pull]', fullName + '#' + pr.number, error.message);
     return;
   }
-  if (fresh.head?.sha !== pr.head.sha) {
-    console.log('[defer]', fullName + '#' + pr.number + ': PR head changed during evaluation; retrying next poll');
+  const freshVerificationState = domainVerificationState(fresh, profile, paths);
+  const headChanged = fresh.head?.sha !== pr.head.sha;
+  const baseChanged = fresh.base?.ref !== pr.base.ref;
+  if (headChanged || baseChanged) {
+    if (shouldDisableAutoMergeForDeferredState(fresh, {
+      headChanged,
+      baseChanged,
+      verificationPending: freshVerificationState === 'pending'
+    })) {
+      await disablePullRequestAutoMerge(fullName, fresh);
+    }
+    console.log('[defer]', fullName + '#' + pr.number + ': PR head or base changed during evaluation; any stale native Auto-merge was disabled and the current diff will be retried');
     return;
   }
+  if (freshVerificationState === 'pending') {
+    if (shouldDisableAutoMergeForDeferredState(fresh, { verificationPending: true })) {
+      await disablePullRequestAutoMerge(fullName, fresh);
+    }
+    console.log('[domain-verification-wait]', fullName + '#' + pr.number + ': repository-specific verification is still pending; any stale native Auto-merge was disabled');
+    return;
+  }
+  const freshAutoMergeCandidate = !dependencyBot && isPolicyAutoMergeCandidate(fresh, paths, profile);
+  risk = assessPullRequestRisk(fresh, paths, policy);
+  const refreshedRiskReasons = reconcilePolicyTriageReason(risk.reasons, freshAutoMergeCandidate, profile);
+  if (freshAutoMergeCandidate && profile?.autoMerge?.allowSensitivePaths === true) {
+    const sensitiveIndex = refreshedRiskReasons.indexOf('sensitive-path');
+    if (sensitiveIndex >= 0) refreshedRiskReasons.splice(sensitiveIndex, 1);
+  }
+  if (freshVerificationState === 'review') refreshedRiskReasons.push('domain-verification-review');
+  if (!allowedBaseBranches.includes(fresh.base.ref)) refreshedRiskReasons.push('target-branch-outside-policy');
+  if (!pathsAvailable) refreshedRiskReasons.push('changed-files-unavailable');
+  riskReasons.splice(0, riskReasons.length, ...refreshedRiskReasons);
+  if (!dependencyBot && autoMergeCandidate && !freshAutoMergeCandidate &&
+      profile?.autoMerge?.allowTriageBypass === true &&
+      !riskReasons.includes('triage-needed')) {
+    riskReasons.push('triage-needed');
+  }
 
+  for (const label of getBlockingPullRequestLabels(fresh)) {
+    if (!riskReasons.includes(label)) riskReasons.push(label);
+  }
   if (fresh.mergeable === false || fresh.mergeable_state === 'dirty') {
     riskReasons.push('merge-conflict');
     await addLabels(fullName, pr.number, ['merge-conflict']);
   } else if (fresh.mergeable === true) {
     await removeLabel(fullName, pr.number, 'merge-conflict');
   } else {
+    if (shouldDisableAutoMergeForKnownReviewHold(fresh, riskReasons)) {
+      await disablePullRequestAutoMerge(fullName, fresh);
+    }
     if (dependencyBot && risk.dependency?.eligible && riskReasons.length === 0) {
       await addLabels(fullName, pr.number, ['automerge-pending']);
     }
-    console.log('[defer]', fullName + '#' + pr.number + ': GitHub is still computing mergeability');
+    console.log('[defer]', fullName + '#' + pr.number + ': GitHub is still computing mergeability; native Auto-merge was disabled for any known review hold');
     return;
   }
 
@@ -798,6 +949,18 @@ async function processPullRequest(repo, pr) {
     ? await getCheckState(fullName, checkSha, repoName, pathsAvailable ? paths : undefined)
     : 'unconfigured';
   await syncCheckLabels(fullName, pr.number, checkState);
+  if (!dependencyBot && checkState === 'success' && freshVerificationState === 'review' && profile?.reviewHoldLabel) {
+    // The current head's commit-bound domain status is green. A review-hold
+    // label from an older, out-of-order workflow run is stale and can be cleared.
+    const staleVerificationHold = String(profile.reviewHoldLabel).trim().toLowerCase();
+    for (let index = riskReasons.length - 1; index >= 0; index -= 1) {
+      if (riskReasons[index] === staleVerificationHold || riskReasons[index] === 'domain-verification-review') {
+        riskReasons.splice(index, 1);
+      }
+    }
+    await removeLabel(fullName, pr.number, profile.reviewHoldLabel);
+  }
+
   const checkReviewReason = requiredCheckReviewReason(checkState);
   if (checkReviewReason) riskReasons.push(checkReviewReason);
 
@@ -814,10 +977,7 @@ async function processPullRequest(repo, pr) {
     }
   }
 
-  const existingLabels = names(pr.labels);
-  for (const label of ['do-not-merge', 'breaking-change', 'wip', 'pinned']) {
-    if (existingLabels.has(label)) riskReasons.push(label);
-  }
+
   const uniqueReasons = [...new Set(riskReasons)];
 
   if (uniqueReasons.length) {
@@ -837,15 +997,11 @@ async function processPullRequest(repo, pr) {
   await removeLabel(fullName, pr.number, 'automerge-blocked');
   await reconcileReviewRouting(fullName, pr, []);
 
-  if (!dependencyBot) {
-    await removeLabel(fullName, pr.number, 'automerge');
-    await removeLabel(fullName, pr.number, 'automerge-pending');
-    console.log('[triaged]', fullName + '#' + pr.number + ': no high-risk signals; CodeRabbit and CI remain active');
-    return;
-  }
+  const dependency = dependencyBot
+    ? (risk.dependency || analyzeDependencyUpdate(pr, paths))
+    : null;
 
-  const dependency = risk.dependency || analyzeDependencyUpdate(pr, paths);
-  if (!dependency.eligible) {
+  if (dependencyBot && !dependency.eligible) {
     await removeLabel(fullName, pr.number, 'automerge-pending');
     await addLabels(fullName, pr.number, ['needs-review']);
     await reconcileReviewRouting(fullName, pr, config.reviewers || []);
@@ -854,16 +1010,36 @@ async function processPullRequest(repo, pr) {
     return;
   }
 
-  const profile = getRepositoryProfile(repoName);
-  if (profile?.autoMergeDependabot !== true || !Array.isArray(profile.requiredChecks) || profile.requiredChecks.length === 0) {
-    await removeLabel(fullName, pr.number, 'automerge');
+  if (dependencyBot) {
+    if (profile?.autoMergeDependabot !== true ||
+        !Array.isArray(profile.requiredChecks) || profile.requiredChecks.length === 0) {
+      await removeLabel(fullName, pr.number, 'automerge');
+      await removeLabel(fullName, pr.number, 'automerge-pending');
+      console.log('[auto-merge-disabled]', fullName + '#' + pr.number + ': repository is not explicitly opted in with required checks');
+      return;
+    }
+  } else if (!freshAutoMergeCandidate) {
+    const optInLabel = String(profile?.autoMerge?.label || 'automerge');
+    await disablePullRequestAutoMerge(fullName, fresh);
+    await removeLabel(fullName, pr.number, optInLabel);
     await removeLabel(fullName, pr.number, 'automerge-pending');
-    console.log('[auto-merge-disabled]', fullName + '#' + pr.number + ': repository is not explicitly opted in with required checks');
+    console.log('[triaged]', fullName + '#' + pr.number + ': repository-specific auto-merge opt-in is no longer present on the latest PR state; native Auto-merge disabled');
     return;
   }
 
-  if (!['pending', 'success'].includes(checkState)) {
-    console.log('[auto-merge-wait]', fullName + '#' + pr.number + ': required checks are not ready (' + checkState + ')');
+  if (!Array.isArray(profile?.requiredChecks) || profile.requiredChecks.length === 0) {
+    await removeLabel(fullName, pr.number, 'automerge-pending');
+    await addLabels(fullName, pr.number, ['needs-review']);
+    await reconcileReviewRouting(fullName, pr, config.reviewers || []);
+    await assignHumans(fullName, pr, true);
+    console.log('[human-review-required]', fullName + '#' + pr.number + ': no required CI checks are configured for this auto-merge path');
+    return;
+  }
+
+  if (!isAutoMergeCheckReady(checkState)) {
+    await addLabels(fullName, pr.number, ['automerge-pending']);
+    await disablePullRequestAutoMerge(fullName, fresh);
+    console.log('[auto-merge-wait]', fullName + '#' + pr.number + ': required checks must all be successful before enabling Auto-merge; checks=' + checkState);
     return;
   }
 
@@ -898,7 +1074,10 @@ async function processPullRequest(repo, pr) {
     await enablePullRequestAutoMerge(fullName, fresh, mergeMethod);
     await removeLabel(fullName, pr.number, 'automerge-pending');
     await addLabels(fullName, pr.number, ['automerge']);
-    console.log('[auto-merge-enabled]', fullName + '#' + pr.number + ': low-risk ' + dependency.versionRisk + ' update; checks=' + checkState);
+    const mergeReason = dependencyBot
+      ? 'low-risk ' + dependency.versionRisk + ' dependency update'
+      : 'repository-authorized ' + String(profile.autoMerge.label) + ' update';
+    console.log('[auto-merge-enabled]', fullName + '#' + pr.number + ': ' + mergeReason + '; checks=' + checkState);
   } catch (error) {
     // GitHub refuses to queue Auto-merge when all requirements are already satisfied.
     // In that case the same verified low-risk PR is merged immediately with a head-SHA guard.
