@@ -511,6 +511,10 @@ export function getBlockingPullRequestLabels(pullRequest, blockingLabels = confi
   return configured.filter(label => present.has(label));
 }
 
+export function shouldDisableAutoMergeForDeferredState(pullRequest, { headChanged = false, verificationPending = false } = {}) {
+  return Boolean(pullRequest?.auto_merge && pullRequest?.node_id && (headChanged || verificationPending));
+}
+
 export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredChecks = []) {
   return evaluateRequiredChecks(checkRuns, statuses, requiredChecks).state;
 }
@@ -814,11 +818,6 @@ async function processPullRequest(repo, pr) {
   const profile = getRepositoryProfile(repoName);
   if (pr.draft) return;
 
-  if (domainVerificationState(pr, profile) === 'pending') {
-    console.log('[domain-verification-wait]', fullName + '#' + pr.number + ': waiting for the repository-specific verification handoff');
-    return;
-  }
-
   let paths = [];
   let pathsAvailable = true;
   try {
@@ -829,10 +828,6 @@ async function processPullRequest(repo, pr) {
   }
 
   const verificationState = domainVerificationState(pr, profile, paths);
-  if (verificationState === 'pending') {
-    console.log('[domain-verification-wait]', fullName + '#' + pr.number + ': waiting for explicit repository-specific verification handoff');
-    return;
-  }
 
   const autoMergeCandidate = !dependencyBot && isPolicyAutoMergeCandidate(pr, paths, profile);
   const risk = assessPullRequestRisk(pr, paths, policy);
@@ -852,7 +847,9 @@ async function processPullRequest(repo, pr) {
   }
   if (!allowedBaseBranches.includes(pr.base.ref)) riskReasons.push('target-branch-outside-policy');
   if (!pathsAvailable) riskReasons.push('changed-files-unavailable');
-  await addLabels(fullName, pr.number, [...labels]);
+  if (verificationState !== 'pending') {
+    await addLabels(fullName, pr.number, [...labels]);
+  }
 
   // Reconcile stale risk labels previously created by broad security/version heuristics.
   // Only reconcile Dependabot PRs; preserve labels on human-authored PRs.
@@ -872,13 +869,22 @@ async function processPullRequest(repo, pr) {
     console.warn('[pull]', fullName + '#' + pr.number, error.message);
     return;
   }
+  const freshVerificationState = domainVerificationState(fresh, profile, paths);
   if (fresh.head?.sha !== pr.head.sha) {
-    console.log('[defer]', fullName + '#' + pr.number + ': PR head changed during evaluation; retrying next poll');
+    if (shouldDisableAutoMergeForDeferredState(fresh, {
+      headChanged: true,
+      verificationPending: freshVerificationState === 'pending'
+    })) {
+      await disablePullRequestAutoMerge(fullName, fresh);
+    }
+    console.log('[defer]', fullName + '#' + pr.number + ': PR head changed during evaluation; any stale native Auto-merge was disabled and the current head will be retried');
     return;
   }
-  const freshVerificationState = domainVerificationState(fresh, profile, paths);
   if (freshVerificationState === 'pending') {
-    console.log('[domain-verification-wait]', fullName + '#' + pr.number + ': repository-specific verification is still pending');
+    if (shouldDisableAutoMergeForDeferredState(fresh, { verificationPending: true })) {
+      await disablePullRequestAutoMerge(fullName, fresh);
+    }
+    console.log('[domain-verification-wait]', fullName + '#' + pr.number + ': repository-specific verification is still pending; any stale native Auto-merge was disabled');
     return;
   }
   if (freshVerificationState === 'review' && !riskReasons.includes('domain-verification-review')) {
