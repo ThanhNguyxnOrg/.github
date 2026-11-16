@@ -6,6 +6,7 @@ import {
   assessPullRequestRisk,
   assessReviewFeedback,
   classifyVersionUpdate,
+  requiredCheckReviewReason,
   isTransientAutoMergeError,
   evaluateCheckRollup,
   isDependencyManifestPath,
@@ -165,6 +166,20 @@ test('dependency update classification remains SemVer-aware across grouped summa
   assert.equal(classifyVersionUpdate('| Package | From | To |\n| [foo](https://example.com) | \x601.0.0\x60 | \x602.0.0\x60 |'), 'major');
   assert.equal(classifyVersionUpdate('| Package | From | To |\n| foo | \x602.0.0\x60 | \x601.9.0\x60 |'), 'downgrade');
   assert.equal(classifyVersionUpdate('Update dependencies'), 'unknown');
+  assert.equal(
+    classifyVersionUpdate('chore(deps-dev): update ruff requirement from <1.0,>=0.17.4 to >=0.17.5,<1.0 in /requirements'),
+    'patch'
+  );
+  assert.equal(
+    classifyVersionUpdate('deps(cargo): bump toml from 1.2.0+spec-1.1.0 to 1.2.1+spec-1.1.0 in /src-tauri'),
+    'patch'
+  );
+  assert.equal(classifyVersionUpdate('Bump golang.org/x/crypto from 0.58.0 to 0.59.0'), 'major');
+  assert.equal(
+    classifyVersionUpdate('Bump foo from 1.2.3 to 1.2.4\\nBump bar from unknown to latest'),
+    'unknown',
+    'unparseable members of a grouped update must fail closed'
+  );
 });
 test('grouped Dependabot summaries classify documented breaking changes', () => {
   const labels = classifyPullRequestLabels(
@@ -197,6 +212,15 @@ test('check rollup requires evidence and rejects failed or incomplete checks', (
   assert.equal(evaluateCheckRollup([{ name: 'tests', status: 'completed', conclusion: 'failure' }], {}, ['tests']), 'failure');
   assert.equal(evaluateCheckRollup([{ name: 'tests', status: 'completed', conclusion: 'success' }], {}, ['tests']), 'success');
   assert.equal(evaluateCheckRollup([], {}, []), 'unconfigured');
+});
+
+test('required check failures, missing gates and non-applicable profiles route to human review', () => {
+  assert.equal(requiredCheckReviewReason('failure'), 'required-checks-failure');
+  assert.equal(requiredCheckReviewReason('missing'), 'required-checks-missing');
+  assert.equal(requiredCheckReviewReason('unconfigured'), 'required-checks-unconfigured');
+  assert.equal(requiredCheckReviewReason('not-applicable'), 'required-checks-not-applicable');
+  assert.equal(requiredCheckReviewReason('pending'), null);
+  assert.equal(requiredCheckReviewReason('success'), null);
 });
 
 test('PR checks prefer the head SHA and fall back to the synthetic merge SHA', () => {
