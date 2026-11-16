@@ -304,6 +304,11 @@ test('dependency update classification remains SemVer-aware across grouped summa
     'unknown',
     'multiple npm wildcard components must remain fail-closed'
   );
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | *1.x.x* | *2.x.x* |'),
+    'unknown',
+    'single-asterisk Markdown emphasis around repeated x-ranges must remain fail-closed'
+  );
   const unsafeMultiWildcardGroup = analyzeDependencyUpdate(
     {
       title: 'chore(deps): bump grouped dependencies with 2 updates',
