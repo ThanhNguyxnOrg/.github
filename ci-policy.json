@@ -51,7 +51,20 @@
             "site/**"
           ]
         }
-      ]
+      ],
+      "autoMerge": {
+        "label": "automerge",
+        "branchPrefix": "agent-remediation/",
+        "sameRepository": true,
+        "paths": [
+          "apis/**",
+          "README.md",
+          "site/index.html",
+          "site/src/data/apis.json"
+        ],
+        "allowTriageBypass": true,
+        "allowSensitivePaths": true
+      }
     },
     "lumeo": {
       "defaultBranch": "main",
