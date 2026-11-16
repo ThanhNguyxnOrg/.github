@@ -518,6 +518,20 @@ export function expandChangedFilePaths(files = []) {
   );
 }
 
+
+export function getStaleAutoClassifiedBlockingLabels(initialLabels, initialClassifiedLabels, refreshedPullRequest, refreshedClassifiedLabels) {
+  const initialNames = initialLabels instanceof Set ? initialLabels : names(initialLabels);
+  const currentNames = names(refreshedPullRequest?.labels);
+  const initialClassified = new Set([...initialClassifiedLabels].map(label => String(label || '').trim().toLowerCase()));
+  const refreshedClassified = new Set([...refreshedClassifiedLabels].map(label => String(label || '').trim().toLowerCase()));
+  return ['breaking', 'security'].filter(label =>
+    !initialNames.has(label) &&
+    currentNames.has(label) &&
+    initialClassified.has(label) &&
+    !refreshedClassified.has(label)
+  );
+}
+
 export function getBlockingPullRequestLabels(pullRequest, blockingLabels = config.blockingLabels || []) {
   const present = names(pullRequest?.labels);
   const configured = [
@@ -850,6 +864,7 @@ export async function processPullRequest(repo, pr) {
   }
 
   const verificationState = domainVerificationState(pr, profile, paths);
+  const initialLabelNames = names(pr.labels);
 
   const autoMergeCandidate = !dependencyBot && isPolicyAutoMergeCandidate(pr, paths, profile);
   let risk = assessPullRequestRisk(pr, paths, policy);
@@ -887,6 +902,25 @@ export async function processPullRequest(repo, pr) {
     console.warn('[pull]', fullName + '#' + pr.number, error.message);
     return;
   }
+  const refreshedClassifiedLabels = new Set(classifyPullRequestLabels(fresh, paths));
+  const staleAutoClassifiedLabels = getStaleAutoClassifiedBlockingLabels(
+    initialLabelNames,
+    labels,
+    fresh,
+    refreshedClassifiedLabels
+  );
+  for (const label of staleAutoClassifiedLabels) {
+    await removeLabel(fullName, pr.number, label);
+  }
+  if (staleAutoClassifiedLabels.length) {
+    const staleLabels = new Set(staleAutoClassifiedLabels);
+    fresh.labels = (fresh.labels || []).filter(item => {
+      const label = typeof item === 'string' ? item : item?.name;
+      return !staleLabels.has(String(label || '').toLowerCase());
+    });
+    console.log('[labels]', fullName + '#' + pr.number + ': removed stale risk labels from an earlier PR snapshot: ' + staleAutoClassifiedLabels.join(', '));
+  }
+
   const freshVerificationState = domainVerificationState(fresh, profile, paths);
   const headChanged = fresh.head?.sha !== pr.head.sha;
   const baseChanged = fresh.base?.ref !== pr.base.ref;
