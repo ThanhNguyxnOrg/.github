@@ -306,8 +306,9 @@ export function classifyVersionUpdate(value) {
     const normalized = String(value || '')
       .replace(new RegExp(String.fromCharCode(96), 'g'), '')
       .trim()
-      // Strip paired underscore emphasis around individual version tokens.
-      .replace(/(^|[,|\s])_{1,2}([^,|\s]+)_{1,2}(?=$|[,|\s])/g, '$1$2');
+      // Strip paired Markdown emphasis wrappers, but retain inner wildcard markers.
+      .replace(/(^|[=><!~^,|\s])(\*\*|__)([^,|\s]+?)\2(?=$|[,|\s])/g, '$1$3')
+      .replace(/(^|[=><!~^,|\s])_([^,|\s]+?)_(?=$|[,|\s])/g, '$1$2');
     // Find npm X-range components anywhere in a comparator expression,
     // including compound constraints like ">=1.0,==1.2.*".
     return /(?:^|[=><!~^,|_\s])(?:[vV]?\d+(?:\.\d+)*(?:\.(?:[xX*])|[xX*])|[xX*])_*(?=$|[,|\s])/i.test(normalized);
