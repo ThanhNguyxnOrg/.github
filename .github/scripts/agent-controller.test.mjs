@@ -881,3 +881,14 @@ test('a risk label still present in refreshed title or body is not cleaned up', 
     []
   );
 });
+
+test('pending verification never removes a concurrent maintainer risk label', () => {
+  const refreshedPullRequest = {
+    labels: [{ name: 'security' }, { name: 'breaking' }]
+  };
+  const labelsAppliedByPendingRun = new Set();
+  assert.deepEqual(
+    getStaleAutoClassifiedBlockingLabels([], labelsAppliedByPendingRun, refreshedPullRequest, []),
+    [],
+  );
+});
