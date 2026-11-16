@@ -17,11 +17,12 @@ class GitHubError extends Error {
 }
 
 async function request(path, options = {}) {
-  if (!TOKEN) throw new Error('GH_TOKEN is required');
+  const token = process.env.GH_TOKEN || TOKEN;
+  if (!token) throw new Error('GH_TOKEN is required');
   const response = await fetch(API + path, {
     method: options.method || 'GET',
     headers: {
-      Authorization: 'Bearer ' + TOKEN,
+      Authorization: 'Bearer ' + token,
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': API_VERSION,
       ...(options.headers || {})
@@ -821,7 +822,7 @@ async function syncCheckLabels(fullName, number, state) {
     current === 'ci-failed' ? [current, 'needs-review'] : [current]);
 }
 
-async function processPullRequest(repo, pr) {
+export async function processPullRequest(repo, pr) {
   const fullName = repo.full_name;
   const repoName = repo.name;
   const dependencyBot = String(pr.user?.login || '').toLowerCase() === 'dependabot[bot]';
@@ -936,18 +937,6 @@ async function processPullRequest(repo, pr) {
   if (!dependencyBot && checkState === 'success' && freshVerificationState === 'review' && profile?.reviewHoldLabel) {
     // The current head's commit-bound domain status is green. A review-hold
     // label from an older, out-of-order workflow run is stale and can be cleared.
-    const staleVerificationHold = String(profile.reviewHoldLabel).trim().toLowerCase();
-    for (let index = riskReasons.length - 1; index >= 0; index -= 1) {
-      if (riskReasons[index] === staleVerificationHold || riskReasons[index] === 'domain-verification-review') {
-        riskReasons.splice(index, 1);
-      }
-    }
-    await removeLabel(fullName, pr.number, profile.reviewHoldLabel);
-  }
-
-  if (!dependencyBot && checkState === 'success' && freshVerificationState === 'review' && profile?.reviewHoldLabel) {
-    // The current head's commit-bound domain status is green. Any remaining
-    // review-hold label is from an older/out-of-order verification attempt.
     const staleVerificationHold = String(profile.reviewHoldLabel).trim().toLowerCase();
     for (let index = riskReasons.length - 1; index >= 0; index -= 1) {
       if (riskReasons[index] === staleVerificationHold || riskReasons[index] === 'domain-verification-review') {
