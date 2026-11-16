@@ -302,6 +302,10 @@ export function classifyVersionUpdate(value) {
     /^(?:unknown|latest|unavailable|not\s+available|n\/?a|undefined|null)$/i.test(
       String(value || '').replace(/[\x60*_]/g, '').trim()
     );
+  const isWildcardVersionRange = value =>
+    /^(?:(?:===|==|~=|>=|<=|!=|>|<)\\s*)?[vV]?\\d+(?:\\.\\d+)*\\.\\*$/i.test(
+      String(value || '').replace(/`/g, '').trim()
+    );
 
   for (let lineIndex = 0; lineIndex < lines.length;) {
     if (!lines[lineIndex].includes('|')) {
@@ -331,7 +335,8 @@ export function classifyVersionUpdate(value) {
       const newValue = cells.at(-1);
       const rowRisk = classifySpecifierPair(oldValue, newValue, allowCargoBuildMetadata);
       return rowRisk !== 'unknown' ||
-        isUnknownVersionMarker(oldValue) || isUnknownVersionMarker(newValue);
+        isUnknownVersionMarker(oldValue) || isUnknownVersionMarker(newValue) ||
+        isWildcardVersionRange(oldValue) || isWildcardVersionRange(newValue);
     });
     if (!looksLikeVersionTable) continue;
 
