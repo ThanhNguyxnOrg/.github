@@ -348,7 +348,9 @@ export function isDependencyManifestPath(path) {
   const normalized = String(path || '').replace(/\\/g, '/').toLowerCase();
   const basename = normalized.split('/').at(-1) || '';
   if (normalized.startsWith('.github/workflows/') || normalized.startsWith('.github/actions/')) return false;
-  return /^(?:package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|cargo\.toml|cargo\.lock|go\.mod|go\.sum|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|pipfile(?:\.lock)?|composer\.json|composer\.lock|gemfile(?:\.lock)?|directory\.packages\.props|packages\.lock\.json|packages\.config)$/i.test(basename)
+  const isNestedRequirementsFile = /^requirements\/.+\.txt$/i.test(normalized);
+  return isNestedRequirementsFile ||
+    /^(?:package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|cargo\.toml|cargo\.lock|go\.mod|go\.sum|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|pipfile(?:\.lock)?|composer\.json|composer\.lock|gemfile(?:\.lock)?|directory\.packages\.props|packages\.lock\.json|packages\.config)$/i.test(basename)
     || /\.(?:csproj|fsproj|vbproj)$/i.test(basename);
 }
 
