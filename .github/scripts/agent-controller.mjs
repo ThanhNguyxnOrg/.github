@@ -179,6 +179,9 @@ function parseVersionCore(value, allowBuildMetadata = false) {
 
 function selectSpecifierVersion(specifier) {
   const text = String(specifier || '').replace(/[\x60*_]/g, '').trim();
+  // Do not let the numeric prefix of a PEP 440 epoch (for example, 1!9.0)
+  // be mistaken for a complete version token.
+  if (/\b\d+!/.test(text)) return null;
   const pattern = /(?:^|[\s,])(?:\s*(===|==|~=|>=|<=|!=|>|<)\s*)?[vV]?(\d+(?:\.\d+){0,2}(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\+[0-9A-Za-z.-]+)?)/g;
   const matches = [...text.matchAll(pattern)].map(match => ({
     operator: match[1] || '',
