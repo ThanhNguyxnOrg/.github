@@ -72,7 +72,7 @@ test('Dependabot release-note history does not create false security or breaking
       '<summary>Release notes</summary>',
       'This historical release text mentions security fixes, vulnerabilities, CVE-2026-93749, and breaking changes.',
       '</details>'
-    ].join('\\n'),
+    ].join('\n'),
     user: { login: 'dependabot[bot]' }
   };
   const files = ['package.json', 'package-lock.json'];
