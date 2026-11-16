@@ -206,9 +206,11 @@ function extractVersionSpecifiers(value) {
     const prefix = part.match(comparatorPattern);
     const operator = prefix?.[1] || '';
     let version = part.slice(prefix?.[0].length || 0).trim();
-    version = stripMarkdownVersionEmphasis(version);
     // Remove sentence punctuation, but leave a terminal X-range wildcard intact.
+    // Trim sentence punctuation before removing paired Markdown emphasis wrappers.
     if (version.endsWith('.') && !version.endsWith('.*')) version = version.slice(0, -1);
+    version = stripMarkdownVersionEmphasis(version);
+    // Wildcard suffixes remain untouched and fail the supported-token check.
     const versionMatch = version.match(versionPattern);
     if (!versionMatch) return null;
     matches.push({ operator, version: versionMatch[1] || versionMatch[0] });
