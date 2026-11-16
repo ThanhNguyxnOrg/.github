@@ -205,6 +205,11 @@ test('dependency update classification remains SemVer-aware across grouped summa
     'trailing prose punctuation must not hide a wildcard range'
   );
   assert.equal(
+    classifyVersionUpdate('Bump foo requirement from 1.2.*,>=*1.2.3* to 1.3.*,>=*1.2.4*'),
+    'unknown',
+    'a wildcard in one comparator must not pair with Markdown emphasis in another'
+  );
+  assert.equal(
     classifyVersionUpdate('Bump foo from *1.2.3* to *1.2.4*'),
     'patch',
     'paired Markdown emphasis around concrete versions remains supported'
