@@ -214,6 +214,11 @@ test('dependency update classification remains SemVer-aware across grouped summa
     'patch',
     'paired Markdown emphasis around concrete versions remains supported'
   );
+  assert.equal(
+    classifyVersionUpdate('Bump foo from *1.2.3* to *1.2.4*.'),
+    'patch',
+    'trailing sentence punctuation after Markdown emphasis remains supported'
+  );
   const unsafeWildcardRange = analyzeDependencyUpdate(
     {
       title: 'chore(deps): bump foo from 1.2.* to 1.3.*',
@@ -444,6 +449,8 @@ test('dependency manifest detection excludes runtime source and GitHub workflows
   assert.equal(isDependencyManifestPath('docs/development.txt'), false);
   assert.equal(isDependencyManifestPath('.github/workflows/ci.yml'), false);
   assert.equal(isDependencyManifestPath('src/main.ts'), false);
+});
+
 test('Dependabot updates to nested requirements manifests can pass the manifest-path gate', () => {
   const result = analyzeDependencyUpdate(
     {
@@ -458,7 +465,6 @@ test('Dependabot updates to nested requirements manifests can pass the manifest-
   assert.deepEqual(result.reasons, []);
 });
 
-});
 
 
 test('event targets require a valid organization PR number and recorded head SHA', () => {
