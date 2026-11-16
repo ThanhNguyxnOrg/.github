@@ -206,7 +206,7 @@ test('dependency update classification remains SemVer-aware across grouped summa
   );
   const unsafeNpmRange = analyzeDependencyUpdate(
     {
-      title: 'Bump foo from 1.0.0 to 2.0.0',
+      title: 'chore(deps): update foo requirement',
       body: 'Updates foo requirement from ^1.0.0 >=1.2.0 to ^2.0.0 >=1.2.1',
       user: { login: 'dependabot[bot]' }
     },
