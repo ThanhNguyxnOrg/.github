@@ -178,7 +178,7 @@ function parseVersionCore(value, allowBuildMetadata = false) {
 }
 
 function extractVersionSpecifiers(value) {
-  const text = String(value || '').replace(/[\x60*_]/g, '').trim();
+  const text = String(value || '').replace(/[\x60*_]/g, '').trim().replace(/\.$/, '');
   // PEP 440 epochs must never be partially consumed as a numeric prefix.
   if (/\b\d+!/.test(text)) return null;
 
