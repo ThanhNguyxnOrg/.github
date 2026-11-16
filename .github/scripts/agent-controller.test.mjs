@@ -10,6 +10,8 @@ import {
   isAutoMergeCheckReady,
   domainVerificationState,
   isPolicyAutoMergeCandidate,
+  expandChangedFilePaths,
+  getBlockingPullRequestLabels,
   isTransientAutoMergeError,
   evaluateCheckRollup,
   isDependencyManifestPath,
@@ -447,6 +449,37 @@ test('domain verification defers before handoff, preserves review holds, and rec
   assert.equal(domainVerificationState(scopedPr, profile, ['skills/new-skill.md']), 'pending');
   assert.equal(domainVerificationState({ ...scopedPr, labels: [{ name: 'automerge' }] }, profile, ['skills/new-skill.md']), 'ready');
   assert.equal(domainVerificationState(scopedPr, profile, ['README.md']), 'ready');
+});
+
+test('renamed files are checked using both their previous and current paths', () => {
+  const changedPaths = expandChangedFilePaths([
+    { filename: 'skills/new/readme.md', previous_filename: 'README.md', status: 'renamed' },
+    { filename: 'skills/new/meta.json', status: 'added' }
+  ]);
+  assert.deepEqual(changedPaths, ['skills/new/readme.md', 'README.md', 'skills/new/meta.json']);
+
+  const profile = {
+    autoMerge: {
+      label: 'automerge',
+      branchPrefix: 'contrib-',
+      sameRepository: true,
+      paths: ['skills/**/*.md']
+    }
+  };
+  const repository = 'ThanhNguyxnOrg/SkillGauge';
+  const pr = {
+    user: { login: 'contributor' },
+    labels: [{ name: 'automerge' }],
+    head: { ref: 'contrib-add-skill', repo: { full_name: repository } },
+    base: { repo: { full_name: repository } }
+  };
+  assert.equal(isPolicyAutoMergeCandidate(pr, changedPaths, profile), false);
+});
+
+test('manual maintainer blocking labels veto policy-authorized auto-merge candidates', () => {
+  const pr = { labels: [{ name: 'automerge' }, { name: 'security' }, { name: 'breaking' }] };
+  assert.deepEqual(getBlockingPullRequestLabels(pr, ['needs-review', 'security', 'breaking']), ['security', 'breaking']);
+  assert.deepEqual(getBlockingPullRequestLabels({ labels: [{ name: 'automerge' }] }, ['needs-review', 'security']), []);
 });
 
 test('repository-authorized auto-merge requires the explicit label, allowed branch, same-repo head and only allowed paths', () => {
