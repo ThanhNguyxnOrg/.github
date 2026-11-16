@@ -160,11 +160,43 @@ function pathMatches(path, pattern) {
   return path === pattern;
 }
 
+function parseVersionCore(value) {
+  const normalized = String(value || '').trim().replace(/^[vV]/, '');
+  // PEP 440 epochs require their own ordering rules; fail closed rather than
+  // silently comparing the portion after the epoch as if it were SemVer.
+  if (/^\d+!/.test(normalized)) return null;
+  const match = normalized.match(/^(\d+(?:\.\d+){0,2})(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\+[0-9A-Za-z.-]+)?$/);
+  if (!match) return null;
+  const parts = match[1].split('.').map(Number);
+  if (parts.some(part => !Number.isSafeInteger(part))) return null;
+  while (parts.length < 3) parts.push(0);
+  return parts;
+}
+
+function selectSpecifierVersion(specifier) {
+  const text = String(specifier || '').replace(/[\x60*_]/g, '').trim();
+  const pattern = /(?:^|[\s,])(?:\s*(===|==|~=|>=|<=|!=|>|<)\s*)?[vV]?(\d+(?:\.\d+){0,2}(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\+[0-9A-Za-z.-]+)?)/g;
+  const matches = [...text.matchAll(pattern)].map(match => ({
+    operator: match[1] || '',
+    version: match[2]
+  }));
+  if (!matches.length) return null;
+
+  // For PEP 440 compound specifiers, compare the effective lower bound.
+  // If there is no lower bound, use an exact/compatible version, then an
+  // unqualified version, and finally an upper bound. Exclusions alone are
+  // insufficient evidence and remain unknown.
+  const lower = matches.filter(item => item.operator === '>=' || item.operator === '>');
+  const exact = matches.filter(item => item.operator === '===' || item.operator === '==' || item.operator === '~=');
+  const unqualified = matches.filter(item => !item.operator);
+  const upper = matches.filter(item => item.operator === '<=' || item.operator === '<');
+  return (lower.at(-1) || exact.at(-1) || unqualified[0] || upper.at(-1) || {}).version || null;
+}
+
 function classifyVersionPair(oldVersion, newVersion) {
-  const oldParts = oldVersion.split('.').map(Number);
-  const newParts = newVersion.split('.').map(Number);
-  while (oldParts.length < 3) oldParts.push(0);
-  while (newParts.length < 3) newParts.push(0);
+  const oldParts = parseVersionCore(oldVersion);
+  const newParts = parseVersionCore(newVersion);
+  if (!oldParts || !newParts) return 'unknown';
   if (newParts.every((part, index) => part === oldParts[index])) return 'unchanged';
   if (newParts[0] > oldParts[0]) return 'major';
   if (newParts[0] < oldParts[0]) return 'downgrade';
@@ -175,33 +207,41 @@ function classifyVersionPair(oldVersion, newVersion) {
 
 export function classifyVersionUpdate(value) {
   const text = String(value || '');
-  const pairs = [];
+  const classifications = [];
 
-  // Dependabot single-package summaries and grouped release-note entries.
-  const fromToPattern = /\bfrom\s+(?:[<>=!~^]+\s*)?v?(\d+(?:\.\d+){0,2})\s+to\s+(?:[<>=!~^]+\s*)?v?(\d+(?:\.\d+){0,2})(?![A-Za-z0-9.+-])/gi;
+  // Supports ordinary SemVer pairs and compound Python constraints such as
+  // "from <1.0,>=0.17.4 to >=0.17.5,<1.0".
+  const fromToPattern = /\bfrom\s+(.+?)\s+to\s+(.+?)(?=\s+\b(?:in|for|with|which|that)\b|[\r\n]|$)/gi;
   for (const match of text.matchAll(fromToPattern)) {
-    pairs.push([match[1], match[2]]);
+    const oldVersion = selectSpecifierVersion(match[1]);
+    const newVersion = selectSpecifierVersion(match[2]);
+    classifications.push(oldVersion && newVersion
+      ? classifyVersionPair(oldVersion, newVersion)
+      : 'unknown');
   }
 
-  // Dependabot grouped npm PRs commonly put old/new versions in a Markdown table.
+  // Dependabot grouped npm/Rust PRs commonly include a Markdown version table.
   for (const line of text.split(/\r?\n/)) {
     if (!line.includes('|')) continue;
     const cells = line.split('|').map(cell => cell.trim()).filter(Boolean);
     if (cells.length < 3) continue;
-    const oldVersion = cells.at(-2).match(/^\x60v?(\d+(?:\.\d+){0,2})\x60?$/i)?.[1];
-    const newVersion = cells.at(-1).match(/^\x60v?(\d+(?:\.\d+){0,2})\x60?$/i)?.[1];
-    if (oldVersion && newVersion) pairs.push([oldVersion, newVersion]);
+    const oldVersion = selectSpecifierVersion(cells.at(-2));
+    const newVersion = selectSpecifierVersion(cells.at(-1));
+    if (oldVersion && newVersion) {
+      classifications.push(classifyVersionPair(oldVersion, newVersion));
+    }
   }
 
-  if (!pairs.length) return 'unknown';
-  const classifications = pairs.map(([oldVersion, newVersion]) => classifyVersionPair(oldVersion, newVersion));
+  if (!classifications.length) return 'unknown';
   if (classifications.includes('major')) return 'major';
   if (classifications.includes('downgrade')) return 'downgrade';
+  // One unparseable pair in a grouped update must not be hidden by another
+  // successfully parsed patch/minor pair.
+  if (classifications.includes('unknown')) return 'unknown';
   if (classifications.includes('minor')) return 'minor';
   if (classifications.includes('patch')) return 'patch';
   return 'unchanged';
 }
-
 
 function dependencySummary(pullRequest) {
   const title = String(pullRequest?.title || '');
@@ -261,6 +301,14 @@ export function assessPullRequestRisk(pullRequest, changedFiles = [], repository
     dependency,
     labels: [...labels]
   };
+}
+
+export function requiredCheckReviewReason(state) {
+  if (state === 'failure') return 'required-checks-failure';
+  if (state === 'missing') return 'required-checks-missing';
+  if (state === 'unconfigured') return 'required-checks-unconfigured';
+  if (state === 'not-applicable') return 'required-checks-not-applicable';
+  return null;
 }
 
 export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredChecks = []) {
@@ -561,6 +609,7 @@ async function syncCheckLabels(fullName, number, state) {
 async function processPullRequest(repo, pr) {
   const fullName = repo.full_name;
   const repoName = repo.name;
+  const dependencyBot = String(pr.user?.login || '').toLowerCase() === 'dependabot[bot]';
   const policy = repositoryPolicy(repoName);
   if (pr.draft) return;
 
@@ -610,6 +659,9 @@ async function processPullRequest(repo, pr) {
   } else if (fresh.mergeable === true) {
     await removeLabel(fullName, pr.number, 'merge-conflict');
   } else {
+    if (dependencyBot && risk.dependency?.eligible && riskReasons.length === 0) {
+      await addLabels(fullName, pr.number, ['automerge-pending']);
+    }
     console.log('[defer]', fullName + '#' + pr.number + ': GitHub is still computing mergeability');
     return;
   }
@@ -619,9 +671,8 @@ async function processPullRequest(repo, pr) {
     ? await getCheckState(fullName, checkSha, repoName, pathsAvailable ? paths : undefined)
     : 'unconfigured';
   await syncCheckLabels(fullName, pr.number, checkState);
-  if (checkState === 'failure') {
-    riskReasons.push('required-checks-failure');
-  }
+  const checkReviewReason = requiredCheckReviewReason(checkState);
+  if (checkReviewReason) riskReasons.push(checkReviewReason);
 
   // Successful CI does not override an outstanding human or CodeRabbit review thread.
   // Query review state only when no earlier risk signal already requires human review.
@@ -641,10 +692,10 @@ async function processPullRequest(repo, pr) {
     if (existingLabels.has(label)) riskReasons.push(label);
   }
   const uniqueReasons = [...new Set(riskReasons)];
-  const dependencyBot = String(pr.user?.login || '').toLowerCase() === 'dependabot[bot]';
 
   if (uniqueReasons.length) {
     await addLabels(fullName, pr.number, ['needs-review']);
+    await removeLabel(fullName, pr.number, 'automerge-pending');
     await removeLabel(fullName, pr.number, 'automerge');
     await removeLabel(fullName, pr.number, 'automerge-blocked');
     await disablePullRequestAutoMerge(fullName, fresh);
@@ -661,12 +712,14 @@ async function processPullRequest(repo, pr) {
 
   if (!dependencyBot) {
     await removeLabel(fullName, pr.number, 'automerge');
+    await removeLabel(fullName, pr.number, 'automerge-pending');
     console.log('[triaged]', fullName + '#' + pr.number + ': no high-risk signals; CodeRabbit and CI remain active');
     return;
   }
 
   const dependency = risk.dependency || analyzeDependencyUpdate(pr, paths);
   if (!dependency.eligible) {
+    await removeLabel(fullName, pr.number, 'automerge-pending');
     await addLabels(fullName, pr.number, ['needs-review']);
     await reconcileReviewRouting(fullName, pr, config.reviewers || []);
     await assignHumans(fullName, pr, true);
@@ -677,6 +730,7 @@ async function processPullRequest(repo, pr) {
   const profile = getRepositoryProfile(repoName);
   if (profile?.autoMergeDependabot !== true || !Array.isArray(profile.requiredChecks) || profile.requiredChecks.length === 0) {
     await removeLabel(fullName, pr.number, 'automerge');
+    await removeLabel(fullName, pr.number, 'automerge-pending');
     console.log('[auto-merge-disabled]', fullName + '#' + pr.number + ': repository is not explicitly opted in with required checks');
     return;
   }
@@ -690,16 +744,24 @@ async function processPullRequest(repo, pr) {
   try {
     repositorySettings = await request('/repos/' + fullName);
   } catch (error) {
+    if (error instanceof GitHubError && [403, 404].includes(error.status)) {
+      await removeLabel(fullName, pr.number, 'automerge-pending');
+      await addLabels(fullName, pr.number, ['automerge-blocked']);
+    } else {
+      await addLabels(fullName, pr.number, ['automerge-pending']);
+    }
     console.warn('[auto-merge-settings]', fullName + '#' + pr.number, error.message);
     return;
   }
   if (repositorySettings.allow_auto_merge !== true) {
+    await removeLabel(fullName, pr.number, 'automerge-pending');
     await addLabels(fullName, pr.number, ['automerge-blocked']);
     console.warn('[auto-merge-blocked]', fullName + '#' + pr.number + ': Allow auto-merge is disabled in repository settings');
     return;
   }
   const mergeMethod = mergeMethodFor(repositorySettings, profile);
   if (!mergeMethod) {
+    await removeLabel(fullName, pr.number, 'automerge-pending');
     await addLabels(fullName, pr.number, ['automerge-blocked']);
     console.warn('[auto-merge-blocked]', fullName + '#' + pr.number + ': no enabled merge method');
     return;
@@ -707,6 +769,7 @@ async function processPullRequest(repo, pr) {
 
   try {
     await enablePullRequestAutoMerge(fullName, fresh, mergeMethod);
+    await removeLabel(fullName, pr.number, 'automerge-pending');
     await addLabels(fullName, pr.number, ['automerge']);
     console.log('[auto-merge-enabled]', fullName + '#' + pr.number + ': low-risk ' + dependency.versionRisk + ' update; checks=' + checkState);
   } catch (error) {
@@ -717,14 +780,17 @@ async function processPullRequest(repo, pr) {
       if (!merged?.merged) throw new Error('GitHub did not confirm immediate merge');
       await removeLabel(fullName, pr.number, 'automerge');
       await removeLabel(fullName, pr.number, 'automerge-blocked');
+      await removeLabel(fullName, pr.number, 'automerge-pending');
       console.log('[auto-merged]', fullName + '#' + pr.number + ': required checks passed; merge=' + merged.sha);
       return;
     }
     if (isTransientAutoMergeError(error)) {
       await removeLabel(fullName, pr.number, 'automerge-blocked');
-      console.log('[auto-merge-wait]', fullName + '#' + pr.number + ': GitHub has not finalized mergeability yet; waiting for the next check or PR event');
+      await addLabels(fullName, pr.number, ['automerge-pending']);
+      console.log('[auto-merge-wait] ' + fullName + '#' + pr.number + ': ' + error.message + '; hourly reconciliation will retry without routing this PR to human review');
       return;
     }
+    await removeLabel(fullName, pr.number, 'automerge-pending');
     await addLabels(fullName, pr.number, ['automerge-blocked']);
     console.warn('[auto-merge-error]', fullName + '#' + pr.number, error.message);
   }
