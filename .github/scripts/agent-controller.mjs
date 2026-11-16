@@ -177,25 +177,43 @@ function parseVersionCore(value, allowBuildMetadata = false) {
   return parts;
 }
 
+function stripMarkdownVersionEmphasis(value) {
+  let text = String(value || '').trim();
+  // Strip only a wrapper around the complete version token, never an internal wildcard.
+  for (const marker of ['**', '__', '*', '_']) {
+    if (text.startsWith(marker) && text.endsWith(marker) && text.length > marker.length * 2) {
+      return text.slice(marker.length, -marker.length);
+    }
+  }
+  return text;
+}
+
 function extractVersionSpecifiers(value) {
-  const text = String(value || '').replace(/[\x60*_]/g, '').trim().replace(/\.$/, '');
+  const text = String(value || '').replace(new RegExp(String.fromCharCode(96), 'g'), '').trim();
   // PEP 440 epochs must never be partially consumed as a numeric prefix.
   if (/\b\d+!/.test(text)) return null;
 
-  // Parse the ENTIRE supported expression. Extracting only the comparator
-  // fragments is unsafe for npm ranges such as "^1.0.0 >=1.2.0" or "1 || 2":
-  // ignored operators can change the effective range dramatically. This
-  // intentionally supports simple versions and comma-separated PEP 440
-  // comparators only; unknown ecosystem syntax fails closed.
-  const tokenPattern = /^(===|==|~=|>=|<=|!=|>|<)?\s*[vV]?(\d+(?:\.\d+){0,2}(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\+[0-9A-Za-z.-]+)?)$/;
+  // Parse every comma-separated comparator completely. Unsupported npm range
+  // operators and wildcard tokens must fail closed instead of being stripped.
+  const comparatorPattern = /^(===|==|~=|>=|<=|!=|>|<)?\s*/;
+  const versionPattern = /^[vV]?(\d+(?:\.\d+){0,2}(?:[-_.]?[A-Za-z][0-9A-Za-z._-]*)?(?:\+[0-9A-Za-z.-]+)?)$/;
   const rawParts = text.split(',');
   if (!rawParts.length) return null;
 
   const matches = [];
   for (const rawPart of rawParts) {
-    const match = rawPart.trim().match(tokenPattern);
-    if (!match) return null;
-    matches.push({ operator: match[1] || '', version: match[2] });
+    const part = rawPart.trim();
+    const prefix = part.match(comparatorPattern);
+    const operator = prefix?.[1] || '';
+    let version = part.slice(prefix?.[0].length || 0).trim();
+    // Remove sentence punctuation, but leave a terminal X-range wildcard intact.
+    // Trim sentence punctuation before removing paired Markdown emphasis wrappers.
+    if (version.endsWith('.') && !version.endsWith('.*')) version = version.slice(0, -1);
+    version = stripMarkdownVersionEmphasis(version);
+    // Wildcard suffixes remain untouched and fail the supported-token check.
+    const versionMatch = version.match(versionPattern);
+    if (!versionMatch) return null;
+    matches.push({ operator, version: versionMatch[1] || versionMatch[0] });
   }
   return matches.length ? matches : null;
 }
@@ -284,6 +302,19 @@ export function classifyVersionUpdate(value) {
     /^(?:unknown|latest|unavailable|not\s+available|n\/?a|undefined|null)$/i.test(
       String(value || '').replace(/[\x60*_]/g, '').trim()
     );
+  const isWildcardVersionRange = value => {
+    const normalized = String(value || '')
+      .replace(new RegExp(String.fromCharCode(96), 'g'), '')
+      .trim()
+      // Strip paired Markdown emphasis wrappers, but retain inner wildcard markers.
+      .replace(/(^|[=><!~^,|\s])(\*\*|__)([^,|\s]+?)\2(?=$|[,|\s])/g, '$1$3')
+      .replace(/(^|[=><!~^,|\s])\*([^,|\s]+?)\*(?=$|[,|\s])/g, '$1$2')
+      .replace(/(^|[=><!~^,|\s])_([^,|\s]+?)_(?=$|[,|\s])/g, '$1$2');
+    // Find npm X-range components anywhere in a comparator expression,
+    // including compound constraints like ">=1.0,==1.2.*".
+    return /(?:^|[=><!~^,|_\s])(?:[vV]?(?:\d+|[xX*])(?:\.(?:\d+|[xX*]))*)_*(?=$|[,|\s])/i.test(normalized) &&
+      /[xX*]/i.test(normalized);
+  };
 
   for (let lineIndex = 0; lineIndex < lines.length;) {
     if (!lines[lineIndex].includes('|')) {
@@ -313,7 +344,8 @@ export function classifyVersionUpdate(value) {
       const newValue = cells.at(-1);
       const rowRisk = classifySpecifierPair(oldValue, newValue, allowCargoBuildMetadata);
       return rowRisk !== 'unknown' ||
-        isUnknownVersionMarker(oldValue) || isUnknownVersionMarker(newValue);
+        isUnknownVersionMarker(oldValue) || isUnknownVersionMarker(newValue) ||
+        isWildcardVersionRange(oldValue) || isWildcardVersionRange(newValue);
     });
     if (!looksLikeVersionTable) continue;
 
@@ -348,6 +380,8 @@ export function isDependencyManifestPath(path) {
   const normalized = String(path || '').replace(/\\/g, '/').toLowerCase();
   const basename = normalized.split('/').at(-1) || '';
   if (normalized.startsWith('.github/workflows/') || normalized.startsWith('.github/actions/')) return false;
+  const isNestedRequirementsFile = /^requirements\/.+\.txt$/i.test(normalized);
+  if (isNestedRequirementsFile) return true;
   return /^(?:package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|cargo\.toml|cargo\.lock|go\.mod|go\.sum|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|pipfile(?:\.lock)?|composer\.json|composer\.lock|gemfile(?:\.lock)?|directory\.packages\.props|packages\.lock\.json|packages\.config)$/i.test(basename)
     || /\.(?:csproj|fsproj|vbproj)$/i.test(basename);
 }

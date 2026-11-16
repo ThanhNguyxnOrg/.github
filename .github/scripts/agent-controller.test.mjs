@@ -195,6 +195,131 @@ test('dependency update classification remains SemVer-aware across grouped summa
     'PEP 440 epoch prefixes must not be partially parsed as ordinary releases'
   );
   assert.equal(
+    classifyVersionUpdate('Bump foo from 1.2.* to 1.3.*'),
+    'unknown',
+    'npm X-ranges must not be normalized into ordinary version numbers'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump foo from 1.2.* to 1.3.*.'),
+    'unknown',
+    'trailing prose punctuation must not hide a wildcard range'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump foo requirement from 1.2.*,>=*1.2.3* to 1.3.*,>=*1.2.4*'),
+    'unknown',
+    'a wildcard in one comparator must not pair with Markdown emphasis in another'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump foo from *1.2.3* to *1.2.4*'),
+    'patch',
+    'paired Markdown emphasis around concrete versions remains supported'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump foo from *1.2.3* to *1.2.4*.'),
+    'patch',
+    'trailing sentence punctuation after Markdown emphasis remains supported'
+  );
+  const unsafeWildcardRange = analyzeDependencyUpdate(
+    {
+      title: 'chore(deps): bump foo from 1.2.* to 1.3.*',
+      body: 'Bumps foo from 1.2.* to 1.3.*',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['package.json']
+  );
+  assert.equal(unsafeWildcardRange.eligible, false);
+  assert.equal(unsafeWildcardRange.versionRisk, 'unknown');
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | 1.2.* | 2.0.* |'),
+    'unknown',
+    'wildcard-only headerless table rows must not be ignored behind a safe prose patch'
+  );
+  const unsafeMixedWildcardGroup = analyzeDependencyUpdate(
+    {
+      title: 'chore(deps): bump grouped dependencies with 2 updates',
+      body: 'Updates foo from 1.2.3 to 1.2.4\n\n| bar | 1.2.* | 2.0.* |',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['package.json']
+  );
+  assert.equal(unsafeMixedWildcardGroup.eligible, false);
+  assert.equal(unsafeMixedWildcardGroup.versionRisk, 'unknown');
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | 1.x | 2.x |'),
+    'unknown',
+    'npm x-ranges in a headerless table must not be ignored behind a safe prose patch'
+  );
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | _1.2.*_ | _2.0.*_ |'),
+    'unknown',
+    'Markdown-emphasized npm wildcard endpoints must remain fail-closed'
+  );
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | =1.x | =2.x |'),
+    'unknown',
+    'equality-prefixed npm X-ranges in grouped tables must fail closed'
+  );
+  const unsafeXRangeGroup = analyzeDependencyUpdate(
+    {
+      title: 'chore(deps): bump grouped dependencies with 2 updates',
+      body: 'Updates foo from 1.2.3 to 1.2.4\n\n| bar | 1.x | 2.x |',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['package.json']
+  );
+  assert.equal(unsafeXRangeGroup.eligible, false);
+  assert.equal(unsafeXRangeGroup.versionRisk, 'unknown');
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | >=1.0,==1.2.* | >=1.0,==2.0.* |'),
+    'unknown',
+    'wildcard components inside compound constraints must prevent table skipping'
+  );
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | >=1.0,==_1.2.*_ | >=1.0,==_2.0.*_ |'),
+    'unknown',
+    'emphasized wildcard components inside compound constraints must fail closed'
+  );
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | >=1.0,==**1.2.*** | >=1.0,==**2.0.*** |'),
+    'unknown',
+    'asterisk-emphasized wildcard components inside compound constraints must fail closed'
+  );
+  const unsafeCompoundWildcardGroup = analyzeDependencyUpdate(
+    {
+      title: 'chore(deps): bump grouped dependencies with 2 updates',
+      body: 'Updates foo from 1.2.3 to 1.2.4\n\n| bar | >=1.0,==1.2.* | >=1.0,==2.0.* |',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['requirements.txt']
+  );
+  assert.equal(unsafeCompoundWildcardGroup.eligible, false);
+  assert.equal(unsafeCompoundWildcardGroup.versionRisk, 'unknown');
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | 1.x.x | 2.x.x |'),
+    'unknown',
+    'multiple npm x-range components must not be ignored beside a safe prose patch'
+  );
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | 1.*.* | 2.*.* |'),
+    'unknown',
+    'multiple npm wildcard components must remain fail-closed'
+  );
+  assert.equal(
+    classifyVersionUpdate('Updates foo from 1.2.3 to 1.2.4\n\n| bar | *1.x.x* | *2.x.x* |'),
+    'unknown',
+    'single-asterisk Markdown emphasis around repeated x-ranges must remain fail-closed'
+  );
+  const unsafeMultiWildcardGroup = analyzeDependencyUpdate(
+    {
+      title: 'chore(deps): bump grouped dependencies with 2 updates',
+      body: 'Updates foo from 1.2.3 to 1.2.4\n\n| bar | 1.x.x | 2.x.x |',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['package.json']
+  );
+  assert.equal(unsafeMultiWildcardGroup.eligible, false);
+  assert.equal(unsafeMultiWildcardGroup.versionRisk, 'unknown');
+  assert.equal(
     classifyVersionUpdate('Bump foo requirement from ^1.0.0 >=1.2.0 to ^2.0.0 >=1.2.1'),
     'unknown',
     'unsupported npm range operators must not be discarded during extraction'
@@ -409,9 +534,27 @@ test('risk assessment routes security, workflow, breaking and sensitive-path cha
 test('dependency manifest detection excludes runtime source and GitHub workflows', () => {
   assert.equal(isDependencyManifestPath('package-lock.json'), true);
   assert.equal(isDependencyManifestPath('src-tauri/Cargo.toml'), true);
+  assert.equal(isDependencyManifestPath('requirements/development.txt'), true);
+  assert.equal(isDependencyManifestPath('requirements/dev/constraints.txt'), true);
+  assert.equal(isDependencyManifestPath('docs/development.txt'), false);
   assert.equal(isDependencyManifestPath('.github/workflows/ci.yml'), false);
   assert.equal(isDependencyManifestPath('src/main.ts'), false);
 });
+
+test('Dependabot updates to nested requirements manifests can pass the manifest-path gate', () => {
+  const result = analyzeDependencyUpdate(
+    {
+      title: 'chore(deps-dev): update ruff requirement from <1.0,>=0.17.4 to >=0.17.5,<1.0',
+      body: 'Updates ruff to 0.17.5',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['requirements/development.txt']
+  );
+  assert.equal(result.eligible, true);
+  assert.equal(result.versionRisk, 'patch');
+  assert.deepEqual(result.reasons, []);
+});
+
 
 
 test('event targets require a valid organization PR number and recorded head SHA', () => {
