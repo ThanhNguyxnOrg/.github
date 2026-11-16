@@ -96,7 +96,7 @@
     },
     "automerge": {
       "color": "0E8A16",
-      "description": "Low-risk Dependabot update queued for Auto-merge after required CI checks pass."
+      "description": "Explicitly authorized low-risk PR queued for Auto-merge only after every configured required check succeeds."
     },
     "automergeBlocked": {
       "color": "FBCA04",
@@ -104,7 +104,11 @@
     },
     "automergePending": {
       "color": "DDEBF7",
-      "description": "Low-risk Dependabot update is eligible for Auto-merge but GitHub is still finalizing mergeability or Auto-merge admission; automatically retried during hourly reconciliation."
+      "description": "An explicitly authorized low-risk PR is waiting for required checks or GitHub mergeability; hourly reconciliation retries it."
+    },
+    "skillVerificationReview": {
+      "color": "D93F0B",
+      "description": "SkillGauge domain verification or contribution-eligibility gate requires maintainer review."
     }
   },
   "blockingLabels": [
@@ -116,7 +120,8 @@
     "wip",
     "major-update",
     "ci-failed",
-    "merge-conflict"
+    "merge-conflict",
+    "skill-verification-review"
   ],
   "ignoredIssueLabels": [
     "automated",
@@ -177,7 +182,8 @@
       "wip",
       "pinned",
       "skill-verification-pending",
-      "automerge-pending"
+      "automerge-pending",
+      "skill-verification-review"
     ],
     "activityTimestampToleranceMinutes": 5
   },
