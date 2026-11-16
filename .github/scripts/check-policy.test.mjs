@@ -214,6 +214,7 @@ test('ApiDex confirmed-dead catalog remediation is scoped to bot PRs and require
   assert.equal(profile.autoMerge.label, 'automerge');
   assert.equal(profile.autoMerge.branchPrefix, 'agent-remediation/');
   assert.equal(profile.autoMerge.sameRepository, true);
+  assert.equal(profile.autoMerge.author, 'thanhnguyxnagent[bot]');
   assert.equal(profile.autoMerge.allowTriageBypass, true);
   assert.equal(profile.autoMerge.allowSensitivePaths, true);
   assert.deepEqual(profile.autoMerge.paths, ['apis/**', 'README.md', 'site/index.html', 'site/src/data/apis.json']);
