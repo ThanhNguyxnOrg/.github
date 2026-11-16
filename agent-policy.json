@@ -112,7 +112,6 @@
     }
   },
   "blockingLabels": [
-    "needs-review",
     "do-not-merge",
     "breaking",
     "breaking-change",
