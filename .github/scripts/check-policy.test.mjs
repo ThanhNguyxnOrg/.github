@@ -208,3 +208,22 @@ test('apidex-hub site dependency changes require the Website CI build', () => {
     paths: ['site/**']
   });
 });
+
+test('ApiDex confirmed-dead catalog remediation is scoped to bot PRs and required checks', () => {
+  const profile = getRepositoryProfile('apidex-hub');
+  assert.equal(profile.autoMerge.label, 'automerge');
+  assert.equal(profile.autoMerge.branchPrefix, 'agent-remediation/');
+  assert.equal(profile.autoMerge.sameRepository, true);
+  assert.equal(profile.autoMerge.allowTriageBypass, true);
+  assert.equal(profile.autoMerge.allowSensitivePaths, true);
+  assert.deepEqual(profile.autoMerge.paths, ['apis/**', 'README.md', 'site/index.html', 'site/src/data/apis.json']);
+  for (const path of ['apis/vendor/api.md', 'README.md', 'site/index.html', 'site/src/data/apis.json']) {
+    assert.ok(profile.autoMerge.paths.some(pattern => matchesPathPattern(path, pattern)), path);
+  }
+  for (const path of ['scripts/remove_dead_links.py', '.github/workflows/link-checker.yml', 'site/src/main.ts']) {
+    assert.ok(!profile.autoMerge.paths.some(pattern => matchesPathPattern(path, pattern)), path);
+  }
+  assert.deepEqual(profile.requiredChecks.map(check => typeof check === 'string' ? check : check.name), [
+    'check-links', 'regression-tests / Python Regression Tests', 'lint', 'website / Website Build'
+  ]);
+});
