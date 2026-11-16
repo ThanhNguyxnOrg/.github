@@ -900,16 +900,24 @@ async function processPullRequest(repo, pr) {
     riskReasons.push('triage-needed');
   }
 
+  for (const label of getBlockingPullRequestLabels(fresh)) {
+    if (!riskReasons.includes(label)) riskReasons.push(label);
+  }
+  const uniqueReasons = [...new Set(riskReasons)];
+
   if (fresh.mergeable === false || fresh.mergeable_state === 'dirty') {
     riskReasons.push('merge-conflict');
     await addLabels(fullName, pr.number, ['merge-conflict']);
   } else if (fresh.mergeable === true) {
     await removeLabel(fullName, pr.number, 'merge-conflict');
   } else {
+    if (riskReasons.length > 0) {
+      await disablePullRequestAutoMerge(fullName, fresh);
+    }
     if (dependencyBot && risk.dependency?.eligible && riskReasons.length === 0) {
       await addLabels(fullName, pr.number, ['automerge-pending']);
     }
-    console.log('[defer]', fullName + '#' + pr.number + ': GitHub is still computing mergeability');
+    console.log('[defer]', fullName + '#' + pr.number + ': GitHub is still computing mergeability; native Auto-merge was disabled for any known review hold');
     return;
   }
 
@@ -934,10 +942,6 @@ async function processPullRequest(repo, pr) {
     }
   }
 
-  for (const label of getBlockingPullRequestLabels(fresh)) {
-    if (!riskReasons.includes(label)) riskReasons.push(label);
-  }
-  const uniqueReasons = [...new Set(riskReasons)];
 
   if (uniqueReasons.length) {
     await addLabels(fullName, pr.number, ['needs-review']);
