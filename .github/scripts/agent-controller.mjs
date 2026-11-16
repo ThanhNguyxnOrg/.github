@@ -104,7 +104,8 @@ export function classifyPullRequestLabels(pullRequest, changedFiles = []) {
   const riskBody = dependencyBot ? dependencySummary(pullRequest) : body;
   const riskText = dependencyBot ? dependencySummary(pullRequest) : text;
   const plainText = riskText.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ');
-  if (/\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)/i.test(plainText)) {
+  if (/^(?:feat|feature|fix|refactor)(?:\([^)]*\))?!:/i.test(title) ||
+      /\b(?:breaking\s*:|breaking changes?|backward[- ]incompatible)/i.test(plainText)) {
     labels.add('breaking');
   }
   if (hasSecuritySignal(riskText)) {
