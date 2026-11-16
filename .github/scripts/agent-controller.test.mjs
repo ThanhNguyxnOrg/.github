@@ -195,6 +195,31 @@ test('dependency update classification remains SemVer-aware across grouped summa
     'PEP 440 epoch prefixes must not be partially parsed as ordinary releases'
   );
   assert.equal(
+    classifyVersionUpdate('Bump foo from 1.2.* to 1.3.*'),
+    'unknown',
+    'npm X-ranges must not be normalized into ordinary version numbers'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump foo from 1.2.* to 1.3.*.'),
+    'unknown',
+    'trailing prose punctuation must not hide a wildcard range'
+  );
+  assert.equal(
+    classifyVersionUpdate('Bump foo from *1.2.3* to *1.2.4*'),
+    'patch',
+    'paired Markdown emphasis around concrete versions remains supported'
+  );
+  const unsafeWildcardRange = analyzeDependencyUpdate(
+    {
+      title: 'chore(deps): bump foo from 1.2.* to 1.3.*',
+      body: 'Bumps foo from 1.2.* to 1.3.*',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['package.json']
+  );
+  assert.equal(unsafeWildcardRange.eligible, false);
+  assert.equal(unsafeWildcardRange.versionRisk, 'unknown');
+  assert.equal(
     classifyVersionUpdate('Bump foo requirement from ^1.0.0 >=1.2.0 to ^2.0.0 >=1.2.1'),
     'unknown',
     'unsupported npm range operators must not be discarded during extraction'
