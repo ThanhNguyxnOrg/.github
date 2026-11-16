@@ -200,6 +200,21 @@ test('dependency update classification remains SemVer-aware across grouped summa
     'unparseable rows in a grouped version table must not be dropped'
   );
   assert.equal(
+    classifyVersionUpdate('| foo | unknown | latest |\n| bar | 1.2.3 | 1.2.4 |'),
+    'unknown',
+    'an unparseable first row in a headerless grouped version table must fail closed'
+  );
+  const unsafeHeaderlessGroup = analyzeDependencyUpdate(
+    {
+      title: 'build(deps): bump grouped group with 2 updates',
+      body: '| foo | unknown | latest |\n| bar | 1.2.3 | 1.2.4 |',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['package-lock.json']
+  );
+  assert.equal(unsafeHeaderlessGroup.eligible, false);
+  assert.equal(unsafeHeaderlessGroup.versionRisk, 'unknown');
+  assert.equal(
     classifyVersionUpdate('Bump package from 1.2.3-rc.1 to 1.2.3'),
     'unknown',
     'prerelease transitions must fail closed until their ecosystem-specific ordering is parsed'
