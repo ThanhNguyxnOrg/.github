@@ -33,6 +33,20 @@ test('dependency labels stay descriptive and do not themselves force review', ()
   assert.ok(!labels.includes('needs-review'));
 });
 
+test('explicit breaking changes in human PR titles or bodies require the breaking label', () => {
+  const base = { user: { login: 'contributor' } };
+  assert.ok(classifyPullRequestLabels({
+    ...base,
+    title: 'feat: change skill inputs',
+    body: 'BREAKING CHANGE: rename required inputs'
+  }, ['skills/new-skill.md']).includes('breaking'));
+  assert.ok(classifyPullRequestLabels({
+    ...base,
+    title: 'feat!: change skill inputs',
+    body: 'This updates the contribution format.'
+  }, ['skills/new-skill.md']).includes('breaking'));
+});
+
 test('major and downgrade dependency updates receive the major-update label', () => {
   const major = classifyPullRequestLabels(
     { title: 'Bump package from 1.4.0 to 2.0.0', user: { login: 'dependabot[bot]' } },
