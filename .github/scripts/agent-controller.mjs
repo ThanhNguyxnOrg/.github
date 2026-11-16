@@ -217,10 +217,10 @@ export function classifyVersionUpdate(value) {
   // Supports ordinary SemVer pairs and compound Python constraints such as
   // "from <1.0,>=0.17.4 to >=0.17.5,<1.0".
   const fromToPattern = /\bfrom\s+(.+?)\s+to\s+(.+?)(?=\s+\b(?:in|for|with|which|that)\b|[\r\n]|$)/gi;
-  for (const match of text.matchAll(fromToPattern)) {
-    // Dependabot Markdown tables may contain a "From | To" header. It is not
-    // a dependency update and must not poison the grouped version result.
-    if (/^\s*from\s*$/i.test(match[1]) && /^\s*to\s*$/i.test(match[2])) continue;
+  // Version-pair prose is parsed separately from Markdown tables; otherwise
+  // the table header "From | To" can look like a malformed dependency pair.
+  const proseText = text.split(/\r?\n/).filter(line => !line.includes('|')).join('\n');
+  for (const match of proseText.matchAll(fromToPattern)) {
     const oldVersion = selectSpecifierVersion(match[1]);
     const newVersion = selectSpecifierVersion(match[2]);
     classifications.push(oldVersion && newVersion
