@@ -439,8 +439,25 @@ test('risk assessment routes security, workflow, breaking and sensitive-path cha
 test('dependency manifest detection excludes runtime source and GitHub workflows', () => {
   assert.equal(isDependencyManifestPath('package-lock.json'), true);
   assert.equal(isDependencyManifestPath('src-tauri/Cargo.toml'), true);
+  assert.equal(isDependencyManifestPath('requirements/development.txt'), true);
+  assert.equal(isDependencyManifestPath('requirements/dev/constraints.txt'), true);
+  assert.equal(isDependencyManifestPath('docs/development.txt'), false);
   assert.equal(isDependencyManifestPath('.github/workflows/ci.yml'), false);
   assert.equal(isDependencyManifestPath('src/main.ts'), false);
+test('Dependabot updates to nested requirements manifests can pass the manifest-path gate', () => {
+  const result = analyzeDependencyUpdate(
+    {
+      title: 'chore(deps-dev): update ruff requirement from <1.0,>=0.17.4 to >=0.17.5,<1.0',
+      body: 'Updates ruff to 0.17.5',
+      user: { login: 'dependabot[bot]' }
+    },
+    ['requirements/development.txt']
+  );
+  assert.equal(result.eligible, true);
+  assert.equal(result.versionRisk, 'patch');
+  assert.deepEqual(result.reasons, []);
+});
+
 });
 
 
