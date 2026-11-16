@@ -482,6 +482,7 @@ test('deferred verification or a changed head cancels an already queued native A
   const notQueued = { node_id: 'PR_kwDOExample', auto_merge: null };
   assert.equal(shouldDisableAutoMergeForDeferredState(queued, { verificationPending: true }), true);
   assert.equal(shouldDisableAutoMergeForDeferredState(queued, { headChanged: true }), true);
+  assert.equal(shouldDisableAutoMergeForDeferredState(queued, { baseChanged: true }), true);
   assert.equal(shouldDisableAutoMergeForDeferredState(queued), false);
   assert.equal(shouldDisableAutoMergeForDeferredState(notQueued, { verificationPending: true }), false);
 });
@@ -490,6 +491,7 @@ test('manual maintainer blocking labels veto policy-authorized auto-merge candid
   const pr = { labels: [{ name: 'automerge' }, { name: 'security' }, { name: 'breaking' }] };
   assert.deepEqual(getBlockingPullRequestLabels(pr, ['needs-review', 'security', 'breaking']), ['security', 'breaking']);
   assert.deepEqual(getBlockingPullRequestLabels({ labels: [{ name: 'automerge' }] }, ['needs-review', 'security']), []);
+  assert.deepEqual(getBlockingPullRequestLabels({ labels: [{ name: 'needs-review' }] }, ['needs-review']), []);
 });
 
 test('repository-authorized auto-merge requires the explicit label, allowed branch, same-repo head and only allowed paths', () => {
