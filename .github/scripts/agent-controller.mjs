@@ -232,13 +232,35 @@ export function classifyVersionUpdate(value) {
   }
 
   // Dependabot grouped npm/Rust PRs commonly include a Markdown version table.
+  // Once a version table is identified, every data row must be parseable;
+  // an "unknown"/"latest" member cannot disappear behind another safe patch.
+  let inVersionTable = false;
+  const oldHeaders = new Set(['from', 'current', 'previous', 'old', 'installed']);
+  const newHeaders = new Set(['to', 'latest', 'new', 'updated']);
   for (const line of text.split(/\r?\n/)) {
-    if (!line.includes('|')) continue;
+    if (!line.includes('|')) {
+      inVersionTable = false;
+      continue;
+    }
     const cells = line.split('|').map(cell => cell.trim()).filter(Boolean);
     if (cells.length < 3) continue;
+    const oldColumn = cells.at(-2).replace(/[\x60*_]/g, '').trim().toLowerCase();
+    const newColumn = cells.at(-1).replace(/[\x60*_]/g, '').trim().toLowerCase();
+    if (oldHeaders.has(oldColumn) && newHeaders.has(newColumn)) {
+      inVersionTable = true;
+      continue;
+    }
+    if (cells.every(cell => /^:?-{3,}:?$/.test(cell))) continue;
+
     const oldVersion = selectSpecifierVersion(cells.at(-2));
     const newVersion = selectSpecifierVersion(cells.at(-1));
-    if (oldVersion && newVersion) {
+    if (inVersionTable) {
+      classifications.push(oldVersion && newVersion
+        ? classifyVersionPair(oldVersion, newVersion, allowCargoBuildMetadata)
+        : 'unknown');
+    } else if (oldVersion && newVersion) {
+      // Headerless version tables are also common in generated summaries.
+      inVersionTable = true;
       classifications.push(classifyVersionPair(oldVersion, newVersion, allowCargoBuildMetadata));
     }
   }
