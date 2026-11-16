@@ -515,6 +515,10 @@ export function shouldDisableAutoMergeForDeferredState(pullRequest, { headChange
   return Boolean(pullRequest?.auto_merge && pullRequest?.node_id && (headChanged || baseChanged || verificationPending));
 }
 
+export function shouldDisableAutoMergeForKnownReviewHold(pullRequest, riskReasons = []) {
+  return Boolean(pullRequest?.auto_merge && pullRequest?.node_id && Array.isArray(riskReasons) && riskReasons.length > 0);
+}
+
 export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredChecks = []) {
   return evaluateRequiredChecks(checkRuns, statuses, requiredChecks).state;
 }
@@ -911,7 +915,7 @@ async function processPullRequest(repo, pr) {
   } else if (fresh.mergeable === true) {
     await removeLabel(fullName, pr.number, 'merge-conflict');
   } else {
-    if (riskReasons.length > 0) {
+    if (shouldDisableAutoMergeForKnownReviewHold(fresh, riskReasons)) {
       await disablePullRequestAutoMerge(fullName, fresh);
     }
     if (dependencyBot && risk.dependency?.eligible && riskReasons.length === 0) {
