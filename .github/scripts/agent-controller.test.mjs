@@ -15,6 +15,7 @@ import {
   buildEnablePullRequestAutoMergeRequest,
   expandChangedFilePaths,
   getBlockingPullRequestLabels,
+  getStaleAutoClassifiedBlockingLabels,
   shouldDisableAutoMergeForDeferredState,
   shouldDisableAutoMergeForKnownReviewHold,
   isTransientAutoMergeError,
@@ -844,4 +845,39 @@ test('processPullRequest disables native Auto-merge for a review hold when merge
     if (originalToken === undefined) delete process.env.GH_TOKEN;
     else process.env.GH_TOKEN = originalToken;
   }
+});
+
+
+test('stale security and breaking labels added from an earlier snapshot are removed after refreshed text changes', () => {
+  const initialLabels = new Set(['automerge']);
+  const initialClassification = new Set(['automated', 'breaking', 'security']);
+  const fresh = { labels: [{ name: 'automerge' }, { name: 'breaking' }, { name: 'security' }] };
+  const refreshedClassification = new Set(['automated']);
+  assert.deepEqual(
+    getStaleAutoClassifiedBlockingLabels(initialLabels, initialClassification, fresh, refreshedClassification),
+    ['breaking', 'security']
+  );
+});
+
+test('pre-existing maintainer security and breaking labels remain blocking vetoes', () => {
+  const initialLabels = new Set(['automerge', 'security', 'breaking']);
+  const initialClassification = new Set(['automated', 'breaking', 'security']);
+  const fresh = { labels: [{ name: 'automerge' }, { name: 'security' }, { name: 'breaking' }] };
+  const refreshedClassification = new Set(['automated']);
+  assert.deepEqual(
+    getStaleAutoClassifiedBlockingLabels(initialLabels, initialClassification, fresh, refreshedClassification),
+    []
+  );
+  assert.deepEqual(getBlockingPullRequestLabels(fresh, ['security', 'breaking']), ['security', 'breaking']);
+});
+
+test('a risk label still present in refreshed title or body is not cleaned up', () => {
+  const initialLabels = new Set(['automerge']);
+  const initialClassification = new Set(['breaking']);
+  const fresh = { labels: [{ name: 'automerge' }, { name: 'breaking' }] };
+  const refreshedClassification = new Set(['breaking']);
+  assert.deepEqual(
+    getStaleAutoClassifiedBlockingLabels(initialLabels, initialClassification, fresh, refreshedClassification),
+    []
+  );
 });
