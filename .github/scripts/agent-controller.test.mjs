@@ -12,6 +12,7 @@ import {
   isPolicyAutoMergeCandidate,
   expandChangedFilePaths,
   getBlockingPullRequestLabels,
+  shouldDisableAutoMergeForDeferredState,
   isTransientAutoMergeError,
   evaluateCheckRollup,
   isDependencyManifestPath,
@@ -474,6 +475,15 @@ test('renamed files are checked using both their previous and current paths', ()
     base: { repo: { full_name: repository } }
   };
   assert.equal(isPolicyAutoMergeCandidate(pr, changedPaths, profile), false);
+});
+
+test('deferred verification or a changed head cancels an already queued native Auto-merge', () => {
+  const queued = { node_id: 'PR_kwDOExample', auto_merge: { enabled_at: '2026-11-16T00:00:00Z' } };
+  const notQueued = { node_id: 'PR_kwDOExample', auto_merge: null };
+  assert.equal(shouldDisableAutoMergeForDeferredState(queued, { verificationPending: true }), true);
+  assert.equal(shouldDisableAutoMergeForDeferredState(queued, { headChanged: true }), true);
+  assert.equal(shouldDisableAutoMergeForDeferredState(queued), false);
+  assert.equal(shouldDisableAutoMergeForDeferredState(notQueued, { verificationPending: true }), false);
 });
 
 test('manual maintainer blocking labels veto policy-authorized auto-merge candidates', () => {
