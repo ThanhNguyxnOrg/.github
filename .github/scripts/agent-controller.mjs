@@ -880,6 +880,9 @@ export async function processPullRequest(repo, pr) {
   }
   if (!allowedBaseBranches.includes(pr.base.ref)) riskReasons.push('target-branch-outside-policy');
   if (!pathsAvailable) riskReasons.push('changed-files-unavailable');
+  // Only classification labels this reconciliation actually attempted to add may be cleaned up.
+  // In the pending handoff state, preserve any labels a maintainer may add concurrently.
+  const appliedClassificationLabels = verificationState === 'pending' ? new Set() : labels;
   if (verificationState !== 'pending') {
     await addLabels(fullName, pr.number, [...labels]);
   }
@@ -905,7 +908,7 @@ export async function processPullRequest(repo, pr) {
   const refreshedClassifiedLabels = new Set(classifyPullRequestLabels(fresh, paths));
   const staleAutoClassifiedLabels = getStaleAutoClassifiedBlockingLabels(
     initialLabelNames,
-    labels,
+    appliedClassificationLabels,
     fresh,
     refreshedClassifiedLabels
   );
