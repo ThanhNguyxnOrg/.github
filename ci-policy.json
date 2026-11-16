@@ -209,7 +209,8 @@
         "paths": [
           "skills/**/*.md"
         ],
-        "allowTriageBypass": true
+        "allowTriageBypass": true,
+        "deferUntilHandoff": true
       }
     },
     "ForgeHelm": {
