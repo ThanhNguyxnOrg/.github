@@ -134,4 +134,4 @@ test('stale controller uses the numeric organization App ID through app-id, not 
   const workflow = read('.github/workflows/stale.yml');
   assert.match(workflow, /app-id:\s*\$\{\{\s*vars\.BOT_APP_ID\s*\}\}/);
   assert.doesNotMatch(workflow, /client-id:\s*\$\{\{\s*vars\.BOT_APP_ID\s*\}\}/);
-}});
+});
