@@ -3,8 +3,10 @@ name: ThanhNguyxnAgent — Sync worker policy pin
 # Keeps the managed worker pins (central relay + distributed template) on the
 # current main HEAD, so a policy change never waits on a manual "advance pin"
 # commit and a pin can never dangle after a squash merge. The pin stays a full
-# immutable SHA; only its value tracks main automatically. The pin commit
-# triggers the controller, which distributes the template to all repositories.
+# immutable SHA; only its value tracks main automatically. The pin commit is
+# pushed with GITHUB_TOKEN (main is unprotected); the controller is then
+# dispatched so the template reaches all repositories without waiting for the
+# hourly sweep.
 
 on:
   push:
@@ -15,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: thanhnguyxnagent-policy-pin-sync
@@ -26,19 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Create a policy-pin token
-        id: pin-sync
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
-        with:
-          app-id: ${{ vars.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          permission-contents: write
-
       - name: Checkout main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          token: ${{ steps.pin-sync.outputs.token }}
 
       - name: Run central policy regression tests
         run: node --test .github/scripts/agent-controller.test.mjs .github/scripts/agent-onboard.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/stale-controller.test.mjs
@@ -61,3 +53,9 @@ jobs:
           git add -- $files
           git commit -m "chore(agent): advance worker policy pin to ${head}"
           git push origin HEAD:main
+
+      - name: Distribute the new template now
+        continue-on-error: true
+        run: gh workflow run agent-controller.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
