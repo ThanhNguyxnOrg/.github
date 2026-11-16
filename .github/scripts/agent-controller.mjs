@@ -259,13 +259,13 @@ export function classifyVersionUpdate(value) {
   // whether ANY row looks like a version row; only then classify every row.
   // This prevents an unparseable first member (for example, "unknown | latest")
   // from being silently dropped just because a later member is a valid patch.
-  const lines = text.split(/\\r?\\n/);
+  const lines = text.split(/\r?\n/);
   const oldHeaders = new Set(['from', 'current', 'previous', 'old', 'installed']);
   const newHeaders = new Set(['to', 'latest', 'new', 'updated']);
   const isSeparatorRow = cells => cells.every(cell => /^:?-{3,}:?$/.test(cell));
   const isUnknownVersionMarker = value =>
-    /^(?:unknown|latest|unavailable|not\\s+available|n\\/?a|undefined|null)$/i.test(
-      String(value || '').replace(/[\\x60*_]/g, '').trim()
+    /^(?:unknown|latest|unavailable|not\s+available|n\/?a|undefined|null)$/i.test(
+      String(value || '').replace(/[\x60*_]/g, '').trim()
     );
 
   for (let lineIndex = 0; lineIndex < lines.length;) {
@@ -283,8 +283,8 @@ export function classifyVersionUpdate(value) {
     if (!tableRows.length) continue;
 
     const headerIndex = tableRows.findIndex(cells => {
-      const oldColumn = cells.at(-2).replace(/[\\x60*_]/g, '').trim().toLowerCase();
-      const newColumn = cells.at(-1).replace(/[\\x60*_]/g, '').trim().toLowerCase();
+      const oldColumn = cells.at(-2).replace(/[\x60*_]/g, '').trim().toLowerCase();
+      const newColumn = cells.at(-1).replace(/[\x60*_]/g, '').trim().toLowerCase();
       return oldHeaders.has(oldColumn) && newHeaders.has(newColumn);
     });
     const dataRows = headerIndex >= 0 ? tableRows.slice(headerIndex + 1) : tableRows;
