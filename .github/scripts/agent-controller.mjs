@@ -501,7 +501,7 @@ export function getBlockingPullRequestLabels(pullRequest, blockingLabels = confi
   const present = names(pullRequest?.labels);
   const configured = [
     ...new Set([
-      ...blockingLabels,
+      ...blockingLabels.filter(label => String(label || '').trim().toLowerCase() !== 'needs-review'),
       'do-not-merge',
       'breaking-change',
       'wip',
@@ -511,8 +511,8 @@ export function getBlockingPullRequestLabels(pullRequest, blockingLabels = confi
   return configured.filter(label => present.has(label));
 }
 
-export function shouldDisableAutoMergeForDeferredState(pullRequest, { headChanged = false, verificationPending = false } = {}) {
-  return Boolean(pullRequest?.auto_merge && pullRequest?.node_id && (headChanged || verificationPending));
+export function shouldDisableAutoMergeForDeferredState(pullRequest, { headChanged = false, baseChanged = false, verificationPending = false } = {}) {
+  return Boolean(pullRequest?.auto_merge && pullRequest?.node_id && (headChanged || baseChanged || verificationPending));
 }
 
 export function evaluateCheckRollup(checkRuns = [], statuses = {}, requiredChecks = []) {
@@ -870,14 +870,17 @@ async function processPullRequest(repo, pr) {
     return;
   }
   const freshVerificationState = domainVerificationState(fresh, profile, paths);
-  if (fresh.head?.sha !== pr.head.sha) {
+  const headChanged = fresh.head?.sha !== pr.head.sha;
+  const baseChanged = fresh.base?.ref !== pr.base.ref;
+  if (headChanged || baseChanged) {
     if (shouldDisableAutoMergeForDeferredState(fresh, {
-      headChanged: true,
+      headChanged,
+      baseChanged,
       verificationPending: freshVerificationState === 'pending'
     })) {
       await disablePullRequestAutoMerge(fullName, fresh);
     }
-    console.log('[defer]', fullName + '#' + pr.number + ': PR head changed during evaluation; any stale native Auto-merge was disabled and the current head will be retried');
+    console.log('[defer]', fullName + '#' + pr.number + ': PR head or base changed during evaluation; any stale native Auto-merge was disabled and the current diff will be retried');
     return;
   }
   if (freshVerificationState === 'pending') {
