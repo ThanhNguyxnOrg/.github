@@ -4,7 +4,7 @@
 
 <div align="center">
   <img src="https://komarev.com/ghpvc/?username=ThanhNguyxnOrg&label=Profile%20Views&color=0e75b6&style=flat-square" alt="ThanhNguyxnOrg views" />
-  <img src="https://img.shields.io/badge/22-Repositories-8A2BE2?style=flat-square" alt="17 repositories" />
+  <img src="https://img.shields.io/badge/23-Repositories-8A2BE2?style=flat-square" alt="17 repositories" />
   <img src="https://img.shields.io/badge/Top-TS%20%C2%B7%20JS%20%C2%B7%20Py%20%C2%B7%20C++?style=flat-square" alt="Top languages" />
   <img src="https://img.shields.io/badge/Focus-developer--tools%20%C2%B7%20typescript?style=flat-square" alt="Focus areas" />
 </div>
@@ -48,7 +48,7 @@ Details: [docs/stack.md](https://github.com/ThanhNguyxnOrg/.github/blob/main/doc
 | [blendops](https://github.com/ThanhNguyxnOrg/blendops) | AI-native Blender workflow and skill pack for non-Blender users, built around official Blender MCP,... | JavaScript | ★ 4 |
 | [lagvex](https://github.com/ThanhNguyxnOrg/lagvex) | Open-source game latency reducer & ping booster via WinTun and Go VPS Relay | Go | ★ 4 |
 | [lumeo](https://github.com/ThanhNguyxnOrg/lumeo) | Bilingual captions and live AI dubbing for YouTube. Three tiers, one click: free caption... | JavaScript | ★ 2 |
-| [apidex-hub](https://github.com/ThanhNguyxnOrg/apidex-hub) | 🌐 A curated collection of awesome free APIs for developers. Categorized, tested daily, and... | TypeScript | ★ 1 |
+| [apidex-hub](https://github.com/ThanhNguyxnOrg/apidex-hub) | A curated collection of awesome free APIs for developers. Categorized, tested daily, and... | Python | ★ 1 |
 | [awesome-cert-sherpa](https://github.com/ThanhNguyxnOrg/awesome-cert-sherpa) | Community-driven IT certification prep — curated resources, 1,590+ original practice questions,... | TypeScript | ★ 1 |
 | [PurgeKit](https://github.com/ThanhNguyxnOrg/PurgeKit) | Ultimate developer-focused system uninstaller and deep cleaner for Windows. | Rust | ★ 1 |
 <!-- AUTO-TOP6-END -->
