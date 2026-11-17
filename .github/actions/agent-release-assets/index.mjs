@@ -172,7 +172,7 @@ async function main() {
   const releaseUrl = `${api}/repos/${owner}/${repo}/releases/tags/${encodeURIComponent(tag)}`;
   const releaseListUrl = `${api}/repos/${owner}/${repo}/releases?per_page=100`;
   let release;
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 180; attempt += 1) {
     try {
       release = await request(releaseUrl);
       break;
@@ -212,10 +212,10 @@ async function main() {
         break;
       }
 
-      if (attempt === 19) {
+      if (attempt === 179) {
         fail(`Central draft release ${tag} was not found by tag lookup or safe orphan-draft recovery`);
       }
-      console.log(`[release-wait] draft ${tag} is not visible yet; retry ${attempt + 1}/20`);
+      console.log(`[release-wait] draft ${tag} is not visible yet; retry ${attempt + 1}/180`);
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
