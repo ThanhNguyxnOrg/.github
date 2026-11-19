@@ -101,10 +101,13 @@ test('central PR test workflow runs all Node regression tests and Python sync te
   assert.match(workflow, /actionlint.*v1\.7\.12|actionlint/);
 });
 
-test('reusable Agent worker checks out the exact immutable policy revision passed by its caller', () => {
+test('reusable Agent worker checks out the exact immutable policy revision resolved from agent-v1', () => {
   const reusable = read('.github/workflows/agent-pr-worker.yml');
-  assert.ok(reusable.includes('ref: ${{ inputs.policy_ref }}'));
+  assert.ok(reusable.includes('ref: ${{ steps.policy.outputs.resolved_sha }}'));
   assert.ok(reusable.includes('repository: ThanhNguyxnOrg/.github'));
+  assert.ok(reusable.includes("repos/${REPOSITORY_OWNER}/.github/commits/agent-v1"));
+  assert.ok(reusable.includes("compare/${resolved}...main"));
+  assert.ok(reusable.includes('required: false'));
   assert.doesNotMatch(reusable, /job\.workflow_(repository|sha)/);
 });
 
