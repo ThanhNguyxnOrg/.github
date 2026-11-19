@@ -1,6 +1,6 @@
 name: ThanhNguyxnAgent — Promote worker policy tag
 
-# Replaces the old pin-sync (Cách 2, 2026-11-18). Instead of committing a
+# Replaces the old pin-sync (Approach 2, 2026-11-18). Instead of committing a
 # 40-char SHA into the relay + template on every policy push — which fanned
 # out into one onboard commit per repository — this workflow moves the
 # agent-v1 tag to the tested main HEAD. Callers use
@@ -9,7 +9,7 @@ name: ThanhNguyxnAgent — Promote worker policy tag
 # and verifies it is on main before checking the policy out.
 #
 # This workflow creates NO commits and dispatches NOTHING: a tag move needs
-# no onboard commit in any repository. The trigger keeps the Cách 2 paths
+# no onboard commit in any repository. The trigger keeps the Approach 2 paths
 # filter (policy files only, no hourly cron), so showcase syncs and other
 # unrelated pushes never promote the tag. Each promotion also creates an
 # immutable tag agent-v1-<UTC date>-<short SHA> so any promotion can be
