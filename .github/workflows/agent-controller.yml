@@ -11,7 +11,12 @@ on:
       - '.github/scripts/agent-onboard.mjs'
       - '.github/scripts/agent-onboard.test.mjs'
       - '.github/templates/agent-pr-signal.yml'
-      - '.github/templates/agent-pr-worker.yml'
+      # NOTE (anti-spam, Cách 2, 2026-11-18): '.github/templates/agent-pr-worker.yml'
+      # is deliberately NOT listed here. Pin commits touch exactly that file,
+      # so listing it made every pin advance fan out to all repositories
+      # immediately. Pin distribution now happens on the hourly schedule below
+      # instead (max ~1h delay); a direct human edit to the template also
+      # waits for the next hourly run.
       - '.github/workflows/agent-pr-worker.yml'
       - '.github/workflows/agent-policy-tests.yml'
       - '.github/scripts/check-policy.mjs'
