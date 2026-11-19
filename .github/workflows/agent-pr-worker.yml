@@ -16,8 +16,8 @@ on:
         required: true
         type: number
       policy_ref:
-        description: Immutable central commit used by both this workflow and its trusted policy checkout.
-        required: true
+        description: Optional immutable central commit used by the trusted policy checkout. When empty, the workflow resolves the agent-v1 tag to its commit instead (see the Resolve step). Kept as an emergency per-repository override; callers should normally omit it.
+        required: false
         type: string
     secrets:
       BOT_PRIVATE_KEY:
@@ -33,14 +33,47 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Validate trusted policy revision
+      - name: Resolve trusted policy revision
+        id: policy
         env:
           POLICY_REF: ${{ inputs.policy_ref }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY_OWNER: ${{ inputs.repository_owner }}
         run: |
-          if [[ ! "$POLICY_REF" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::policy_ref must be a full 40-character commit SHA" >&2
+          set -euo pipefail
+          # Caller-supplied SHA pin (legacy / emergency override): keep the
+          # old strict validation and use it verbatim.
+          if [[ -n "${POLICY_REF}" ]]; then
+            if [[ ! "${POLICY_REF}" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::policy_ref must be a full 40-character commit SHA" >&2
+              exit 1
+            fi
+            echo "resolved_sha=${POLICY_REF}" >> "${GITHUB_OUTPUT}"
+            echo "[policy] using caller-supplied policy pin ${POLICY_REF}"
+            exit 0
+          fi
+          # No pin supplied: resolve the agent-v1 moving tag to its commit.
+          # The commits API dereferences annotated tags, so this is the
+          # commit SHA even when agent-v1 is an annotated tag.
+          resolved="$(gh api "repos/${REPOSITORY_OWNER}/.github/commits/agent-v1" --jq '.sha')"
+          if [[ ! "${resolved}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::agent-v1 did not resolve to a full commit SHA" >&2
             exit 1
           fi
+          # The resolved commit must be on main. Compare API direction
+          # matters: base=resolved, head=main, so 'ahead' means main is
+          # ahead of the resolved commit (i.e. it is an ancestor of main)
+          # and 'identical' means it is main HEAD. Anything else
+          # (behind/diverged) or a 404 means the tag points somewhere
+          # untrusted; fail closed. This also avoids a shallow-clone
+          # git merge-base check (checkout uses fetch-depth 1).
+          status="$(gh api "repos/${REPOSITORY_OWNER}/.github/compare/${resolved}...main" --jq '.status')"
+          if [[ "${status}" != "identical" && "${status}" != "ahead" ]]; then
+            echo "::error::agent-v1 resolved to ${resolved}, which is not on main (compare status: ${status})" >&2
+            exit 1
+          fi
+          echo "resolved_sha=${resolved}" >> "${GITHUB_OUTPUT}"
+          echo "[policy] Resolved agent-v1 -> ${resolved} (compare status: ${status})"
 
       - name: Create read-only token for central Agent policy
         id: central
@@ -56,7 +89,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ThanhNguyxnOrg/.github
-          ref: ${{ inputs.policy_ref }}
+          ref: ${{ steps.policy.outputs.resolved_sha }}
           token: ${{ steps.central.outputs.token }}
           persist-credentials: false
 
