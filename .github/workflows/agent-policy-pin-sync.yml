@@ -5,20 +5,32 @@ name: ThanhNguyxnAgent — Sync worker policy pin
 # commit and a pin can never dangle after a squash merge. The pin stays a full
 # immutable SHA; only its value tracks main automatically. Pushing the relay
 # workflow file needs the App token with contents + workflows write (the same
-# pair the onboard job already uses); the pin commit is then dispatched to the
-# controller so the template reaches all repositories without waiting for the
-# hourly sweep.
+# pair the onboard job already uses).
+#
+# Anti-spam (Cách 2, 2026-11-18): the pin only advances on pushes that touch
+# policy files (paths filter below), there is no hourly cron, and there is no
+# immediate dispatch to the controller. A pin advance is distributed by the
+# controller's hourly sweep instead, so N pin advances inside one hour
+# collapse into a single onboard commit per repository (max ~1h delay).
+# The controller's push trigger no longer lists the worker template either,
+# otherwise a pin commit would still fan out immediately via that trigger.
 
 on:
   push:
     branches: [main]
-  schedule:
-    - cron: "17 * * * *"
+    paths:
+      - 'agent-policy.json'
+      - 'ci-policy.json'
+      - 'release-policy.json'
+      - '.github/workflows/agent-pr-worker.yml'
+      - '.github/workflows/agent-pr-worker-relay.yml'
+      - '.github/templates/agent-pr-worker.yml'
+      - '.github/scripts/**'
+      - '.github/actions/**'
   workflow_dispatch:
 
 permissions:
   contents: read
-  actions: write
 
 concurrency:
   group: thanhnguyxnagent-policy-pin-sync
@@ -73,9 +85,3 @@ jobs:
           git add -- "${files[@]}"
           git commit -m "chore(agent): advance worker policy pin to ${head}"
           git push origin HEAD:main
-
-      - name: Distribute the new template now
-        continue-on-error: true
-        run: gh workflow run agent-controller.yml --ref main
-        env:
-          GH_TOKEN: ${{ github.token }}
