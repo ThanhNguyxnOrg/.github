@@ -1,19 +1,25 @@
-name: ThanhNguyxnAgent — Sync worker policy pin
+name: ThanhNguyxnAgent — Promote worker policy tag
 
-# Keeps the managed worker pins (central relay + distributed template) on the
-# current main HEAD, so a policy change never waits on a manual "advance pin"
-# commit and a pin can never dangle after a squash merge. The pin stays a full
-# immutable SHA; only its value tracks main automatically. Pushing the relay
-# workflow file needs the App token with contents + workflows write (the same
-# pair the onboard job already uses).
+# Replaces the old pin-sync (Cách 2, 2026-11-18). Instead of committing a
+# 40-char SHA into the relay + template on every policy push — which fanned
+# out into one onboard commit per repository — this workflow moves the
+# agent-v1 tag to the tested main HEAD. Callers use
+# uses: ThanhNguyxnOrg/.github/.github/workflows/agent-pr-worker.yml@agent-v1
+# with no policy_ref, and the central worker resolves the tag to its commit
+# and verifies it is on main before checking the policy out.
 #
-# Anti-spam (Cách 2, 2026-11-18): the pin only advances on pushes that touch
-# policy files (paths filter below), there is no hourly cron, and there is no
-# immediate dispatch to the controller. A pin advance is distributed by the
-# controller's hourly sweep instead, so N pin advances inside one hour
-# collapse into a single onboard commit per repository (max ~1h delay).
-# The controller's push trigger no longer lists the worker template either,
-# otherwise a pin commit would still fan out immediately via that trigger.
+# This workflow creates NO commits and dispatches NOTHING: a tag move needs
+# no onboard commit in any repository. The trigger keeps the Cách 2 paths
+# filter (policy files only, no hourly cron), so showcase syncs and other
+# unrelated pushes never promote the tag. Each promotion also creates an
+# immutable tag agent-v1-<UTC date>-<short SHA> so any promotion can be
+# rolled back by moving agent-v1 back to that tag.
+#
+# The tag itself must be protected by a tag ruleset on this repository
+# (pattern agent-v1, update/delete restricted to the ThanhNguyxnAgent App
+# as bypass actor; no human bypass), otherwise anyone with push access can
+# move it. The App token used here has contents: write, which is what
+# moving/creating tags needs.
 
 on:
   push:
@@ -33,55 +39,66 @@ permissions:
   contents: read
 
 concurrency:
-  group: thanhnguyxnagent-policy-pin-sync
+  group: thanhnguyxnagent-policy-tag-promote
   cancel-in-progress: false
 
 jobs:
-  sync:
-    name: Advance worker policy pin to main HEAD
+  promote:
+    name: Promote agent-v1 tag to main HEAD
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Create a policy-pin token
-        id: pin-sync
+      - name: Create a tag-promotion token
+        id: promote
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
         with:
           app-id: ${{ vars.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-contents: write
-          permission-workflows: write
 
       - name: Checkout main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          token: ${{ steps.pin-sync.outputs.token }}
+          token: ${{ steps.promote.outputs.token }}
+          fetch-depth: 0
 
       - name: Run central policy regression tests
         run: node --test .github/scripts/agent-controller.test.mjs .github/scripts/agent-onboard.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/stale-controller.test.mjs
 
-      - name: Advance worker policy pin to HEAD
+      - name: Promote agent-v1 tag to HEAD
+        env:
+          GH_TOKEN: ${{ steps.promote.outputs.token }}
         run: |
           set -euo pipefail
           head="$(git rev-parse HEAD)"
-          # A pin commit only moves the pin lines, never policy, so the pin
-          # already covers everything at HEAD. Without this guard every pin
-          # commit would retrigger this workflow and mint another pin commit.
-          if git log -1 --format=%s | grep -q '^chore(agent): advance worker policy pin to '; then
-            echo "[pin-sync] HEAD is a pin-sync commit; nothing to do"
-            exit 0
-          fi
-          files=(.github/workflows/agent-pr-worker-relay.yml .github/templates/agent-pr-worker.yml)
-          for file in "${files[@]}"; do
-            sed -i -E "s#agent-pr-worker\.yml@[0-9a-f]{40}#agent-pr-worker.yml@${head}#g" "$file"
-            sed -i -E "s#^([[:space:]]*policy_ref:[[:space:]]*)[0-9a-f]{40}#\1${head}#" "$file"
-          done
-          if git diff --quiet -- "${files[@]}"; then
-            echo "[pin-sync] worker policy pin already at ${head}; nothing to do"
-            exit 0
-          fi
+          short="${head:0:7}"
+          stamp="$(date -u +%Y%m%d-%H%M)"
+          immutable="agent-v1-${stamp}-${short}"
           git config user.name "thanhnguyxnagent[bot]"
           git config user.email "296222857+thanhnguyxnagent[bot]@users.noreply.github.com"
-          git add -- "${files[@]}"
-          git commit -m "chore(agent): advance worker policy pin to ${head}"
-          git push origin HEAD:main
+          # Already promoted: the tag already points at HEAD, nothing to do.
+          # The commits API dereferences annotated tags, so this is the
+          # commit SHA even if agent-v1 is an annotated tag. A missing tag
+          # makes gh api fail; that is expected on the very first run, so
+          # treat it as "not promoted yet" instead of failing the job.
+          current="$(gh api "repos/${GITHUB_REPOSITORY}/commits/agent-v1" --jq '.sha' 2>/dev/null || true)"
+          if [[ "${current}" == "${head}" ]]; then
+            echo "[tag-promote] agent-v1 already points at ${head}; nothing to do"
+            exit 0
+          fi
+          git fetch --tags origin
+          git tag -a "${immutable}" -m "ThanhNguyxnAgent policy release: ${head}" "${head}"
+          git tag -fa agent-v1 -m "ThanhNguyxnAgent policy ${head}" "${head}"
+          git push origin "${immutable}"
+          git push --force origin agent-v1
+          # Verify both tags resolve to HEAD (via the API, which
+          # dereferences annotated tags). Fail closed on any mismatch.
+          for ref in agent-v1 "${immutable}"; do
+            verified="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${ref}" --jq '.sha')"
+            if [[ "${verified}" != "${head}" ]]; then
+              echo "::error::tag ${ref} resolves to ${verified}, expected ${head}" >&2
+              exit 1
+            fi
+          done
+          echo "[tag-promote] agent-v1 -> ${head} (immutable record: ${immutable})"
