@@ -15,6 +15,13 @@ name: ThanhNguyxnAgent — Promote worker policy tag
 # immutable tag agent-v1-<UTC date>-<short SHA> so any promotion can be
 # rolled back by moving agent-v1 back to that tag.
 #
+# Retention: only the newest 20 immutable snapshot tags are kept. Each
+# promotion prunes older snapshots (oldest first); the moving agent-v1 tag
+# is never deleted. Snapshot names sort chronologically
+# (agent-v1-YYYYMMDD-HHMM-<short SHA>), so pruning is a plain newest-20
+# cut. Pruning is best-effort housekeeping and never fails the run: a bad
+# listing only skips pruning, and a failed delete is only a warning.
+#
 # The tag itself must be protected by a tag ruleset on this repository
 # (pattern agent-v1, update/delete restricted to the ThanhNguyxnAgent App
 # as bypass actor; no human bypass), otherwise anyone with push access can
@@ -102,3 +109,35 @@ jobs:
             fi
           done
           echo "[tag-promote] agent-v1 -> ${head} (immutable record: ${immutable})"
+
+      - name: Prune old immutable policy tags (keep newest 20)
+        env:
+          GH_TOKEN: ${{ steps.promote.outputs.token }}
+        run: |
+          set -euo pipefail
+          # Best-effort housekeeping: this step never fails the run. The
+          # listing below matches only the agent-v1- prefix, so the moving
+          # agent-v1 tag is never listed and never deleted, and the newest
+          # snapshot is always kept. A bad listing can only skip pruning.
+          tags="$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/agent-v1-" --jq '.[].ref' --paginate 2>/dev/null | sed 's|refs/tags/||' | sort || true)"
+          if [[ -z "${tags}" ]]; then
+            echo "[tag-prune] no immutable tags found or listing failed; skipping"
+            exit 0
+          fi
+          mapfile -t all <<< "${tags}"
+          total="${#all[@]}"
+          keep=20
+          if (( total <= keep )); then
+            echo "[tag-prune] ${total} immutable tags, nothing to prune"
+            exit 0
+          fi
+          prune_count=$(( total - keep ))
+          echo "[tag-prune] pruning ${prune_count} of ${total} immutable tags, keeping newest ${keep}"
+          for (( i=0; i<prune_count; i++ )); do
+            tag="${all[$i]}"
+            if gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}"; then
+              echo "[tag-prune] deleted ${tag}"
+            else
+              echo "::warning::could not delete ${tag}; it will be retried on the next promotion"
+            fi
+          done
