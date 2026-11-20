@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 
 const token = process.env.GH_TOKEN;
 const repository = process.env.REPOSITORY || '';
@@ -134,7 +135,19 @@ async function request(url, options = {}) {
   return data;
 }
 
-async function main() {
+export async function publishDraftRelease(owner, repo, releaseId) {
+  const published = await request(`${api}/repos/${owner}/${repo}/releases/${releaseId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ draft: false })
+  });
+  if (!published || published.draft !== false) {
+    fail(`Unable to publish draft release ${releaseId}: draft flag is still set`);
+  }
+  return published;
+}
+
+export async function main() {
   if (!token) fail('GH_TOKEN is required');
   if (!/^[^/]+\/[^/]+$/.test(repository)) fail('GITHUB_REPOSITORY is invalid');
   if (!/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(tag)) fail(`Invalid release tag: ${tag}`);
@@ -261,12 +274,18 @@ async function main() {
   const missingAfterUpload = required.filter(name => !uploadedNames.has(name));
   if (missingAfterUpload.length) fail(`Release is still missing required assets: ${missingAfterUpload.join(', ')}`);
 
+  // Manifest verified: every required asset is present on the draft. Only now
+  // flip the draft to public. A failed verification above throws first, so a
+  // draft with missing assets is never published.
+  await publishDraftRelease(owner, repo, release.id);
+  console.log(`[release-published] published draft ${tag} (id=${release.id})`);
+
   const summary = [
     '## ThanhNguyxnAgent release assets',
     '',
     `- Repository: \`${repository}\``,
     `- Tag: \`${tag}\``,
-    `- Draft release: ${verified.html_url}`,
+    `- Release: ${verified.html_url}`,
     `- Required assets verified: ${required.length}/${required.length}`,
     `- Assets uploaded or already verified: ${plan.uploads.length}`
   ].join('\n');
@@ -274,7 +293,10 @@ async function main() {
   console.log(`[release-assets-verified] ${repository} ${tag}; ${required.length} required assets present`);
 }
 
-if (process.env.RELEASE_TAG) {
+// Run automatically only when executed directly as the composite action
+// entrypoint (node index.mjs). Importing the module from tests must not
+// trigger a release run.
+if (process.env.RELEASE_TAG && process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   main().catch(error => {
     console.error(error.stack || error.message || String(error));
     process.exitCode = 1;
