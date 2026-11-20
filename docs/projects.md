@@ -19,8 +19,8 @@ Every repository in the organization, auto-updated. The profile page shows the T
 <!-- AUTO-FULL-START -->
 | Project | Description | Stack | Topics |
 |---|---|---|---|
-| [blendops](https://github.com/ThanhNguyxnOrg/blendops) | AI-native Blender workflow and skill pack for non-Blender users, built around official Blender MCP,... | JavaScript | agent-skills, ai-agents, blender |
 | [lagvex](https://github.com/ThanhNguyxnOrg/lagvex) | Open-source game latency reducer & ping booster via WinTun and Go VPS Relay | Go | cs2, game-booster, golang |
+| [blendops](https://github.com/ThanhNguyxnOrg/blendops) | AI-native Blender workflow and skill pack for non-Blender users, built around official Blender MCP,... | JavaScript | agent-skills, ai-agents, blender |
 | [lumeo](https://github.com/ThanhNguyxnOrg/lumeo) | Bilingual captions and live AI dubbing for YouTube. Three tiers, one click: free caption... | JavaScript | ai-dubbing, chrome-extension, javascript |
 | [apidex-hub](https://github.com/ThanhNguyxnOrg/apidex-hub) | A curated collection of awesome free APIs for developers. Categorized, tested daily, and... | Python | api, api-list, awesome |
 | [awesome-cert-sherpa](https://github.com/ThanhNguyxnOrg/awesome-cert-sherpa) | Community-driven IT certification prep — curated resources, 1,590+ original practice questions,... | TypeScript | awesome-list, aws, azure |
