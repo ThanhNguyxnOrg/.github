@@ -1,0 +1,141 @@
+name: ThanhNguyxnAgent — Promote release tag
+
+# Replaces per-repository SHA pin updates for the release pipeline. Instead
+# of committing a 40-char SHA into every repository's release workflow on
+# every central release change — which forced one pin commit per repository —
+# this workflow moves the release-v1 tag to the tested main HEAD. Callers use
+# uses: ThanhNguyxnOrg/.github/.github/workflows/release-publish.yml@release-v1
+# and the internal agent-release-assets action ref stays a full SHA inside
+# the single central release-publish.yml file, so no fan-out is possible.
+#
+# This workflow creates NO commits and dispatches NOTHING: a tag move needs
+# no pin commit in any repository. The trigger keeps a paths filter (release
+# files only, no hourly cron), so showcase syncs and other unrelated pushes
+# never promote the tag. Each promotion also creates an immutable tag
+# release-v1-<UTC date>-<short SHA> so any promotion can be rolled back by
+# moving release-v1 back to that tag.
+#
+# Retention: only the newest 20 immutable snapshot tags are kept. Each
+# promotion prunes older snapshots (oldest first); the moving release-v1 tag
+# is never deleted. Snapshot names sort chronologically
+# (release-v1-YYYYMMDD-HHMM-<short SHA>), so pruning is a plain newest-20
+# cut. Pruning is best-effort housekeeping and never fails the run: a bad
+# listing only skips pruning, and a failed delete is only a warning.
+#
+# The tag itself must be protected by a tag ruleset on this repository
+# (pattern release-v1, update/delete restricted to the ThanhNguyxnAgent App
+# as bypass actor; no human bypass), otherwise anyone with push access can
+# move it. The App token used here has contents: write, which is what
+# moving/creating tags needs.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'release-policy.json'
+      - '.github/workflows/release-publish.yml'
+      - '.github/workflows/release-controller.yml'
+      - '.github/actions/agent-release-assets/**'
+      - '.github/scripts/release-assets*.test.mjs'
+      - '.github/workflows/release-tag-promote.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: thanhnguyxnagent-release-tag-promote
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote release-v1 tag to main HEAD
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Create a tag-promotion token
+        id: promote
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          token: ${{ steps.promote.outputs.token }}
+          fetch-depth: 0
+
+      - name: Run release regression tests
+        run: node --test .github/scripts/release-assets.test.mjs .github/scripts/release-assets-publish.test.mjs
+
+      - name: Promote release-v1 tag to HEAD
+        env:
+          GH_TOKEN: ${{ steps.promote.outputs.token }}
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          short="${head:0:7}"
+          stamp="$(date -u +%Y%m%d-%H%M)"
+          immutable="release-v1-${stamp}-${short}"
+          git config user.name "thanhnguyxnagent[bot]"
+          git config user.email "296222857+thanhnguyxnagent[bot]@users.noreply.github.com"
+          # Already promoted: the tag already points at HEAD, nothing to do.
+          # The commits API dereferences annotated tags, so this is the
+          # commit SHA even if release-v1 is an annotated tag. A missing tag
+          # makes gh api fail; that is expected on the very first run, so
+          # treat it as "not promoted yet" instead of failing the job.
+          current="$(gh api "repos/${GITHUB_REPOSITORY}/commits/release-v1" --jq '.sha' 2>/dev/null || true)"
+          if [[ "${current}" == "${head}" ]]; then
+            echo "[tag-promote] release-v1 already points at ${head}; nothing to do"
+            exit 0
+          fi
+          git fetch --tags origin
+          git tag -a "${immutable}" -m "ThanhNguyxnAgent release: ${head}" "${head}"
+          git tag -fa release-v1 -m "ThanhNguyxnAgent release ${head}" "${head}"
+          git push origin "${immutable}"
+          git push --force origin release-v1
+          # Verify both tags resolve to HEAD (via the API, which
+          # dereferences annotated tags). Fail closed on any mismatch.
+          for ref in release-v1 "${immutable}"; do
+            verified="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${ref}" --jq '.sha')"
+            if [[ "${verified}" != "${head}" ]]; then
+              echo "::error::tag ${ref} resolves to ${verified}, expected ${head}" >&2
+              exit 1
+            fi
+          done
+          echo "[tag-promote] release-v1 -> ${head} (immutable record: ${immutable})"
+
+      - name: Prune old immutable release tags (keep newest 20)
+        env:
+          GH_TOKEN: ${{ steps.promote.outputs.token }}
+        run: |
+          set -euo pipefail
+          # Best-effort housekeeping: this step never fails the run. The
+          # listing below matches only the release-v1- prefix, so the moving
+          # release-v1 tag is never listed and never deleted, and the newest
+          # snapshot is always kept. A bad listing can only skip pruning.
+          tags="$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/release-v1-" --jq '.[].ref' --paginate 2>/dev/null | sed 's|refs/tags/||' | sort || true)"
+          if [[ -z "${tags}" ]]; then
+            echo "[tag-prune] no immutable tags found or listing failed; skipping"
+            exit 0
+          fi
+          mapfile -t all <<< "${tags}"
+          total="${#all[@]}"
+          keep=20
+          if (( total <= keep )); then
+            echo "[tag-prune] ${total} immutable tags, nothing to prune"
+            exit 0
+          fi
+          prune_count=$(( total - keep ))
+          echo "[tag-prune] pruning ${prune_count} of ${total} immutable tags, keeping newest ${keep}"
+          for (( i=0; i<prune_count; i++ )); do
+            tag="${all[$i]}"
+            if gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}"; then
+              echo "[tag-prune] deleted ${tag}"
+            else
+              echo "::warning::could not delete ${tag}; it will be retried on the next promotion"
+            fi
+          done
