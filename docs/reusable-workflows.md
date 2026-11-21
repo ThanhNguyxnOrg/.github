@@ -7,8 +7,8 @@ The organization keeps repeated automation primitives in `.github`. Project repo
 - Use a reusable workflow when an entire job or multi-job process should be shared.
 - Use a composite action for a sequence of steps inside an existing job (Agent token creation, Git identity, comments, or asset upload).
 - Keep project-specific compiler, dependency, signing, packaging, and platform-matrix steps in the project adapter. A Qt/MSVC/CMake app, a Tauri app, a Go CLI, and an Electron app do not share the same build commands.
-- Pin calls into this repository to a full commit SHA. Update pins deliberately when the central library changes.
-- Pin third-party actions to verified full commit SHAs; Dependabot opens one PR per GitHub Actions dependency each week (no update groups).
+- Member repositories call shared `ci-*.yml` and `publish-npm.yml` workflows via `@ci-v1`, `release-publish.yml` via `@release-v1`, and Agent composite actions via `@agent-v1`. Tag promotions avoid per-repository pin-update commits.
+- Member repositories use major tags for third-party actions (for example `actions/checkout@v7`). Full SHA pins for library dependencies stay inside the central `.github` repository, including its internal action references. Central Dependabot checks GitHub Actions monthly in one `*` group, with a seven-day cooldown and at most one open PR.
 - For Agent automation, do not pass all repository secrets to a called workflow. `BOT_APP_ID` is read directly from the organization `vars` context; only `BOT_PRIVATE_KEY` is declared and passed through `workflow_call.secrets`.
 - For third-party publishing, consult both [organization-secrets.md](organization-secrets.md) and [organization-variables.md](organization-variables.md). npm uses the shared `publish-npm.yml` contract below; keep other platform-specific publishing in the project adapter until at least two repositories share the same build/publish contract. Declare each required credential explicitly under `workflow_call.secrets`; never use `secrets: inherit`.
 - The Agent-token action scopes tokens to the calling repository by default. Do not set `owner` without a repository allowlist unless organization-wide access is specifically required.
@@ -31,6 +31,22 @@ secrets:
 The App installation must have only the repository permissions required by the workflows. Token profiles in `.github/actions/agent-token` request narrow permissions. Installation tokens expire after one hour, so mint them inside the job that performs the write.
 
 For Git commits, use `.github/actions/agent-git-identity` and check out the repository with the same installation token. This sets both author and committer to `ThanhNguyxnAgent[bot]`; the token determines the actor for the push/API operation. Setting the Git name alone does not authenticate a push as the Agent.
+
+Example member-repository steps:
+
+```yaml
+steps:
+  - uses: ThanhNguyxnOrg/.github/.github/actions/agent-token@agent-v1
+    id: agent
+    with:
+      profile: content
+      app-id: ${{ vars.BOT_APP_ID }}
+      private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+  - uses: actions/checkout@v7
+    with:
+      token: ${{ steps.agent.outputs.token }}
+  - uses: ThanhNguyxnOrg/.github/.github/actions/agent-git-identity@agent-v1
+```
 
 ## Platform publishing credentials
 
@@ -76,7 +92,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: ThanhNguyxnOrg/.github/.github/workflows/publish-npm.yml@<CENTRAL_COMMIT_SHA>
+    uses: ThanhNguyxnOrg/.github/.github/workflows/publish-npm.yml@ci-v1
     with:
       verify_command: npm run verify
       build_command: npm run build:cli
@@ -89,6 +105,20 @@ jobs:
 For monorepos, install, verify, and build run at the repository root; `working_directory` selects only the package to publish. For a root package, omit `working_directory` (default `.`). Set `dry_run: true` to validate publishing without uploading.
 
 ## Reusable workflows
+
+Member-repository CI callers follow the tested moving tag:
+
+```yaml
+jobs:
+  verify:
+    permissions:
+      contents: read
+    uses: ThanhNguyxnOrg/.github/.github/workflows/ci-node.yml@ci-v1
+    with:
+      test_command: npm test
+```
+
+Use `ci-python.yml@ci-v1`, `ci-go.yml@ci-v1`, or `ci-cmake.yml@ci-v1` with ecosystem-specific inputs for other projects. The `ci-tag-promote.yml` workflow tests CI contracts before promoting `ci-v1` from `main`, records an immutable `ci-v1-<UTC stamp>-<short SHA>` snapshot, verifies both tags, and retains the newest 20 snapshots. Roll back by moving `ci-v1` to a retained snapshot's commit. Like `agent-v1` and `release-v1`, `ci-v1` needs a repository tag ruleset restricting updates/deletion to the ThanhNguyxnAgent App as bypass actor, with no human bypass. Configure that ruleset before member repositories adopt the tag. Agent composite actions already participate in `agent-v1` promotion through the `.github/actions/**` path trigger.
 
 - `ci-node.yml`, `ci-python.yml`, `ci-go.yml`, and `ci-cmake.yml` share the optional baseline inputs `job_name`, `runner`, `timeout_minutes`, `fetch_depth`, `working_directory`, `artifact_name`, `artifact_path`, and `artifact_retention_days`. Defaults preserve existing check names and timeout behavior: Node remains 20 minutes; Python, Go, and CMake default to 360 minutes (the prior GitHub-hosted job limit). Callers may lower the timeout explicitly. Each workflow retains ecosystem-specific setup and commands, supports explicit Node versions or version files and lockfile-aware caching, and applies `working_directory` on each `run` step because GitHub does not allow expressions in `defaults.run`.
 - `ci-python.yml`: Python setup, pip caching, dependency installation, lint, typecheck, test, build, and optional CI artifact upload.
@@ -127,7 +157,7 @@ jobs:
 
   publish:
     needs: build
-    uses: ThanhNguyxnOrg/.github/.github/workflows/release-publish.yml@<CENTRAL_COMMIT_SHA>
+    uses: ThanhNguyxnOrg/.github/.github/workflows/release-publish.yml@release-v1
     with:
       tag: ${{ github.ref_name }}
       artifact_pattern: release-assets-*
