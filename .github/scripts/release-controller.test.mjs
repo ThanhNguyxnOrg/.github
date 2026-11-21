@@ -78,7 +78,8 @@ test('every centrally managed version-file pattern compiles and updates its vers
     'PurgeKit/src-tauri/Cargo.toml': 'version = "1.3.0"\n',
     'Locsight/src-tauri/Cargo.toml': 'version = "2.2.0"\n',
     'git-account-switcher/bin/git-account-switcher': 'SCRIPT_VERSION="1.0.0"\n',
-    'git-account-switcher/bin/git-account-switcher.ps1': '$SCRIPT_VERSION = "1.0.0"\n'
+    'git-account-switcher/bin/git-account-switcher.ps1': '$SCRIPT_VERSION = "1.0.0"\n',
+    'blendops/scripts/install-skills.mjs': "export const INSTALLER_VERSION = '1.0.0';\n"
   };
   for (const [repo, rule] of Object.entries(policy.repositories)) {
     for (const file of rule.versionFiles || []) {
