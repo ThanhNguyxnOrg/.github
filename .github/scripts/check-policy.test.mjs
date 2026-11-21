@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateRequiredChecks, getRepositoryProfile, matchesPathPattern } from './check-policy.mjs';
 import { isPolicyAutoMergeCandidate } from './agent-controller.mjs';
+import organizationRepositories from '../../organization-repositories.json' with { type: 'json' };
 
 test('repository profiles inherit organization defaults and keep repository-specific CI gates', () => {
   assert.equal(getRepositoryProfile('WriteCanvas').defaultBranch, 'master');
@@ -22,13 +23,7 @@ test('repository profiles inherit organization defaults and keep repository-spec
 });
 
 test('central profiles inherit one organization-wide auto-merge policy and keep CI gates explicit', () => {
-  const names = [
-    'judgeloom-core', 'blendops', 'apidex-hub', 'lumeo', 'ForgeHelm',
-    'cogmint', 'awesome-cert-sherpa', 'Snapbooth', 'Locsight', 'PurgeKit',
-    'SkillGauge', 'LayoutLingua', 'lagvex', 'git-account-switcher', 'StepDSA',
-    'ThanhNguyxnOrg.github.io', 'ClipForge', 'WriteCanvas', 'Techstack-Studio',
-    'AFTERFRAME-THE-LAST-LOOP', 'chess-on-glass', 'chromadna'
-  ];
+  const names = organizationRepositories.filter(name => name !== '.github');
   for (const name of names) assert.ok(getRepositoryProfile(name), 'missing central CI profile: ' + name);
   for (const name of names) {
     const profile = getRepositoryProfile(name);
