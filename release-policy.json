@@ -79,16 +79,36 @@
               "version"
             ]
           ]
+        },
+        {
+          "path": "src-tauri/tauri.conf.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": "src-tauri/Cargo.toml",
+          "kind": "regex",
+          "pattern": "^(version\\s*=\\s*\")[^\"]+(\\\")",
+          "replacement": "$1{{version}}$2"
         }
       ],
       "changelogPath": "CHANGELOG.md",
       "requireSuccessfulChecks": true,
       "releaseWorkflowName": "release-cogmint",
       "requiredAssets": [
-        "cogmint-linux-x64.tar.gz",
-        "cogmint-windows-x64.zip",
-        "cogmint-macos-arm64.tar.gz",
-        "checksums.txt"
+        "COGMINT-{version}-1.x86_64.rpm",
+        "COGMINT_{version}_aarch64.app.tar.gz",
+        "COGMINT_{version}_aarch64.dmg",
+        "COGMINT_{version}_amd64.AppImage",
+        "COGMINT_{version}_amd64.deb",
+        "COGMINT_{version}_x64-setup.exe",
+        "COGMINT_{version}_x64.app.tar.gz",
+        "COGMINT_{version}_x64.dmg",
+        "COGMINT_{version}_x64_en-US.msi"
       ]
     },
     "lagvex": {
