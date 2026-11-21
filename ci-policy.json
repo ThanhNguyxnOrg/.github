@@ -76,7 +76,7 @@
     "cogmint": {
       "defaultBranch": "main",
       "requiredChecks": [
-        "Typecheck"
+        "verify / Typecheck"
       ]
     },
     "awesome-cert-sherpa": {
