@@ -1,0 +1,144 @@
+name: ThanhNguyxnAgent — Promote CI tag
+
+# Replaces per-repository SHA pin updates for shared CI and npm publishing.
+# Callers follow ci-v1 instead of receiving a pin commit on every central
+# change, while internal and third-party refs stay SHA-pinned inside .github.
+# uses: ThanhNguyxnOrg/.github/.github/workflows/ci-node.yml@ci-v1
+#
+# This workflow creates NO commits and dispatches NOTHING: a tag move needs
+# no pin commit in any repository. The trigger keeps a paths filter (CI
+# files only, no hourly cron), so showcase syncs and other unrelated pushes
+# never promote the tag. Each promotion also creates an immutable tag
+# ci-v1-<UTC date>-<short SHA> so any promotion can be rolled back by
+# moving ci-v1 back to that tag.
+#
+# Retention: only the newest 20 immutable snapshot tags are kept. Each
+# promotion prunes older snapshots (oldest first); the moving ci-v1 tag
+# is never deleted. Snapshot names sort chronologically
+# (ci-v1-YYYYMMDD-HHMM-<short SHA>), so pruning is a plain newest-20
+# cut. Pruning is best-effort housekeeping and never fails the run: a bad
+# listing only skips pruning, and a failed delete is only a warning.
+#
+# The tag itself must be protected by a tag ruleset on this repository
+# (pattern ci-v1, update/delete restricted to the ThanhNguyxnAgent App
+# as bypass actor; no human bypass), otherwise anyone with push access can
+# move it. The App token used here has contents: write, which is what
+# moving/creating tags needs.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ci-*.yml'
+      - '.github/workflows/publish-npm.yml'
+      - 'ci-policy.json'
+      - '.github/workflows/ci-tag-promote.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: thanhnguyxnagent-ci-tag-promote
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote ci-v1 tag to main HEAD
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Create a tag-promotion token
+        id: promote
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          token: ${{ steps.promote.outputs.token }}
+          ref: main
+          fetch-depth: 0
+
+      - name: Run CI workflow contract tests
+        run: node --test .github/scripts/workflow-contract.test.mjs
+
+      - name: Promote ci-v1 tag to HEAD
+        env:
+          GH_TOKEN: ${{ steps.promote.outputs.token }}
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          short="${head:0:7}"
+          stamp="$(date -u +%Y%m%d-%H%M)"
+          immutable="ci-v1-${stamp}-${short}"
+          git config user.name "thanhnguyxnagent[bot]"
+          git config user.email "296222857+thanhnguyxnagent[bot]@users.noreply.github.com"
+          # Already promoted: the tag already points at HEAD, nothing to do.
+          # The commits API dereferences annotated tags, so this is the
+          # commit SHA even if ci-v1 is an annotated tag. A missing tag
+          # makes gh api fail; that is expected on the very first run, so
+          # treat it as "not promoted yet" instead of failing the job.
+          current="$(gh api "repos/${GITHUB_REPOSITORY}/commits/ci-v1" --jq '.sha' 2>/dev/null || true)"
+          if [[ "${current}" == "${head}" ]]; then
+            echo "[tag-promote] ci-v1 already points at ${head}; nothing to do"
+            exit 0
+          fi
+          # Force the tag fetch: the ci-v1/release-v1/agent-v1 moving tags can be
+          # promoted by a concurrent run between checkout and this step, and
+          # a plain fetch would abort on "would clobber existing tag".
+          git fetch --force --tags origin
+          git tag -a "${immutable}" -m "ThanhNguyxnAgent CI: ${head}" "${head}"
+          git tag -fa ci-v1 -m "ThanhNguyxnAgent CI ${head}" "${head}"
+          # Push both tags in a single complete pack. Two separate pushes
+          # raced: the second thin pack could delta against the just-created
+          # immutable tag object before the server replicated it, which the
+          # remote rejected as "missing necessary objects".
+          git push --atomic --no-thin origin "refs/tags/${immutable}" "+refs/tags/ci-v1"
+
+          # Verify both tags resolve to HEAD (via the API, which
+          # dereferences annotated tags). Fail closed on any mismatch.
+          for ref in ci-v1 "${immutable}"; do
+            verified="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${ref}" --jq '.sha')"
+            if [[ "${verified}" != "${head}" ]]; then
+              echo "::error::tag ${ref} resolves to ${verified}, expected ${head}" >&2
+              exit 1
+            fi
+          done
+          echo "[tag-promote] ci-v1 -> ${head} (immutable record: ${immutable})"
+
+      - name: Prune old immutable CI tags (keep newest 20)
+        env:
+          GH_TOKEN: ${{ steps.promote.outputs.token }}
+        run: |
+          set -euo pipefail
+          # Best-effort housekeeping: this step never fails the run. The
+          # listing below matches only the ci-v1- prefix, so the moving
+          # ci-v1 tag is never listed and never deleted, and the newest
+          # snapshot is always kept. A bad listing can only skip pruning.
+          tags="$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/ci-v1-" --jq '.[].ref' --paginate 2>/dev/null | sed 's|refs/tags/||' | sort || true)"
+          if [[ -z "${tags}" ]]; then
+            echo "[tag-prune] no immutable tags found or listing failed; skipping"
+            exit 0
+          fi
+          mapfile -t all <<< "${tags}"
+          total="${#all[@]}"
+          keep=20
+          if (( total <= keep )); then
+            echo "[tag-prune] ${total} immutable tags, nothing to prune"
+            exit 0
+          fi
+          prune_count=$(( total - keep ))
+          echo "[tag-prune] pruning ${prune_count} of ${total} immutable tags, keeping newest ${keep}"
+          for (( i=0; i<prune_count; i++ )); do
+            tag="${all[$i]}"
+            if gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}"; then
+              echo "[tag-prune] deleted ${tag}"
+            else
+              echo "::warning::could not delete ${tag}; it will be retried on the next promotion"
+            fi
+          done

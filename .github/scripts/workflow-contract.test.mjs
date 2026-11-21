@@ -4,6 +4,95 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 const read = (path) => fs.readFileSync(path, 'utf8');
+const managedTag = /^ThanhNguyxnOrg\/\.github\/\.github\/(?:workflows\/[\w.-]+@(agent-v1|release-v1|ci-v1)|actions\/[\w.-]+@agent-v1)$/;
+
+test('managed tags are scoped to central workflows and Agent composite actions', () => {
+  for (const ref of ['workflows/ci-node.yml@ci-v1', 'workflows/publish-npm.yml@ci-v1', 'workflows/release-publish.yml@release-v1', 'actions/agent-token@agent-v1', 'actions/agent-git-identity@agent-v1']) {
+    assert.ok(managedTag.test('ThanhNguyxnOrg/.github/.github/' + ref), ref);
+  }
+  for (const ref of ['', 'actions/checkout@v7', 'OtherOrg/.github/.github/workflows/ci-node.yml@ci-v1', 'ThanhNguyxnOrg/.github/.github/actions/agent-token@ci-v1', 'ThanhNguyxnOrg/.github/.github/workflows/ci-node.yml@main']) {
+    assert.equal(managedTag.test(ref), false, ref);
+  }
+});
+
+test('CI tag promotion tests main before atomically promoting ci-v1 and retaining snapshots', () => {
+  const workflow = read('.github/workflows/ci-tag-promote.yml');
+  assert.match(workflow, /push:\n    branches: \[main\]/);
+  for (const path of ['.github/workflows/ci-*.yml', '.github/workflows/publish-npm.yml', 'ci-policy.json', '.github/workflows/ci-tag-promote.yml']) {
+    assert.ok(workflow.includes("      - '" + path + "'"), path);
+  }
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /ref: main/);
+  const tests = workflow.indexOf('run: node --test .github/scripts/workflow-contract.test.mjs');
+  assert.ok(tests > 0 && tests < workflow.indexOf('git tag -fa ci-v1'));
+  assert.ok(workflow.includes('immutable="ci-v1-${stamp}-${short}"'));
+  assert.ok(workflow.includes('git push --atomic --no-thin origin "refs/tags/${immutable}" "+refs/tags/ci-v1"'));
+  assert.ok(workflow.includes('for ref in ci-v1 "${immutable}"; do'));
+  assert.ok(workflow.includes('if [[ "${verified}" != "${head}" ]]'));
+  assert.ok(workflow.includes('matching-refs/tags/ci-v1-'));
+  assert.match(workflow, /keep=20/);
+});
+
+test('CI promotion handles first promotion, no-op, and verification failures', () => {
+  const workflow = read('.github/workflows/ci-tag-promote.yml');
+  const script = workflow.split('      - name: Promote ci-v1 tag to HEAD\n')[1]
+    .split('\n      - name:')[0].split('        run: |\n')[1].replace(/^          /gm, '');
+  const mocks = `
+    git() {
+      if [[ "$1" == rev-parse ]]; then printf '%s\\n' "$HEAD_SHA";
+      else
+        printf 'git %s\\n' "$*"
+        if [[ "$1" == push ]]; then export PROMOTED=true; fi
+      fi
+    }
+    gh() {
+      if [[ "\${PROMOTED:-}" == true ]]; then
+        printf '%s\\n' "$VERIFIED_SHA"
+      elif [[ -n "$CURRENT_SHA" ]]; then
+        printf '%s\\n' "$CURRENT_SHA"
+      else
+        return 1
+      fi
+    }
+  `;
+  for (const [current, verified, expectedStatus, pushed] of [
+    ['', 'head-sha', 0, true],
+    ['head-sha', 'head-sha', 0, false],
+    ['', 'wrong-sha', 1, true],
+  ]) {
+    const result = spawnSync('bash', ['-c', mocks + script], {
+      encoding: 'utf8',
+      env: { ...process.env, HEAD_SHA: 'head-sha', CURRENT_SHA: current, VERIFIED_SHA: verified, GITHUB_REPOSITORY: 'ThanhNguyxnOrg/.github' },
+    });
+    assert.equal(result.status, expectedStatus, result.stderr);
+    assert.equal(result.stdout.includes('git push --atomic --no-thin'), pushed);
+  }
+});
+
+test('CI snapshot pruning handles empty listings and failed deletions without touching the moving tag', () => {
+  const workflow = read('.github/workflows/ci-tag-promote.yml');
+  const script = workflow.split('      - name: Prune old immutable CI tags (keep newest 20)\n')[1]
+    .split('        run: |\n')[1].replace(/^          /gm, '');
+  for (const count of [0, 20, 22]) {
+    const tags = Array.from({ length: count }, (_, index) => 'refs/tags/ci-v1-20260101-' + String(index).padStart(4, '0') + '-abcdef0').join('\n');
+    const result = spawnSync('bash', ['-c', `
+      gh() {
+        if [[ "$1" == api && "$2" == -X ]]; then
+          printf 'delete %s\\n' "$4"
+          return 1
+        fi
+        printf '%s\\n' "$SNAPSHOTS"
+      }
+    ` + script], {
+      encoding: 'utf8',
+      env: { ...process.env, SNAPSHOTS: tags, GITHUB_REPOSITORY: 'ThanhNguyxnOrg/.github' },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal((result.stdout.match(/^delete /gm) || []).length, Math.max(0, count - 20));
+    assert.doesNotMatch(result.stdout, /delete [^\n]*\/ci-v1\n/);
+    if (count > 20) assert.match(result.stdout, /::warning::could not delete/);
+  }
+});
 
 test('Agent signal catches slash-bearing workflow names and excludes its own relay workflows', () => {
   const signal = read('.github/templates/agent-pr-signal.yml');
@@ -127,10 +216,9 @@ test('workflow, template, and composite-action references use immutable SHAs, ma
     const source = read(file);
     return [...source.matchAll(/^\s*-?\s*uses:\s*([^\s#]+)/gm)].map((match) => ({ file, ref: match[1] }));
   });
-  // The org's own reusable workflows may follow the managed moving tags
-  // (agent-v1 / release-v1), which the pin-sync and promote workflows advance
+  // The org's own workflows and actions may follow managed moving tags
+  // (agent-v1 / release-v1 / ci-v1), which the promotion workflows advance
   // on main. Everything else must stay pinned to a full commit SHA.
-  const managedTag = /^ThanhNguyxnOrg\/\.github\/\.github\/workflows\/[\w.-]+@(agent-v1|release-v1)$/;
   const unpinned = refs.filter(({ ref }) => !ref.startsWith('./.github/actions/') && !/@[0-9a-f]{40}$/.test(ref) && !managedTag.test(ref));
   assert.ok(refs.some(({ ref }) => ref.startsWith('./.github/actions/')), 'same-repository composite actions should use a local ./ path');
   assert.deepEqual(unpinned, [], 'un-pinned workflow/action references: ' + JSON.stringify(unpinned));
