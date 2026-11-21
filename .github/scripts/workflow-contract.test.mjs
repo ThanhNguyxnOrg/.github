@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 const read = (path) => fs.readFileSync(path, 'utf8');
 
@@ -53,6 +54,61 @@ test('all shared CI workflows expose the same baseline controls', () => {
     const timeoutMatch = workflow.match(/timeout_minutes:\s*\n(?:[^\n]*\n){0,3}\s+default:\s*(\d+)/);
     assert.ok(timeoutMatch, file + ' must declare a timeout default');
     assert.equal(Number(timeoutMatch[1]), expectedTimeout, file + ' must preserve its prior timeout default');
+  }
+});
+
+test('npm publishing exposes an explicit reusable workflow and credential contract', () => {
+  const workflow = read('.github/workflows/publish-npm.yml');
+  const ci = read('.github/workflows/ci-node.yml');
+  assert.match(workflow, /^on:\n  workflow_call:/m);
+  const inputs = workflow.split('    inputs:\n')[1].split('    secrets:\n')[0];
+  for (const input of ['job_name', 'node_version_file', 'package_manager', 'cache', 'install_command', 'verify_command', 'build_command', 'working_directory', 'access', 'tag', 'dry_run', 'provenance']) {
+    assert.match(inputs, new RegExp('^      ' + input + ':', 'm'), 'missing input ' + input);
+  }
+  assert.match(workflow, /    secrets:\n      NPM_TOKEN:\n(?:        description:[^\n]*\n)?        required: true/);
+  assert.doesNotMatch(workflow, /secrets:\s*inherit/);
+  assert.match(workflow, /permissions:\s*\n\s+contents: read\s*\n\s+id-token: write/);
+  assert.match(workflow, /persist-credentials: false/);
+  for (const action of ['checkout', 'setup-node']) {
+    const pattern = new RegExp('uses: actions/' + action + '@([0-9a-f]{40})', 'g');
+    const expected = [...ci.matchAll(pattern)].map((match) => match[1]);
+    const actual = [...workflow.matchAll(pattern)].map((match) => match[1]);
+    assert.ok(expected.length > 0);
+    assert.deepEqual(actual, expected, action + ' must match ci-node.yml pins');
+  }
+  const nodeSteps = workflow.split(/\n      - name:/).filter((step) => step.includes('uses: actions/setup-node@'));
+  for (const step of nodeSteps) assert.match(step, /registry-url: https:\/\/registry\.npmjs\.org/);
+  const tokenBindings = [...workflow.matchAll(/NODE_AUTH_TOKEN:\s*([^\n]+)/g)].map((match) => match[1]);
+  assert.ok(tokenBindings.length > 0);
+  for (const binding of tokenBindings) assert.ok(['unused', '${{ secrets.NPM_TOKEN }}'].includes(binding));
+  for (const name of ['Install dependencies', 'Verify', 'Build']) {
+    const step = workflow.split('      - name: ' + name + '\n')[1].split('\n      - name:')[0];
+    assert.match(step, /NODE_AUTH_TOKEN: unused/);
+    assert.doesNotMatch(step, /secrets\.NPM_TOKEN/);
+  }
+  const publish = workflow.split('      - name: Publish to npm\n')[1].split('\n      - name:')[0];
+  assert.match(publish, /working-directory: \$\{\{ inputs\.working_directory \}\}/);
+  assert.match(publish, /NODE_AUTH_TOKEN: \$\{\{ secrets\.NPM_TOKEN \}\}/);
+});
+
+test('npm provenance is enabled only when the checkout matches the workflow commit', () => {
+  const workflow = read('.github/workflows/publish-npm.yml');
+  const step = workflow.split('      - name: Publish to npm\n')[1].split('\n      - name:')[0];
+  const script = step.split('        run: |\n')[1].replace(/^          /gm, '');
+  for (const [requested, checkout, expected] of [
+    ['true', 'workflow-sha', 'enabled'],
+    ['true', 'recovery-sha', 'disabled (checkout differs from GITHUB_SHA)'],
+    ['false', 'workflow-sha', 'disabled'],
+    ['', 'workflow-sha', 'disabled'],
+  ]) {
+    const result = spawnSync('bash', ['-c', 'git() { printf "%s" "$CHECKOUT_SHA"; }; npm() { printf "arg=%s\\n" "$@"; };\n' + script.replace(' >> "$GITHUB_OUTPUT"', '')], {
+      encoding: 'utf8',
+      env: { ...process.env, CHECKOUT_SHA: checkout, GITHUB_SHA: 'workflow-sha', GITHUB_OUTPUT: '/dev/stdout', PROVENANCE: requested, DRY_RUN: 'false', ACCESS: 'public', DIST_TAG: 'latest' },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(result.stdout.includes('provenance=' + expected));
+    assert.equal(result.stdout.includes('arg=--provenance'), expected === 'enabled');
+    assert.equal(result.stdout.includes('::warning::'), requested === 'true' && checkout !== 'workflow-sha');
   }
 });
 

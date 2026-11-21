@@ -10,7 +10,7 @@ The organization keeps repeated automation primitives in `.github`. Project repo
 - Pin calls into this repository to a full commit SHA. Update pins deliberately when the central library changes.
 - Pin third-party actions to verified full commit SHAs; Dependabot opens one PR per GitHub Actions dependency each week (no update groups).
 - For Agent automation, do not pass all repository secrets to a called workflow. `BOT_APP_ID` is read directly from the organization `vars` context; only `BOT_PRIVATE_KEY` is declared and passed through `workflow_call.secrets`.
-- For third-party publishing, consult both [organization-secrets.md](organization-secrets.md) and [organization-variables.md](organization-variables.md). Keep platform-specific publishing in the project adapter until at least two repositories share the same build/publish contract. If a reusable publisher is introduced, declare each required credential explicitly under `workflow_call.secrets`; never use `secrets: inherit`.
+- For third-party publishing, consult both [organization-secrets.md](organization-secrets.md) and [organization-variables.md](organization-variables.md). npm uses the shared `publish-npm.yml` contract below; keep other platform-specific publishing in the project adapter until at least two repositories share the same build/publish contract. Declare each required credential explicitly under `workflow_call.secrets`; never use `secrets: inherit`.
 - The Agent-token action scopes tokens to the calling repository by default. Do not set `owner` without a repository allowlist unless organization-wide access is specifically required.
 - Every automated write must use the GitHub App installation token. The default `GITHUB_TOKEN` is read-only in project workflows and must not be used for bot commits, comments, tags, release edits, or package-registry writes.
 
@@ -53,12 +53,48 @@ For the current itch.io integration:
 
 Never put actual secret values in documentation, workflow inputs, artifacts, or command arguments. Expose the key only as a masked environment variable to the Butler process.
 
+### npm publishing
+
+`NPM_TOKEN` is an organization Actions secret. Callers pass only `NPM_TOKEN: ${{ secrets.NPM_TOKEN }}` explicitly; never use `secrets: inherit`. The caller job must grant `contents: read` and `id-token: write`, because reusable workflows cannot exceed caller permissions. Provenance requires a public repository and a package.json `repository` field matching that repository.
+
+Publish after the GitHub Release is published (`release: types: [published]`), not when the tag is created. Keep `workflow_dispatch` for recovery, passing an existing `vX.Y.Z` tag as `ref`; do not create or move tags. Prefer dispatching from that existing tag itself (set **Use workflow from** to the tag) so npm provenance attests the published commit. Passing `ref` from another branch publishes without provenance when the checked-out commit differs from `GITHUB_SHA`; the workflow warns and records this in the job summary. The first consumer is Techstack-Studio:
+
+```yaml
+name: Publish npm
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing vX.Y.Z tag to publish
+        required: true
+        type: string
+
+jobs:
+  publish:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ThanhNguyxnOrg/.github/.github/workflows/publish-npm.yml@<CENTRAL_COMMIT_SHA>
+    with:
+      verify_command: npm run verify
+      build_command: npm run build:cli
+      working_directory: packages/cli
+      ref: ${{ inputs.tag || github.ref }}
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+```
+
+For monorepos, install, verify, and build run at the repository root; `working_directory` selects only the package to publish. For a root package, omit `working_directory` (default `.`). Set `dry_run: true` to validate publishing without uploading.
+
 ## Reusable workflows
 
 - `ci-node.yml`, `ci-python.yml`, `ci-go.yml`, and `ci-cmake.yml` share the optional baseline inputs `job_name`, `runner`, `timeout_minutes`, `fetch_depth`, `working_directory`, `artifact_name`, `artifact_path`, and `artifact_retention_days`. Defaults preserve existing check names and timeout behavior: Node remains 20 minutes; Python, Go, and CMake default to 360 minutes (the prior GitHub-hosted job limit). Callers may lower the timeout explicitly. Each workflow retains ecosystem-specific setup and commands, supports explicit Node versions or version files and lockfile-aware caching, and applies `working_directory` on each `run` step because GitHub does not allow expressions in `defaults.run`.
 - `ci-python.yml`: Python setup, pip caching, dependency installation, lint, typecheck, test, build, and optional CI artifact upload.
 - `ci-go.yml`: Go setup, module caching, optional lint-tool installation and lint command, test, vet, build, and optional CI artifact upload.
 - `ci-cmake.yml`: CMake configure, build, test, optional system dependencies, and optional CI artifact upload; use custom project adapters for extra Qt/MSVC/NASM or other system requirements.
+- `publish-npm.yml`: installs dependencies and optionally verifies/builds at the repository root, then publishes the package in `working_directory`. Skips versions already on npm, supports provenance and `dry_run`, and writes a job summary.
 
 All shared CI workflows expose an explicit `job_name` so the check-run name can match `ci-policy.json`. Every reusable CI workflow defaults `run` steps to Bash, including Windows runners, so command inputs have consistent shell behavior. They default to read-only checkout credentials and `contents: read`. CI artifacts are optional; do not upload every intermediate build by default. Keep short-lived CI artifacts only when another job or a human reviewer consumes them.
 - `release-publish.yml`: downloads the caller's build artifacts, mints a repository-scoped Agent token, uploads to the central draft release, and verifies the required asset manifest from `release-policy.json`.

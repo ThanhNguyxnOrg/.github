@@ -4,6 +4,7 @@ Quick reference for the GitHub Actions secrets configured in [ThanhNguyxnOrg](ht
 
 | Secret | Purpose |
 |---|---|
+| `NPM_TOKEN` | npm publishing token consumed through the explicit `publish-npm.yml` secret contract; current consumer is Techstack-Studio's `techstack-studio` package. |
 | `BOT_PRIVATE_KEY` | The GitHub App private key paired with the App ID. Workflows use it to authenticate the App and generate an installation access token. |
 | `CHOCO_API_KEY` | Chocolatey publishing credential used by the `git-account-switcher` release workflow to publish the `gswitch` package. |
 | `AMO_API_SECRET` | Matching AMO JWT secret used with `AMO_API_KEY` to authenticate with the AMO API. |
@@ -63,8 +64,16 @@ The current consumer is [AFTERFRAME's itch.io package/publish workflow](https://
 
 The organization secret is consumed in the caller repository's own trusted workflow. If publishing is later moved to a reusable workflow, define an explicit `workflow_call` secret contract and pass only `BUTLER_API_KEY`; do not use `secrets: inherit`.
 
+## npm
+
+`NPM_TOKEN` is an npm granular/automation access token with publish rights. Configure it once at organization level and make it available to public repositories. The current consumer is Techstack-Studio's `techstack-studio` package.
+
+Consume it only through the explicit `publish-npm.yml` secret contract: callers pass `NPM_TOKEN: ${{ secrets.NPM_TOKEN }}`, never `secrets: inherit`. The workflow exposes the token only through the `NODE_AUTH_TOKEN` environment variable, never as a CLI argument. See [reusable-workflows.md](reusable-workflows.md) for caller permissions, provenance requirements, and recovery.
+
+Rotate before expiry: update the organization secret, run a `dry_run`, then revoke the old token.
+
 ## Security
 
 This repository is public. Never put secret values, private keys, API keys, or tokens in this file or in workflow source. Manage values under GitHub Organization → Settings → Secrets and variables → Actions.
 
-**Last reviewed:** November 15, 2026
+**Last reviewed:** November 21, 2026

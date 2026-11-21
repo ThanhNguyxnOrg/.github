@@ -32,7 +32,7 @@ It keeps the public-facing profile and default documentation clean, organized, a
 - `ISSUE_TEMPLATE/` → default issue templates
 - `docs/` → extra documentation about this workspace
 - `agent-policy.json`, `ci-policy.json`, and `release-policy.json` → centralized organization automation policies
-- `.github/workflows/` → central Agent, Release, Stale, and showcase-sync controllers
+- `.github/workflows/` → central Agent, Release, Stale, and showcase-sync controllers, plus shared CI and npm publish reusable workflows
 - `docs/agent-automation.md` → control-plane rules, CI profiles, release adapters, and onboarding
 - `docs/organization-secrets.md` → canonical inventory, scope, and least-privilege access policy for organization Actions secrets
 - `docs/organization-variables.md` → canonical inventory and scope policy for organization and repository Actions variables
