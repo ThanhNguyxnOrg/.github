@@ -2,6 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, releaseBodyFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy, releaseMatchesTag, selectReleaseByTag, selectOrphanDraftForTag } from './release-controller.mjs';
+import { shouldReprepareRelease } from './release-controller.mjs';
+
+test('re-prepares a release with missing or failed checks only at a newer verified HEAD', async () => {
+  for (const preparedState of ['missing', 'failure']) {
+    assert.equal(await shouldReprepareRelease(preparedState, 'old', 'new', async () => 'success'), true);
+    assert.equal(await shouldReprepareRelease(preparedState, 'old', 'new', async () => 'missing'), false);
+    assert.equal(await shouldReprepareRelease(preparedState, 'old', 'new', async () => 'pending'), false);
+  }
+
+  const unexpectedCheck = async () => assert.fail('should wait without evaluating HEAD');
+  assert.equal(await shouldReprepareRelease('missing', 'same', 'same', unexpectedCheck), false);
+  assert.equal(await shouldReprepareRelease('pending', 'old', 'new', unexpectedCheck), false);
+  assert.equal(await shouldReprepareRelease('unconfigured', 'old', 'new', unexpectedCheck), false);
+});
 
 const policy = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
