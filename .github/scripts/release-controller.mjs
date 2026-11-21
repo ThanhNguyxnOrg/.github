@@ -728,6 +728,41 @@ async function createCommit(fullName, branch, headSha, changes, message) {
   return commit.sha;
 }
 
+async function prepareReleaseCommit(fullName, branch, headSha, nextVersion, notes, rule, baseLabel) {
+  const changes = [];
+  for (const file of rule.versionFiles || []) {
+    const source = await getFile(fullName, file.path, headSha);
+    const updated = applyVersionFile(file, source, nextVersion);
+    if (updated !== source) changes.push({ path: file.path, content: updated });
+  }
+
+  const changelogPath = rule.changelogPath || 'CHANGELOG.md';
+  let changelog;
+  try {
+    changelog = await getFile(fullName, changelogPath, headSha);
+  } catch (error) {
+    if (!(error instanceof GitHubError) || error.status !== 404) throw error;
+    changelog = '# Changelog\n\n';
+  }
+  let updatedChangelog = changelog;
+  try {
+    updatedChangelog = insertChangelogSection(changelog, nextVersion, new Date().toISOString().slice(0, 10), notes);
+  } catch (error) {
+    // A previous prepare attempt may already have written this version's
+    // section; keep it instead of failing a re-declared release.
+    if (!(error instanceof Error) || !/already contains version/.test(error.message)) throw error;
+  }
+  if (updatedChangelog !== changelog) changes.push({ path: changelogPath, content: updatedChangelog });
+
+  const commitMessage = rule.mode === 'commit'
+    ? 'release: v' + nextVersion
+    : 'chore(release): prepare v' + nextVersion;
+  const body = 'Prepared automatically from Conventional Commits since ' + baseLabel + '.\n\n' +
+    'Co-authored-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>\n' +
+    'Signed-off-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>';
+  return createCommit(fullName, branch, headSha, changes, commitMessage + '\n\n' + body);
+}
+
 
 async function reconcileRepository(repoName, rule) {
   const fullName = ORG + '/' + repoName;
@@ -765,7 +800,20 @@ async function reconcileRepository(repoName, rule) {
     const tag = makeTagName(version);
     const state = await checkState(fullName, pending.sha, repoName, changedFiles);
     if (state !== 'success') {
-      console.log('[release-wait]', fullName, tag, '— CI state is ' + state);
+      // Required checks are pinned to the prepared commit, so a failed one can
+      // never turn green again. When main has since moved to a newer verified
+      // HEAD, re-declare the same release intent there instead of holding
+      // forever; the next run picks that commit up as pending and publishes it.
+      const reprepare = state === 'failure' && pending.sha !== headSha &&
+        (await checkState(fullName, headSha, repoName, changedFiles)) === 'success';
+      if (!reprepare) {
+        console.log('[release-wait]', fullName, tag, '— CI state is ' + state);
+        return;
+      }
+      const notes = 'Re-declared at ' + headSha.slice(0, 12) + ' after prepared commit ' +
+        pending.sha.slice(0, 12) + ' failed its required checks.';
+      const sha = await prepareReleaseCommit(fullName, branch, headSha, version, notes, rule, pending.sha);
+      console.log('[release-prepared]', fullName, tag, 'commit ' + sha, 'mode=' + rule.mode, 're-declared');
       return;
     }
     const preparedRelease = await ensureDraftRelease(fullName, repoName, tag, version, pending.sha, rule);
@@ -803,33 +851,8 @@ async function reconcileRepository(repoName, rule) {
     return;
   }
 
-  const date = new Date().toISOString().slice(0, 10);
   const notes = makeReleaseNotes(conventional, fullName);
-  const changes = [];
-  for (const file of rule.versionFiles || []) {
-    const source = await getFile(fullName, file.path, headSha);
-    const updated = applyVersionFile(file, source, nextVersion);
-    if (updated !== source) changes.push({ path: file.path, content: updated });
-  }
-
-  const changelogPath = rule.changelogPath || 'CHANGELOG.md';
-  let changelog;
-  try {
-    changelog = await getFile(fullName, changelogPath, headSha);
-  } catch (error) {
-    if (!(error instanceof GitHubError) || error.status !== 404) throw error;
-    changelog = '# Changelog\n\n';
-  }
-  const updatedChangelog = insertChangelogSection(changelog, nextVersion, date, notes);
-  changes.push({ path: changelogPath, content: updatedChangelog });
-
-  const commitMessage = rule.mode === 'commit'
-    ? 'release: v' + nextVersion
-    : 'chore(release): prepare v' + nextVersion;
-  const body = 'Prepared automatically from Conventional Commits since ' + (latestTag || rule.baselineSha) + '.\n\n' +
-    'Co-authored-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>\n' +
-    'Signed-off-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>';
-  const sha = await createCommit(fullName, branch, headSha, changes, commitMessage + '\n\n' + body);
+  const sha = await prepareReleaseCommit(fullName, branch, headSha, nextVersion, notes, rule, latestTag || rule.baselineSha);
   console.log('[release-prepared]', fullName, tag, 'commit ' + sha, 'mode=' + rule.mode);
 }
 
