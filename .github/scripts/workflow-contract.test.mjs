@@ -79,7 +79,12 @@ test('npm publishing exposes an explicit reusable workflow and credential contra
   for (const step of nodeSteps) assert.match(step, /registry-url: https:\/\/registry\.npmjs\.org/);
   const tokenBindings = [...workflow.matchAll(/NODE_AUTH_TOKEN:\s*([^\n]+)/g)].map((match) => match[1]);
   assert.ok(tokenBindings.length > 0);
-  for (const binding of tokenBindings) assert.equal(binding, '${{ secrets.NPM_TOKEN }}');
+  for (const binding of tokenBindings) assert.ok(['unused', '${{ secrets.NPM_TOKEN }}'].includes(binding));
+  for (const name of ['Install dependencies', 'Verify', 'Build']) {
+    const step = workflow.split('      - name: ' + name + '\n')[1].split('\n      - name:')[0];
+    assert.match(step, /NODE_AUTH_TOKEN: unused/);
+    assert.doesNotMatch(step, /secrets\.NPM_TOKEN/);
+  }
   const publish = workflow.split('      - name: Publish to npm\n')[1].split('\n      - name:')[0];
   assert.match(publish, /working-directory: \$\{\{ inputs\.working_directory \}\}/);
   assert.match(publish, /NODE_AUTH_TOKEN: \$\{\{ secrets\.NPM_TOKEN \}\}/);

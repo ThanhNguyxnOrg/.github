@@ -183,18 +183,21 @@ jobs:
       - name: Install dependencies
         if: inputs.install_command != ''
         env:
+          NODE_AUTH_TOKEN: unused
           COMMAND: ${{ inputs.install_command }}
         run: bash -euo pipefail -c "$COMMAND"
 
       - name: Verify
         if: inputs.verify_command != ''
         env:
+          NODE_AUTH_TOKEN: unused
           COMMAND: ${{ inputs.verify_command }}
         run: bash -euo pipefail -c "$COMMAND"
 
       - name: Build
         if: inputs.build_command != ''
         env:
+          NODE_AUTH_TOKEN: unused
           COMMAND: ${{ inputs.build_command }}
         run: bash -euo pipefail -c "$COMMAND"
 
