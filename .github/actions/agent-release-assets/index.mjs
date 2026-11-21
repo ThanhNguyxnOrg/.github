@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { releaseBodyFromChangelog } from '../../scripts/release-changelog.mjs';
 
 const token = process.env.GH_TOKEN;
 const repository = process.env.REPOSITORY || '';
@@ -57,7 +58,7 @@ export function planAssetUpload(localAssets, expectedNames, existingAssets) {
     const previous = existing.get(item.name);
     return {
       ...item,
-      action: previous && previous.digest === item.digest ? 'skip' : previous ? 'replace' : 'upload',
+      action: previous && previous.state === 'uploaded' && previous.digest === item.digest ? 'skip' : previous ? 'replace' : 'upload',
       existingId: previous?.id ?? null
     };
   });
@@ -67,11 +68,7 @@ export function planAssetUpload(localAssets, expectedNames, existingAssets) {
 export function selectDraftRelease(releases, releaseTag) {
   const matches = (Array.isArray(releases) ? releases : [])
     .filter(release => release && release.tag_name === releaseTag && release.draft === true)
-    .sort((a, b) => {
-      const aDate = String(a.updated_at || a.created_at || '');
-      const bDate = String(b.updated_at || b.created_at || '');
-      return bDate.localeCompare(aDate);
-    });
+    .sort((a, b) => Number(a.id) - Number(b.id));
   return matches[0] || null;
 }
 
@@ -182,10 +179,34 @@ export async function main() {
     };
   });
   if (!localAssets.length) fail('No release assets were found');
+  const localPlan = planAssetUpload(localAssets, required, []);
+  if (localPlan.unexpected.length) fail(`Unlisted release assets are not allowed by the central manifest: ${localPlan.unexpected.join(', ')}`);
+  if (localPlan.missing.length) fail(`Required assets missing from ${assetPath}: ${localPlan.missing.join(', ')}`);
+  if (required.includes('checksums.txt')) {
+    const listed = new Set();
+    for (const line of localAssets.find(asset => asset.name === 'checksums.txt').bytes.toString('utf8').split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      const match = /^([0-9a-fA-F]{64}) [ *](.+)$/.exec(line);
+      if (!match) fail('Invalid checksums.txt entry: ' + line);
+      const [, digest, name] = match;
+      const asset = localAssets.find(item => item.name === name);
+      if (listed.has(name) || !asset || asset.digest !== 'sha256:' + digest.toLowerCase()) {
+        fail('checksums.txt digest mismatch or duplicate entry: ' + name);
+      }
+      listed.add(name);
+    }
+    const missing = required.filter(name => name !== 'checksums.txt' && !listed.has(name));
+    if (missing.length) fail('checksums.txt is missing required assets: ' + missing.join(', '));
+  }
+  const attempts = Number(process.env.RELEASE_LOOKUP_ATTEMPTS || 6);
+  const delay = Number(process.env.RELEASE_LOOKUP_DELAY_MS ?? 5000);
+  if (!Number.isInteger(attempts) || attempts < 1 || !Number.isFinite(delay) || delay < 0) {
+    fail('Invalid release lookup retry configuration');
+  }
   const releaseUrl = `${api}/repos/${owner}/${repo}/releases/tags/${encodeURIComponent(tag)}`;
   const releaseListUrl = `${api}/repos/${owner}/${repo}/releases?per_page=100`;
   let release;
-  for (let attempt = 0; attempt < 180; attempt += 1) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       release = await request(releaseUrl);
       break;
@@ -197,7 +218,7 @@ export async function main() {
       // Resolve by exact tag_name from the collection before assuming that the
       // central controller has not created the draft yet.
       const releases = await request(releaseListUrl);
-      release = selectDraftRelease(releases, tag);
+      release = releases.find(item => item.tag_name === tag && item.draft === false) || selectDraftRelease(releases, tag);
       if (release) {
         console.log(`[release-lookup-fallback] resolved draft ${tag} from release collection (id=${release.id})`);
         break;
@@ -225,16 +246,52 @@ export async function main() {
         break;
       }
 
-      if (attempt === 179) {
-        fail(`Central draft release ${tag} was not found by tag lookup or safe orphan-draft recovery`);
+      if (attempt === attempts - 1) {
+        if (!targetSha) fail(`Git tag ${tag} does not exist; refusing to create a release without an existing tag`);
+        const changelogPath = profile.changelogPath || 'CHANGELOG.md';
+        const contents = await request(`${api}/repos/${owner}/${repo}/contents/${changelogPath.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(targetSha)}`);
+        const body = releaseBodyFromChangelog(Buffer.from(contents.content, 'base64').toString('utf8'), tag);
+        const created = await request(`${api}/repos/${owner}/${repo}/releases`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tag_name: tag, target_commitish: targetSha, name: `${repo} ${tag}`,
+            body, draft: true, prerelease: tag.includes('-'), generate_release_notes: false
+          })
+        });
+        const refreshed = await request(releaseListUrl);
+        const drafts = refreshed.filter(item => item.tag_name === tag && item.draft === true);
+        if (!drafts.some(item => item.id === created.id)) drafts.push(created);
+        drafts.sort((a, b) => Number(a.id) - Number(b.id));
+        release = refreshed.find(item => item.tag_name === tag && item.draft === false) || drafts[0];
+        const ownDraft = drafts.find(item => item.id === created.id);
+        if (ownDraft.id !== release.id && Array.isArray(ownDraft.assets) && ownDraft.assets.length === 0) {
+          const ownDraftUrl = `${api}/repos/${owner}/${repo}/releases/${ownDraft.id}`;
+          const current = await request(ownDraftUrl);
+          if (current.draft === true && Array.isArray(current.assets) && current.assets.length === 0) {
+            await request(ownDraftUrl, { method: 'DELETE' });
+          }
+        }
+        break;
       }
-      console.log(`[release-wait] draft ${tag} is not visible yet; retry ${attempt + 1}/180`);
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      console.log(`[release-wait] draft ${tag} is not visible yet; retry ${attempt + 1}/${attempts}`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
   if (!release) fail(`Central draft release was not created for ${tag}`);
   if (release.tag_name !== tag) fail(`Release tag mismatch: expected ${tag}, got ${release.tag_name}`);
-  if (!release.draft) fail(`Release ${tag} is already published; refusing to mutate published assets`);
+  if (!release.draft) {
+    verifyDigests(release);
+    console.log(`[release-already-published-verified] ${repository} ${tag}`);
+    return;
+  }
+
+  function verifyDigests(current) {
+    for (const local of localAssets) {
+      const remote = (current.assets || []).find(asset => asset.name === local.name && asset.state === 'uploaded');
+      if (!remote || remote.digest !== local.digest) fail('Release asset missing or digest mismatch: ' + local.name);
+    }
+  }
 
   const plan = planAssetUpload(localAssets, required, release.assets || []);
   if (plan.unexpected.length) {
@@ -273,6 +330,7 @@ export async function main() {
     .map(asset => asset.name));
   const missingAfterUpload = required.filter(name => !uploadedNames.has(name));
   if (missingAfterUpload.length) fail(`Release is still missing required assets: ${missingAfterUpload.join(', ')}`);
+  verifyDigests(verified);
 
   // Manifest verified: every required asset is present on the draft. Only now
   // flip the draft to public. A failed verification above throws first, so a

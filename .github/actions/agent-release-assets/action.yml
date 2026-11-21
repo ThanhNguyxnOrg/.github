@@ -1,5 +1,5 @@
 name: Upload and verify release assets as ThanhNguyxnAgent
-description: Upload platform artifacts to the central draft, validate the exact asset manifest, and publish the release.
+description: Find or create a draft for an existing tag, verify artifact checksums, and publish; verify published releases without mutation.
 inputs:
   token:
     description: Repository-scoped Agent installation token with contents:write.

@@ -56,7 +56,7 @@ jobs:
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
 
       - name: Upload assets and verify central manifest
-        uses: ThanhNguyxnOrg/.github/.github/actions/agent-release-assets@04ac29ef8dbc6131403521760e4bfb0e7656e6f2
+        uses: ThanhNguyxnOrg/.github/.github/actions/agent-release-assets@38b2948f757dd367f02734dad21a8b1e8dd8d1ea
         with:
           token: ${{ steps.agent.outputs.token }}
           tag: ${{ inputs.tag }}
