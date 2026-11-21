@@ -10,6 +10,8 @@ on:
       - '.github/scripts/agent-controller.test.mjs'
       - '.github/scripts/agent-onboard.mjs'
       - '.github/scripts/agent-onboard.test.mjs'
+      - '.github/scripts/policy-sync.mjs'
+      - '.github/scripts/policy-sync.test.mjs'
       - '.github/templates/agent-pr-signal.yml'
       # NOTE (anti-spam, Cách 2, 2026-11-18): '.github/templates/agent-pr-worker.yml'
       # is deliberately NOT listed here. Pin commits touch exactly that file,
@@ -44,6 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       repositories: ${{ steps.list.outputs.repositories }}
+      repository_meta: ${{ steps.list.outputs.repository_meta }}
     steps:
       - name: Create metadata-only organization inventory token
         id: inventory
@@ -102,6 +105,17 @@ jobs:
             .sort((a, b) => a.localeCompare(b));
 
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `repositories=${JSON.stringify(eligible)}\n`);
+          const metadata = repositories
+            .filter(repo =>
+              repo.owner?.login?.toLowerCase() === org.toLowerCase() &&
+              !repo.archived &&
+              !repo.fork &&
+              repo.name !== '.github' &&
+              typeof repo.default_branch === 'string' &&
+              repo.default_branch.length > 0
+            )
+            .map(repo => ({ name: repo.name, default_branch: repo.default_branch }));
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `repository_meta=${JSON.stringify(metadata)}\n`);
           console.log(`[discover] found ${eligible.length} active repositories eligible for per-repository onboarding`);
           NODE
 
@@ -151,6 +165,36 @@ jobs:
           TARGET_REPOSITORY: ${{ matrix.repository }}
         run: node .github/scripts/agent-onboard.mjs
 
+  policy-sync:
+    name: Register newly discovered repositories in the central policies
+    needs: discover
+    if: needs.discover.outputs.repositories != '[]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout central policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Create a .github-scoped contents-write token
+        id: policy
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: '.github'
+          permission-contents: write
+
+      - name: Configure Agent git identity
+        uses: ./.github/actions/agent-git-identity
+
+      - name: Sync central policies for newly discovered repositories
+        env:
+          REPOSITORY_METADATA: ${{ needs.discover.outputs.repository_meta }}
+          GH_TOKEN: ${{ steps.policy.outputs.token }}
+        run: node .github/scripts/policy-sync.mjs
+
   reconcile:
     name: Triage issues, auto-merge safe dependencies, and route risky PRs to humans
     needs: [discover, onboard]
@@ -171,7 +215,7 @@ jobs:
           owner: ${{ github.repository_owner }}
 
       - name: Test central policy helpers
-        run: node --test .github/scripts/agent-controller.test.mjs .github/scripts/agent-onboard.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/stale-controller.test.mjs
+        run: node --test .github/scripts/agent-controller.test.mjs .github/scripts/agent-onboard.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/stale-controller.test.mjs .github/scripts/policy-sync.test.mjs
 
       - name: Reconcile open pull requests and issues
         env:

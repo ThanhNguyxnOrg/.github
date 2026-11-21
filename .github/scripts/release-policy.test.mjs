@@ -1,32 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import policy from '../../release-policy.json' with { type: 'json' };
-
-const organizationRepositories = [
-  '.github',
-  'AFTERFRAME-THE-LAST-LOOP',
-  'apidex-hub',
-  'awesome-cert-sherpa',
-  'blendops',
-  'chess-on-glass',
-  'chromadna',
-  'ClipForge',
-  'cogmint',
-  'ForgeHelm',
-  'git-account-switcher',
-  'judgeloom-core',
-  'lagvex',
-  'LayoutLingua',
-  'lumeo',
-  'Locsight',
-  'PurgeKit',
-  'SkillGauge',
-  'Snapbooth',
-  'StepDSA',
-  'Techstack-Studio',
-  'ThanhNguyxnOrg.github.io',
-  'WriteCanvas'
-];
+import organizationRepositories from '../../organization-repositories.json' with { type: 'json' };
 
 test('every organization repository has exactly one release classification', () => {
   const active = Object.keys(policy.repositories || {});
