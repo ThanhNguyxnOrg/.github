@@ -1013,11 +1013,13 @@ export async function processPullRequest(repo, pr) {
   for (const label of getBlockingPullRequestLabels(fresh)) {
     if (!riskReasons.includes(label)) riskReasons.push(label);
   }
+  const clearedVetoes = new Set();
   if (fresh.mergeable === false || fresh.mergeable_state === 'dirty') {
     riskReasons.push('merge-conflict');
     await addLabels(fullName, pr.number, ['merge-conflict']);
   } else if (fresh.mergeable === true) {
     await removeLabel(fullName, pr.number, 'merge-conflict');
+    clearedVetoes.add('merge-conflict');
   } else {
     if (shouldDisableAutoMergeForKnownReviewHold(fresh, riskReasons)) {
       await disablePullRequestAutoMerge(fullName, fresh);
@@ -1034,6 +1036,8 @@ export async function processPullRequest(repo, pr) {
     ? await getCheckState(fullName, checkSha, repoName, pathsAvailable ? paths : undefined)
     : 'unconfigured';
   await syncCheckLabels(fullName, pr.number, checkState);
+  if (checkState !== 'failure') clearedVetoes.add('ci-failed');
+  riskReasons = riskReasons.filter(reason => !clearedVetoes.has(reason));
   if (!dependencyBot && checkState === 'success' && freshVerificationState === 'review' && profile?.reviewHoldLabel) {
     // The current head's commit-bound domain status is green. A review-hold
     // label from an older, out-of-order workflow run is stale and can be cleared.

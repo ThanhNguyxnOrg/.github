@@ -839,6 +839,70 @@ test('event routing skips closed PRs and stale or mismatched head metadata', () 
   assert.equal(matchesPullRequestEvent({ state: 'open', head: { sha: 'a'.repeat(40), repo: null } }, target), false);
 });
 
+test('processPullRequest reconciles stale CI and conflict vetoes in the same pass', async t => {
+  const cases = [
+    { name: 'both stale vetoes', labels: ['ci-failed', 'merge-conflict'], state: 'success' },
+    { name: 'no prior vetoes', labels: [], state: 'success' },
+    { name: 'current CI failure', labels: ['ci-failed', 'merge-conflict'], state: 'failure', hold: true },
+    { name: 'new CI failure', labels: [], state: 'failure', hold: true },
+    { name: 'current conflict', labels: ['ci-failed', 'merge-conflict'], state: 'success', conflict: true, hold: true },
+    { name: 'new conflict', labels: [], state: 'success', conflict: true, hold: true },
+    { name: 'pending checks clear stale CI veto', labels: ['ci-failed'], state: 'pending' },
+    { name: 'missing checks retain review hold', labels: ['ci-failed'], state: 'missing', hold: true },
+    { name: 'independent human veto', labels: ['ci-failed', 'merge-conflict', 'do-not-merge'], state: 'success', hold: true },
+    { name: 'check lookup error fails closed', labels: ['ci-failed'], state: 'error', error: true }
+  ];
+  for (const scenario of cases) await t.test(scenario.name, async () => {
+    const originalFetch = globalThis.fetch;
+    const originalToken = process.env.GH_TOKEN;
+    process.env.GH_TOKEN = 'test-agent-token';
+    const requests = [];
+    const pr = {
+      number: 4322, node_id: 'PR_test', state: 'open', draft: false,
+      title: 'Bump lodash from 4.17.20 to 4.17.21', body: '',
+      user: { login: 'dependabot[bot]' },
+      labels: [...scenario.labels, 'needs-review'].map(name => ({ name })),
+      head: { sha: 'a'.repeat(40) }, base: { ref: 'main' },
+      mergeable: !scenario.conflict, mergeable_state: scenario.conflict ? 'dirty' : 'clean'
+    };
+    globalThis.fetch = async (url, options = {}) => {
+      const path = new URL(url).pathname;
+      const body = options.body ? JSON.parse(options.body) : null;
+      requests.push({ path, method: options.method || 'GET', body });
+      let result = [];
+      if (path.endsWith('/files')) result = [{ filename: 'package.json', status: 'modified' }];
+      else if (path.endsWith('/pulls/4322')) result = pr;
+      else if (path.endsWith('/check-runs')) {
+        if (scenario.error) return new Response(JSON.stringify({ message: 'check lookup failed' }), { status: 500 });
+        result = { check_runs: scenario.state === 'missing' ? [] : [{
+          name: 'verify / Node (Ubuntu)',
+          status: scenario.state === 'pending' ? 'in_progress' : 'completed',
+          conclusion: scenario.state === 'pending' ? null : scenario.state
+        }] };
+      } else if (path.endsWith('/LayoutLingua')) result = { allow_auto_merge: true, allow_squash_merge: true };
+      else if (path === '/graphql') result = {
+        data: { repository: { pullRequest: { reviewThreads: { nodes: [], pageInfo: { hasNextPage: false } } } } }
+      };
+      return new Response(JSON.stringify(result), { status: 200 });
+    };
+    try {
+      const run = () => processPullRequest({ name: 'LayoutLingua', full_name: 'ThanhNguyxnOrg/LayoutLingua', default_branch: 'main' }, pr);
+      if (scenario.error) await assert.rejects(run, /check lookup failed/);
+      else await run();
+      const removedReview = requests.some(r => r.method === 'DELETE' && r.path.endsWith('/labels/needs-review'));
+      const addedReview = requests.some(r => r.method === 'POST' && r.body?.labels?.includes('needs-review'));
+      const enabled = requests.some(r => r.body?.query?.includes('enablePullRequestAutoMerge'));
+      assert.equal(removedReview, !scenario.hold && !scenario.error);
+      assert.equal(addedReview, Boolean(scenario.hold));
+      assert.equal(enabled, scenario.state === 'success' && !scenario.hold);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalToken === undefined) delete process.env.GH_TOKEN;
+      else process.env.GH_TOKEN = originalToken;
+    }
+  });
+});
+
 test('processPullRequest disables native Auto-merge for a review hold when mergeability is unknown', async () => {
   const originalFetch = globalThis.fetch;
   const originalToken = process.env.GH_TOKEN;
