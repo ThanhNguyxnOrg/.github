@@ -149,7 +149,7 @@ test('a profile with no applicable required checks is neutral, not missing', () 
 
 test('CI profiles match the real project gates and quarantine known failing or optional checks', () => {
   assert.deepEqual(getRepositoryProfile('judgeloom-core').requiredChecks, ['Lint • Typecheck • Test (Python 3.12)', 'go-test / Go worker test • vet']);
-  assert.deepEqual(getRepositoryProfile('cogmint').requiredChecks, ['verify / Typecheck']);
+  assert.deepEqual(getRepositoryProfile('cogmint').requiredChecks, ['verify / Typecheck', 'rust (ubuntu-latest)', 'rust (macos-latest)', 'rust (windows-latest)']);
   assert.deepEqual(getRepositoryProfile('lumeo').requiredChecks, ['verify / lint-and-syntax']);
   assert.deepEqual(getRepositoryProfile('Techstack-Studio').requiredChecks, ['verify / Verify']);
   assert.deepEqual(getRepositoryProfile('StepDSA').requiredChecks, ['test / test']);

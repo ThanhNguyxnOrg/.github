@@ -76,7 +76,10 @@
     "cogmint": {
       "defaultBranch": "main",
       "requiredChecks": [
-        "verify / Typecheck"
+        "verify / Typecheck",
+        "rust (ubuntu-latest)",
+        "rust (macos-latest)",
+        "rust (windows-latest)"
       ]
     },
     "awesome-cert-sherpa": {
