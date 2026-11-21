@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 // so the environment must be set before importing the action module.
 const assetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'release-assets-'));
 const appBytes = Buffer.from('fake-windows-installer');
-const checksumsBytes = Buffer.from('fake-checksums');
+const checksumsBytes = Buffer.from(createHash('sha256').update(appBytes).digest('hex') + '  app.zip\n');
 fs.writeFileSync(path.join(assetDir, 'app.zip'), appBytes);
 fs.writeFileSync(path.join(assetDir, 'checksums.txt'), checksumsBytes);
 const digestOf = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex');
@@ -20,6 +20,8 @@ process.env.RELEASE_TAG = 'v1.3.1';
 process.env.ASSET_PATH = assetDir;
 process.env.POLICY_REF = 'main';
 process.env.API_URL = 'https://api.github.com';
+process.env.RELEASE_LOOKUP_ATTEMPTS = '2';
+process.env.RELEASE_LOOKUP_DELAY_MS = '0';
 
 const { main } = await import('../actions/agent-release-assets/index.mjs');
 
@@ -74,8 +76,8 @@ function createFetchStub({ verificationAssets }) {
 test('publishes the draft exactly once after the asset manifest verifies', async () => {
   const fetchStub = createFetchStub({
     verificationAssets: [
-      { name: 'app.zip', state: 'uploaded' },
-      { name: 'checksums.txt', state: 'uploaded' }
+      { name: 'app.zip', state: 'uploaded', digest: digestOf(appBytes) },
+      { name: 'checksums.txt', state: 'uploaded', digest: digestOf(checksumsBytes) }
     ]
   });
   const originalFetch = globalThis.fetch;
@@ -90,6 +92,7 @@ test('publishes the draft exactly once after the asset manifest verifies', async
   );
   assert.equal(publishes.length, 1);
   assert.deepEqual(JSON.parse(publishes[0].body), { draft: false });
+  assert.equal(fetchStub.calls.filter(call => call.method === 'POST' || call.method === 'DELETE').length, 0);
 });
 
 test('does not publish when the asset manifest verification fails', async () => {
@@ -105,4 +108,147 @@ test('does not publish when the asset manifest verification fails', async () => 
   }
   const publishes = fetchStub.calls.filter(call => call.method === 'PATCH');
   assert.equal(publishes.length, 0);
+});
+
+const assets = () => [
+  { id: 7, name: 'app.zip', state: 'uploaded', digest: digestOf(appBytes) },
+  { id: 8, name: 'checksums.txt', state: 'uploaded', digest: digestOf(checksumsBytes) }
+];
+const draft = (id = 42) => ({
+  id, tag_name: 'v1.3.1', draft: true, assets: assets(),
+  upload_url: 'https://uploads.github.com/assets{?name,label}'
+});
+const sha = 'a'.repeat(40);
+
+async function runLifecycle(config = {}, expectedError) {
+  const calls = [];
+  let created = false;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options = {}) => {
+    const href = String(url);
+    const method = options.method || 'GET';
+    const body = options.body ? JSON.parse(options.body) : null;
+    calls.push({ href, method, body });
+    const json = (data, status = 200) => ({
+      ok: status < 400, status, text: async () => JSON.stringify(data), json: async () => data
+    });
+    if (href.startsWith('https://raw.githubusercontent.com/')) {
+      return json({ repositories: { WriteCanvas: {
+        requiredAssets: ['app.zip', 'checksums.txt'], changelogPath: 'docs/CHANGELOG.md'
+      } } });
+    }
+    if (href.includes('/releases/tags/')) {
+      return config.lookup404 ? json({ message: 'Not Found' }, 404) : json(config.release || draft());
+    }
+    if (href.includes('/releases?')) {
+      return json(created ? config.afterCreate || [draft()] : config.collection || []);
+    }
+    if (href.includes('/git/ref/')) {
+      return config.noTag ? json({ message: 'Not Found' }, 404) : json({ object: { type: 'commit', sha } });
+    }
+    if (href.includes('/contents/')) {
+      assert.ok(href.endsWith('/contents/docs/CHANGELOG.md?ref=' + sha));
+      return json({ content: Buffer.from('## [1.3.1]\n\nRelease notes\n\n## [1.3.0]\nOld').toString('base64') });
+    }
+    if (href.endsWith('/releases') && method === 'POST') {
+      created = true;
+      return json(config.created || draft());
+    }
+    if (method === 'DELETE') return json(null);
+    if (/\/releases\/\d+$/.test(href)) {
+      if (method === 'PATCH') {
+        return json(body.draft === false ? { ...draft(), draft: false } : draft());
+      }
+      return json({ ...draft(), assets: config.verificationAssets || assets() });
+    }
+    throw new Error('Unexpected fetch: ' + method + ' ' + href);
+  };
+  try {
+    if (expectedError) await assert.rejects(main(), expectedError);
+    else await main();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  return calls;
+}
+
+test('creates a draft at the existing tag SHA after a short consistency wait', async () => {
+  const calls = await runLifecycle({ lookup404: true });
+  const posts = calls.filter(call => call.method === 'POST');
+  assert.equal(posts.length, 1);
+  assert.deepEqual(posts[0].body, {
+    tag_name: 'v1.3.1', target_commitish: sha, name: 'WriteCanvas v1.3.1',
+    body: 'Release notes', draft: true, prerelease: false, generate_release_notes: false
+  });
+  assert.equal(calls.filter(call => call.href.includes('/releases/tags/')).length, 2);
+});
+
+test('tag lookup 404 uses the collection without creating a duplicate', async () => {
+  const calls = await runLifecycle({ lookup404: true, collection: [draft()] });
+  assert.equal(calls.filter(call => call.method === 'POST').length, 0);
+});
+
+test('repairs a safely identified orphan draft before attempting creation', async () => {
+  const calls = await runLifecycle({ lookup404: true, collection: [{
+    ...draft(), tag_name: 'untagged-abcdef1234', name: 'WriteCanvas v1.3.1', target_commitish: sha
+  }] });
+  assert.equal(calls.filter(call => call.method === 'POST').length, 0);
+  assert.deepEqual(calls.find(call => call.method === 'PATCH').body, {
+    tag_name: 'v1.3.1', target_commitish: sha, draft: true
+  });
+});
+
+test('missing tag fails without creating any ref or release', async () => {
+  const calls = await runLifecycle({ lookup404: true, noTag: true }, /Git tag v1.3.1 does not exist/);
+  assert.ok(calls.every(call => call.method === 'GET'));
+});
+
+test('published matching assets are an immutable successful no-op', async () => {
+  for (const lookup404 of [false, true]) {
+    const release = { ...draft(), draft: false };
+    const calls = await runLifecycle({ release, lookup404, collection: [release] });
+    assert.ok(calls.every(call => call.method === 'GET'));
+  }
+});
+
+test('published missing or mismatched assets fail without mutation', async () => {
+  for (const remote of [[], [{ ...assets()[0], digest: 'sha256:wrong' }, assets()[1]]]) {
+    const calls = await runLifecycle({ release: { ...draft(), draft: false, assets: remote } }, /missing or digest mismatch/);
+    assert.ok(calls.every(call => call.method === 'GET'));
+  }
+});
+
+test('duplicate race keeps lowest id and deletes only this run empty draft', async () => {
+  const calls = await runLifecycle({
+    lookup404: true, created: { ...draft(50), assets: [] },
+    afterCreate: [draft(43), draft(42), { ...draft(50), assets: [] }]
+  });
+  assert.deepEqual(calls.filter(call => call.method === 'DELETE').map(call => call.href.split('/').pop()), ['50']);
+  assert.ok(calls.find(call => call.method === 'PATCH').href.endsWith('/42'));
+});
+
+test('duplicate race preserves this run draft when it has assets', async () => {
+  const calls = await runLifecycle({
+    lookup404: true, created: draft(50), afterCreate: [draft(42), draft(50)]
+  });
+  assert.equal(calls.filter(call => call.method === 'DELETE').length, 0);
+});
+
+test('does not publish a manifest whose remote digest differs', async () => {
+  const calls = await runLifecycle({ verificationAssets: [
+    { ...assets()[0], digest: 'sha256:wrong' }, assets()[1]
+  ] }, /digest mismatch/);
+  assert.equal(calls.filter(call => call.method === 'PATCH').length, 0);
+});
+
+test('rejects invalid, incomplete, and mismatched checksums before any release mutation', async () => {
+  try {
+    for (const content of ['invalid', '', '0'.repeat(64) + '  app.zip\n']) {
+      fs.writeFileSync(path.join(assetDir, 'checksums.txt'), content);
+      const calls = await runLifecycle({}, /checksums.txt/);
+      assert.ok(calls.every(call => call.method === 'GET'));
+    }
+  } finally {
+    fs.writeFileSync(path.join(assetDir, 'checksums.txt'), checksumsBytes);
+  }
 });

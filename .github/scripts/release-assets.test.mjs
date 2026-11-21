@@ -28,7 +28,7 @@ test('skips an already-uploaded asset only when its SHA-256 digest matches', () 
   const plan = planAssetUpload(
     [{ name: 'app.zip', digest: 'sha256:a' }],
     ['app.zip'],
-    [{ id: 7, name: 'app.zip', digest: 'sha256:a' }]
+    [{ id: 7, name: 'app.zip', digest: 'sha256:a', state: 'uploaded' }]
   );
   assert.equal(plan.uploads[0].action, 'skip');
   assert.equal(plan.uploads[0].existingId, 7);
