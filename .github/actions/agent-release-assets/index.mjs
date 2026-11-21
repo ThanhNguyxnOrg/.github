@@ -68,11 +68,7 @@ export function planAssetUpload(localAssets, expectedNames, existingAssets) {
 export function selectDraftRelease(releases, releaseTag) {
   const matches = (Array.isArray(releases) ? releases : [])
     .filter(release => release && release.tag_name === releaseTag && release.draft === true)
-    .sort((a, b) => {
-      const aDate = String(a.updated_at || a.created_at || '');
-      const bDate = String(b.updated_at || b.created_at || '');
-      return bDate.localeCompare(aDate);
-    });
+    .sort((a, b) => Number(a.id) - Number(b.id));
   return matches[0] || null;
 }
 
@@ -270,7 +266,11 @@ export async function main() {
         release = refreshed.find(item => item.tag_name === tag && item.draft === false) || drafts[0];
         const ownDraft = drafts.find(item => item.id === created.id);
         if (ownDraft.id !== release.id && Array.isArray(ownDraft.assets) && ownDraft.assets.length === 0) {
-          await request(`${api}/repos/${owner}/${repo}/releases/${ownDraft.id}`, { method: 'DELETE' });
+          const ownDraftUrl = `${api}/repos/${owner}/${repo}/releases/${ownDraft.id}`;
+          const current = await request(ownDraftUrl);
+          if (current.draft === true && Array.isArray(current.assets) && current.assets.length === 0) {
+            await request(ownDraftUrl, { method: 'DELETE' });
+          }
         }
         break;
       }

@@ -156,6 +156,9 @@ async function runLifecycle(config = {}, expectedError) {
     }
     if (method === 'DELETE') return json(null);
     if (/\/releases\/\d+$/.test(href)) {
+      if (method === 'GET' && href.endsWith('/50')) {
+        return json(config.ownDraftRefresh || { ...draft(50), assets: [] });
+      }
       if (method === 'PATCH') {
         return json(body.draft === false ? { ...draft(), draft: false } : draft());
       }
@@ -232,6 +235,17 @@ test('duplicate race preserves this run draft when it has assets', async () => {
     lookup404: true, created: draft(50), afterCreate: [draft(42), draft(50)]
   });
   assert.equal(calls.filter(call => call.method === 'DELETE').length, 0);
+});
+
+test('duplicate race rechecks own draft and preserves newly uploaded assets or publication', async () => {
+  for (const ownDraftRefresh of [draft(50), { ...draft(50), draft: false, assets: [] }]) {
+    const calls = await runLifecycle({
+      lookup404: true, created: { ...draft(50), assets: [] },
+      afterCreate: [draft(42), { ...draft(50), assets: [] }], ownDraftRefresh
+    });
+    assert.ok(calls.some(call => call.method === 'GET' && call.href.endsWith('/50')));
+    assert.equal(calls.filter(call => call.method === 'DELETE').length, 0);
+  }
 });
 
 test('does not publish a manifest whose remote digest differs', async () => {

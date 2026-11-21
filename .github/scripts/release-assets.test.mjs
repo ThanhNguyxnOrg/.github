@@ -58,7 +58,7 @@ test('resolves a freshly created draft by exact tag from the releases collection
     { id: 43, tag_name: 'v1.1.1', draft: true, created_at: '2026-11-10T11:01:00Z' }
   ], 'v1.1.1');
 
-  assert.equal(selected.id, 43);
+  assert.equal(selected.id, 42);
 });
 
 test('does not resolve published releases or tags that only partially match', () => {
