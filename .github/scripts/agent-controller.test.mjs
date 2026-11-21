@@ -783,6 +783,32 @@ test('dependency manifest detection excludes runtime source and GitHub workflows
   assert.equal(isDependencyManifestPath('src/main.ts'), false);
 });
 
+test('Dependabot Docker image updates in Dockerfiles can pass the manifest-path gate', () => {
+  for (const path of ['Dockerfile', 'docker/Dockerfile.gojudge', 'images/worker.dockerfile', 'Containerfile']) {
+    assert.equal(isDependencyManifestPath(path), true, path);
+  }
+  for (const path of ['docker/entrypoint.sh', 'docs/dockerfile-guide.md', 'docker-compose.yml']) {
+    assert.equal(isDependencyManifestPath(path), false, path);
+  }
+
+  const pullRequest = {
+    title: 'build(docker)(deps): bump criyle/go-judge from v1.14.0 to v1.14.1 in /docker in the docker-all group',
+    body: 'Bumps the docker-all group in /docker with 1 update: criyle/go-judge.\n\nUpdates `criyle/go-judge` from v1.14.0 to v1.14.1',
+    user: { login: 'dependabot[bot]' }
+  };
+  const result = analyzeDependencyUpdate(pullRequest, ['docker/Dockerfile.gojudge']);
+  assert.equal(result.eligible, true);
+  assert.equal(result.versionRisk, 'patch');
+  assert.equal(assessPullRequestRisk(pullRequest, ['docker/Dockerfile.gojudge']).requiresHumanReview, false);
+
+  const unparseableTag = analyzeDependencyUpdate(
+    { title: 'build(docker): bump python from 3.12-slim to 3.13-slim', body: '', user: { login: 'dependabot[bot]' } },
+    ['Dockerfile']
+  );
+  assert.equal(unparseableTag.eligible, false);
+  assert.deepEqual(unparseableTag.reasons, ['version-risk-unknown']);
+});
+
 test('Dependabot updates to nested requirements manifests can pass the manifest-path gate', () => {
   const result = analyzeDependencyUpdate(
     {
