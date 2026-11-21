@@ -9,6 +9,7 @@ const organizationRepositories = [
   'awesome-cert-sherpa',
   'blendops',
   'chess-on-glass',
+  'chromadna',
   'ClipForge',
   'cogmint',
   'ForgeHelm',

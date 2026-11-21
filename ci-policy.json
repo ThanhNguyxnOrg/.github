@@ -255,6 +255,20 @@
     "chess-on-glass": {
       "defaultBranch": "main",
       "requiredChecks": []
+    },
+    "chromadna": {
+      "defaultBranch": "main",
+      "requiredChecks": [
+        "test (ubuntu-latest, 3.10)",
+        "test (ubuntu-latest, 3.11)",
+        "test (ubuntu-latest, 3.12)",
+        "test (windows-latest, 3.10)",
+        "test (windows-latest, 3.11)",
+        "test (windows-latest, 3.12)",
+        "test (macos-latest, 3.10)",
+        "test (macos-latest, 3.11)",
+        "test (macos-latest, 3.12)"
+      ]
     }
   }
 }

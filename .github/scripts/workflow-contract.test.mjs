@@ -12,15 +12,18 @@ test('Agent signal catches slash-bearing workflow names and excludes its own rel
   assert.match(signal, /workflow_run\.pull_requests\[0\]\.number\s*!=\s*null/);
 });
 
-test('managed worker calls an immutable central reusable workflow', () => {
+test('managed worker calls the central reusable workflow via the agent-v1 tag', () => {
   const worker = read('.github/templates/agent-pr-worker.yml');
-  assert.match(worker, /uses:\s*ThanhNguyxnOrg\/\.github\/\.github\/workflows\/agent-pr-worker\.yml@[0-9a-f]{40}/);
+  assert.match(worker, /uses:\s*ThanhNguyxnOrg\/\.github\/\.github\/workflows\/agent-pr-worker\.yml@agent-v1/);
   assert.doesNotMatch(worker, /agent-pr-worker\.yml@main/);
-  const workflowRef = worker.match(/agent-pr-worker\.yml@([0-9a-f]{40})/);
-  const policyRef = worker.match(/^\s+policy_ref:\s*([0-9a-f]{40})$/m);
-  assert.ok(workflowRef, 'worker reusable workflow must be pinned to a full SHA');
-  assert.ok(policyRef, 'trusted policy checkout must receive an immutable SHA');
-  assert.equal(policyRef[1], workflowRef[1], 'workflow code and trusted policy checkout must use the same commit');
+  assert.doesNotMatch(worker, /agent-pr-worker\.yml@[0-9a-f]{40}/, 'worker must follow the agent-v1 tag, not a pinned SHA');
+  assert.doesNotMatch(worker, /^\s+policy_ref:/m, 'callers omit policy_ref so the reusable worker resolves agent-v1 itself');
+});
+
+test('the central relay calls the reusable worker via the agent-v1 tag', () => {
+  const relay = read('.github/workflows/agent-pr-worker-relay.yml');
+  assert.match(relay, /uses:\s*ThanhNguyxnOrg\/\.github\/\.github\/workflows\/agent-pr-worker\.yml@agent-v1/);
+  assert.doesNotMatch(relay, /^\s+policy_ref:/m, 'the relay omits policy_ref so the reusable worker resolves agent-v1 itself');
 });
 
 test('Worker admits only signal runs with a valid artifact and queues all pending per-repository events', () => {
@@ -53,7 +56,7 @@ test('all shared CI workflows expose the same baseline controls', () => {
   }
 });
 
-test('workflow, template, and composite-action references use immutable SHAs or same-repository self references', () => {
+test('workflow, template, and composite-action references use immutable SHAs, managed version tags, or same-repository self references', () => {
   const workflowFiles = fs.readdirSync('.github/workflows')
     .filter((file) => file.endsWith('.yml'))
     .map((file) => '.github/workflows/' + file);
@@ -68,7 +71,11 @@ test('workflow, template, and composite-action references use immutable SHAs or 
     const source = read(file);
     return [...source.matchAll(/^\s*-?\s*uses:\s*([^\s#]+)/gm)].map((match) => ({ file, ref: match[1] }));
   });
-  const unpinned = refs.filter(({ ref }) => !ref.startsWith('./.github/actions/') && !/@[0-9a-f]{40}$/.test(ref));
+  // The org's own reusable workflows may follow the managed moving tags
+  // (agent-v1 / release-v1), which the pin-sync and promote workflows advance
+  // on main. Everything else must stay pinned to a full commit SHA.
+  const managedTag = /^ThanhNguyxnOrg\/\.github\/\.github\/workflows\/[\w.-]+@(agent-v1|release-v1)$/;
+  const unpinned = refs.filter(({ ref }) => !ref.startsWith('./.github/actions/') && !/@[0-9a-f]{40}$/.test(ref) && !managedTag.test(ref));
   assert.ok(refs.some(({ ref }) => ref.startsWith('./.github/actions/')), 'same-repository composite actions should use a local ./ path');
   assert.deepEqual(unpinned, [], 'un-pinned workflow/action references: ' + JSON.stringify(unpinned));
 });

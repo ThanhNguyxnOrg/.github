@@ -27,7 +27,7 @@ test('central profiles inherit one organization-wide auto-merge policy and keep 
     'cogmint', 'awesome-cert-sherpa', 'Snapbooth', 'Locsight', 'PurgeKit',
     'SkillGauge', 'LayoutLingua', 'lagvex', 'git-account-switcher', 'StepDSA',
     'ThanhNguyxnOrg.github.io', 'ClipForge', 'WriteCanvas', 'Techstack-Studio',
-    'AFTERFRAME-THE-LAST-LOOP', 'chess-on-glass'
+    'AFTERFRAME-THE-LAST-LOOP', 'chess-on-glass', 'chromadna'
   ];
   for (const name of names) assert.ok(getRepositoryProfile(name), 'missing central CI profile: ' + name);
   for (const name of names) {
@@ -176,6 +176,11 @@ test('CI profiles match the real project gates and quarantine known failing or o
   );
   assert.deepEqual(getRepositoryProfile('apidex-hub').requiredChecks.find(check => typeof check === 'object' && check.name.startsWith('regression-tests')).name, 'regression-tests / Python Regression Tests');
   assert.equal(getRepositoryProfile('cogmint').autoMergeDependabot, true);
+  assert.deepEqual(getRepositoryProfile('chromadna').requiredChecks, [
+    'test (ubuntu-latest, 3.10)', 'test (ubuntu-latest, 3.11)', 'test (ubuntu-latest, 3.12)',
+    'test (windows-latest, 3.10)', 'test (windows-latest, 3.11)', 'test (windows-latest, 3.12)',
+    'test (macos-latest, 3.10)', 'test (macos-latest, 3.11)', 'test (macos-latest, 3.12)',
+  ]);
   assert.deepEqual(getRepositoryProfile('chess-on-glass').requiredChecks, [],
     'repositories without mapped CI checks remain ineligible for auto-merge');
   assert.deepEqual(getRepositoryProfile('PurgeKit').requiredChecks, [
