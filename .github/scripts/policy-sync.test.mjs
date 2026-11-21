@@ -35,14 +35,15 @@ test('existing tuned profiles are never modified', () => {
   assert.equal(changes.length, 0);
 });
 
-test('stale auto-shaped entries are removed; custom entries survive with a warning', () => {
+test('stale entries are removed so the classification invariant holds; custom removals warn', () => {
   const ci = JSON.parse(JSON.stringify(baseCi));
   ci.repositories['gone-auto'] = { defaultBranch: 'main', requiredChecks: [] };
   ci.repositories['gone-tuned'] = { defaultBranch: 'main', requiredChecks: ['build'] };
   const release = JSON.parse(JSON.stringify(baseRelease));
   release.excluded['gone-auto'] = AUTO_EXCLUDE_REASON;
   release.excluded['gone-tuned'] = 'Custom manual reason.';
-  const { warnings } = planPolicySync({
+  release.repositories['gone-active'] = { branch: 'main', mode: 'tag' };
+  const { warnings, inventory } = planPolicySync({
     discovered: [{ name: 'alive', default_branch: 'main' }],
     ciPolicy: ci,
     releasePolicy: release
@@ -50,7 +51,24 @@ test('stale auto-shaped entries are removed; custom entries survive with a warni
   assert.equal(ci.repositories['gone-auto'], undefined);
   assert.deepEqual(ci.repositories['gone-tuned'].requiredChecks, ['build']);
   assert.equal(release.excluded['gone-auto'], undefined);
-  assert.equal(release.excluded['gone-tuned'], 'Custom manual reason.');
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /gone-tuned/);
+  assert.equal(release.excluded['gone-tuned'], undefined);
+  assert.equal(release.repositories['gone-active'], undefined);
+  assert.equal(warnings.length, 3);
+  assert.ok(warnings.every(warning => /gone-tuned|gone-active/.test(warning)));
+  assert.deepEqual(
+    [...Object.keys(release.repositories), ...Object.keys(release.excluded)].sort(),
+    inventory.slice().sort()
+  );
+});
+
+test('repositories named after inherited Object properties are still registered', () => {
+  const ci = JSON.parse(JSON.stringify(baseCi));
+  const release = JSON.parse(JSON.stringify(baseRelease));
+  planPolicySync({
+    discovered: [{ name: 'constructor', default_branch: 'main' }, { name: 'toString', default_branch: 'dev' }],
+    ciPolicy: ci,
+    releasePolicy: release
+  });
+  assert.deepEqual(ci.repositories['constructor'], { defaultBranch: 'main', requiredChecks: [] });
+  assert.equal(release.excluded['toString'], AUTO_EXCLUDE_REASON);
 });

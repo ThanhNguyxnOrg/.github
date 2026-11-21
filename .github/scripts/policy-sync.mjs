@@ -41,7 +41,7 @@ export function planPolicySync({ discovered, ciPolicy, releasePolicy }) {
 
   const ciRepos = ciPolicy.repositories || (ciPolicy.repositories = {});
   for (const repo of discovered) {
-    if (!(repo.name in ciRepos)) {
+    if (!Object.hasOwn(ciRepos, repo.name)) {
       ciRepos[repo.name] = { defaultBranch: repo.default_branch, requiredChecks: [] };
       changes.push(`ci-policy: added ${repo.name} (fail-closed default)`);
     }
@@ -60,20 +60,30 @@ export function planPolicySync({ discovered, ciPolicy, releasePolicy }) {
   const relRepos = releasePolicy.repositories || {};
   const relExcluded = releasePolicy.excluded || (releasePolicy.excluded = {});
   for (const name of inventory) {
-    if (!(name in relRepos) && !(name in relExcluded)) {
+    if (!Object.hasOwn(relRepos, name) && !Object.hasOwn(relExcluded, name)) {
       relExcluded[name] = AUTO_EXCLUDE_REASON;
       changes.push(`release-policy: excluded ${name} (classification not mapped)`);
     }
   }
+  // A stale classification breaks the release-policy invariant
+  // (classified set must equal the inventory), so stale entries are removed
+  // from both maps. Custom entries are recoverable from git history and are
+  // flagged loudly so a temporarily archived repository is not lost silently.
   for (const name of Object.keys(relExcluded)) {
-    if (!inventory.includes(name) && relExcluded[name] === AUTO_EXCLUDE_REASON) {
+    if (!inventory.includes(name)) {
+      const auto = relExcluded[name] === AUTO_EXCLUDE_REASON;
       delete relExcluded[name];
-      changes.push(`release-policy: removed stale auto-excluded entry for ${name}`);
+      changes.push(`release-policy: removed stale ${auto ? 'auto-' : ''}excluded entry for ${name}`);
+      if (!auto) {
+        warnings.push(`release-policy: removed the custom exclusion of ${name} because it is not an active repository; restore it from git history if the repository returns`);
+      }
     }
   }
   for (const name of Object.keys(relRepos)) {
     if (!inventory.includes(name)) {
-      warnings.push(`release-policy: ${name} has an active release profile but is not an active repository; left for manual review`);
+      delete relRepos[name];
+      changes.push(`release-policy: removed the release profile of ${name}`);
+      warnings.push(`release-policy: removed the tuned release profile of ${name} because it is not an active repository; restore it from git history if the repository returns`);
     }
   }
 
