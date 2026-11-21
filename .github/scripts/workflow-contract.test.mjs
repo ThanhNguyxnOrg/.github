@@ -56,6 +56,35 @@ test('all shared CI workflows expose the same baseline controls', () => {
   }
 });
 
+test('npm publishing exposes an explicit reusable workflow and credential contract', () => {
+  const workflow = read('.github/workflows/publish-npm.yml');
+  const ci = read('.github/workflows/ci-node.yml');
+  assert.match(workflow, /^on:\n  workflow_call:/m);
+  const inputs = workflow.split('    inputs:\n')[1].split('    secrets:\n')[0];
+  for (const input of ['job_name', 'node_version_file', 'package_manager', 'cache', 'install_command', 'verify_command', 'build_command', 'working_directory', 'access', 'tag', 'dry_run', 'provenance']) {
+    assert.match(inputs, new RegExp('^      ' + input + ':', 'm'), 'missing input ' + input);
+  }
+  assert.match(workflow, /    secrets:\n      NPM_TOKEN:\n(?:        description:[^\n]*\n)?        required: true/);
+  assert.doesNotMatch(workflow, /secrets:\s*inherit/);
+  assert.match(workflow, /permissions:\s*\n\s+contents: read\s*\n\s+id-token: write/);
+  assert.match(workflow, /persist-credentials: false/);
+  for (const action of ['checkout', 'setup-node']) {
+    const pattern = new RegExp('uses: actions/' + action + '@([0-9a-f]{40})', 'g');
+    const expected = [...ci.matchAll(pattern)].map((match) => match[1]);
+    const actual = [...workflow.matchAll(pattern)].map((match) => match[1]);
+    assert.ok(expected.length > 0);
+    assert.deepEqual(actual, expected, action + ' must match ci-node.yml pins');
+  }
+  const nodeSteps = workflow.split(/\n      - name:/).filter((step) => step.includes('uses: actions/setup-node@'));
+  for (const step of nodeSteps) assert.match(step, /registry-url: https:\/\/registry\.npmjs\.org/);
+  const tokenBindings = [...workflow.matchAll(/NODE_AUTH_TOKEN:\s*([^\n]+)/g)].map((match) => match[1]);
+  assert.ok(tokenBindings.length > 0);
+  for (const binding of tokenBindings) assert.equal(binding, '${{ secrets.NPM_TOKEN }}');
+  const publish = workflow.split('      - name: Publish to npm\n')[1].split('\n      - name:')[0];
+  assert.match(publish, /working-directory: \$\{\{ inputs\.working_directory \}\}/);
+  assert.match(publish, /NODE_AUTH_TOKEN: \$\{\{ secrets\.NPM_TOKEN \}\}/);
+});
+
 test('workflow, template, and composite-action references use immutable SHAs, managed version tags, or same-repository self references', () => {
   const workflowFiles = fs.readdirSync('.github/workflows')
     .filter((file) => file.endsWith('.yml'))

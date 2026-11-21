@@ -55,6 +55,8 @@ identity values at organization scope.
 
 ## Workflow usage
 
+npm publishing uses no Actions variables; package name and version come from package.json.
+
 In GitHub Actions, read Actions variables through the `vars` context:
 
 ```yaml
@@ -86,4 +88,4 @@ Values under `vars` are non-sensitive configuration identifiers. Values under
 - When adding, renaming, or removing a variable, update this inventory and the
   consuming workflow in the same change.
 
-**Last reviewed:** November 15, 2026
+**Last reviewed:** November 21, 2026
