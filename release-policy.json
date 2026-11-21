@@ -54,6 +54,12 @@
               "version"
             ]
           ]
+        },
+        {
+          "path": "scripts/install-skills.mjs",
+          "kind": "regex",
+          "pattern": "(INSTALLER_VERSION\\s*=\\s*')[^']+(')",
+          "replacement": "$1{{version}}$2"
         }
       ],
       "changelogPath": "CHANGELOG.md",

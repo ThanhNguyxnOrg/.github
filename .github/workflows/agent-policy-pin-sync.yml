@@ -94,11 +94,17 @@ jobs:
             echo "[tag-promote] agent-v1 already points at ${head}; nothing to do"
             exit 0
           fi
-          git fetch --tags origin
+          # Force the tag fetch: the release-v1/agent-v1 moving tags can be
+          # promoted by a concurrent run between checkout and this step, and
+          # a plain fetch would abort on "would clobber existing tag".
+          git fetch --force --tags origin
           git tag -a "${immutable}" -m "ThanhNguyxnAgent policy release: ${head}" "${head}"
           git tag -fa agent-v1 -m "ThanhNguyxnAgent policy ${head}" "${head}"
-          git push origin "${immutable}"
-          git push --force origin agent-v1
+          # Push both tags in a single complete pack. Two separate pushes
+          # raced: the second thin pack could delta against the just-created
+          # immutable tag object before the server replicated it, which the
+          # remote rejected as "missing necessary objects".
+          git push --no-thin --force origin "refs/tags/${immutable}" "refs/tags/agent-v1"
           # Verify both tags resolve to HEAD (via the API, which
           # dereferences annotated tags). Fail closed on any mismatch.
           for ref in agent-v1 "${immutable}"; do
