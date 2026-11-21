@@ -810,10 +810,27 @@ async function reconcileRepository(repoName, rule) {
         console.log('[release-wait]', fullName, tag, '— CI state is ' + state);
         return;
       }
+      // Recompute the version for the newer HEAD: commits that landed after
+      // the failed prepare may require a higher bump, and reusing the old
+      // version would ship them under the wrong SemVer level.
+      let targetVersion = version;
+      const reprepareLevel = highestReleaseLevel(commits
+        .filter(commit => classifyConventionalCommit(commit.commit?.message))
+        .map(commit => ({ message: commit.commit.message })));
+      if (reprepareLevel) {
+        const currentVersion = latestTag ? latestTag.replace(/^v/, '') : rule.initialVersion;
+        const candidate = bumpSemver(currentVersion, reprepareLevel);
+        if (compareVersions(candidate, targetVersion) > 0) targetVersion = candidate;
+      }
+      const targetTag = makeTagName(targetVersion);
+      if (refs.some(item => item.ref === 'refs/tags/' + targetTag)) {
+        console.warn('[release-hold]', fullName, targetTag, 'already exists but was not selected as the latest tag');
+        return;
+      }
       const notes = 'Re-declared at ' + headSha.slice(0, 12) + ' after prepared commit ' +
         pending.sha.slice(0, 12) + ' failed its required checks.';
-      const sha = await prepareReleaseCommit(fullName, branch, headSha, version, notes, rule, pending.sha);
-      console.log('[release-prepared]', fullName, tag, 'commit ' + sha, 'mode=' + rule.mode, 're-declared');
+      const sha = await prepareReleaseCommit(fullName, branch, headSha, targetVersion, notes, rule, pending.sha);
+      console.log('[release-prepared]', fullName, targetTag, 'commit ' + sha, 'mode=' + rule.mode, 're-declared');
       return;
     }
     const preparedRelease = await ensureDraftRelease(fullName, repoName, tag, version, pending.sha, rule);
