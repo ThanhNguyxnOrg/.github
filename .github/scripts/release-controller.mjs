@@ -764,6 +764,11 @@ async function prepareReleaseCommit(fullName, branch, headSha, nextVersion, note
 }
 
 
+export async function shouldReprepareRelease(preparedState, preparedSha, headSha, checkHead) {
+  return ['failure', 'missing'].includes(preparedState) && preparedSha !== headSha &&
+    (await checkHead()) === 'success';
+}
+
 async function reconcileRepository(repoName, rule) {
   const fullName = ORG + '/' + repoName;
   const repo = await api('/repos/' + fullName);
@@ -800,12 +805,11 @@ async function reconcileRepository(repoName, rule) {
     const tag = makeTagName(version);
     const state = await checkState(fullName, pending.sha, repoName, changedFiles);
     if (state !== 'success') {
-      // Required checks are pinned to the prepared commit, so a failed one can
-      // never turn green again. When main has since moved to a newer verified
-      // HEAD, re-declare the same release intent there instead of holding
-      // forever; the next run picks that commit up as pending and publishes it.
-      const reprepare = state === 'failure' && pending.sha !== headSha &&
-        (await checkState(fullName, headSha, repoName, changedFiles)) === 'success';
+      // Failed or missing checks on an old prepared commit can stall releases
+      // after CI changes. A fresh prepared commit must still pass its own checks.
+      const reprepare = await shouldReprepareRelease(
+        state, pending.sha, headSha, () => checkState(fullName, headSha, repoName, changedFiles)
+      );
       if (!reprepare) {
         console.log('[release-wait]', fullName, tag, '— CI state is ' + state);
         return;
@@ -828,7 +832,7 @@ async function reconcileRepository(repoName, rule) {
         return;
       }
       const notes = 'Re-declared at ' + headSha.slice(0, 12) + ' after prepared commit ' +
-        pending.sha.slice(0, 12) + ' failed its required checks.';
+        pending.sha.slice(0, 12) + ' had required checks in state ' + state + '.';
       const sha = await prepareReleaseCommit(fullName, branch, headSha, targetVersion, notes, rule, pending.sha);
       console.log('[release-prepared]', fullName, targetTag, 'commit ' + sha, 'mode=' + rule.mode, 're-declared');
       return;
