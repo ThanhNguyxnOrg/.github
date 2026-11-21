@@ -385,7 +385,8 @@ export function isDependencyManifestPath(path) {
   const isNestedRequirementsFile = /^requirements\/.+\.txt$/i.test(normalized);
   if (isNestedRequirementsFile) return true;
   return /^(?:package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|cargo\.toml|cargo\.lock|go\.mod|go\.sum|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|pipfile(?:\.lock)?|composer\.json|composer\.lock|gemfile(?:\.lock)?|directory\.packages\.props|packages\.lock\.json|packages\.config)$/i.test(basename)
-    || /\.(?:csproj|fsproj|vbproj)$/i.test(basename);
+    || /\.(?:csproj|fsproj|vbproj)$/i.test(basename)
+    || /^(?:dockerfile|containerfile)(?:\..+)?$|\.dockerfile$/i.test(basename);
 }
 
 export function analyzeDependencyUpdate(pullRequest, changedFiles = []) {
