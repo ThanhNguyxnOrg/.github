@@ -57,7 +57,7 @@ Never put actual secret values in documentation, workflow inputs, artifacts, or 
 
 `NPM_TOKEN` is an organization Actions secret. Callers pass only `NPM_TOKEN: ${{ secrets.NPM_TOKEN }}` explicitly; never use `secrets: inherit`. The caller job must grant `contents: read` and `id-token: write`, because reusable workflows cannot exceed caller permissions. Provenance requires a public repository and a package.json `repository` field matching that repository.
 
-Publish after the GitHub Release is published (`release: types: [published]`), not when the tag is created. Keep `workflow_dispatch` for recovery, passing an existing `vX.Y.Z` tag as `ref`; do not create or move tags. The first consumer is Techstack-Studio:
+Publish after the GitHub Release is published (`release: types: [published]`), not when the tag is created. Keep `workflow_dispatch` for recovery, passing an existing `vX.Y.Z` tag as `ref`; do not create or move tags. Prefer dispatching from that existing tag itself (set **Use workflow from** to the tag) so npm provenance attests the published commit. Passing `ref` from another branch publishes without provenance when the checked-out commit differs from `GITHUB_SHA`; the workflow warns and records this in the job summary. The first consumer is Techstack-Studio:
 
 ```yaml
 name: Publish npm

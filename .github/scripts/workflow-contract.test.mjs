@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 const read = (path) => fs.readFileSync(path, 'utf8');
 
@@ -88,6 +89,27 @@ test('npm publishing exposes an explicit reusable workflow and credential contra
   const publish = workflow.split('      - name: Publish to npm\n')[1].split('\n      - name:')[0];
   assert.match(publish, /working-directory: \$\{\{ inputs\.working_directory \}\}/);
   assert.match(publish, /NODE_AUTH_TOKEN: \$\{\{ secrets\.NPM_TOKEN \}\}/);
+});
+
+test('npm provenance is enabled only when the checkout matches the workflow commit', () => {
+  const workflow = read('.github/workflows/publish-npm.yml');
+  const step = workflow.split('      - name: Publish to npm\n')[1].split('\n      - name:')[0];
+  const script = step.split('        run: |\n')[1].replace(/^          /gm, '');
+  for (const [requested, checkout, expected] of [
+    ['true', 'workflow-sha', 'enabled'],
+    ['true', 'recovery-sha', 'disabled (checkout differs from GITHUB_SHA)'],
+    ['false', 'workflow-sha', 'disabled'],
+    ['', 'workflow-sha', 'disabled'],
+  ]) {
+    const result = spawnSync('bash', ['-c', 'git() { printf "%s" "$CHECKOUT_SHA"; }; npm() { printf "arg=%s\\n" "$@"; };\n' + script.replace(' >> "$GITHUB_OUTPUT"', '')], {
+      encoding: 'utf8',
+      env: { ...process.env, CHECKOUT_SHA: checkout, GITHUB_SHA: 'workflow-sha', GITHUB_OUTPUT: '/dev/stdout', PROVENANCE: requested, DRY_RUN: 'false', ACCESS: 'public', DIST_TAG: 'latest' },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(result.stdout.includes('provenance=' + expected));
+    assert.equal(result.stdout.includes('arg=--provenance'), expected === 'enabled');
+    assert.equal(result.stdout.includes('::warning::'), requested === 'true' && checkout !== 'workflow-sha');
+  }
 });
 
 test('workflow, template, and composite-action references use immutable SHAs, managed version tags, or same-repository self references', () => {

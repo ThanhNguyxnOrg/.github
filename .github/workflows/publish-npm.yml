@@ -244,7 +244,17 @@ jobs:
         run: |
           set -euo pipefail
           args=(publish --access "$ACCESS" --tag "$DIST_TAG")
-          if [[ "$PROVENANCE" == "true" ]]; then args+=(--provenance); fi
+          provenance="disabled"
+          if [[ "$PROVENANCE" == "true" ]]; then
+            if [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]; then
+              args+=(--provenance)
+              provenance="enabled"
+            else
+              echo '::warning::Skipping npm provenance because the checked-out commit differs from GITHUB_SHA. Dispatch the workflow from the tag itself ("Use workflow from" = the tag) for provenance.'
+              provenance="disabled (checkout differs from GITHUB_SHA)"
+            fi
+          fi
+          echo "provenance=$provenance" >> "$GITHUB_OUTPUT"
           if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
           npm "${args[@]}"
 
@@ -255,6 +265,7 @@ jobs:
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
           ALREADY_PUBLISHED: ${{ steps.registry.outputs.published }}
           PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+          PROVENANCE_STATUS: ${{ steps.publish.outputs.provenance }}
           DIST_TAG: ${{ inputs.tag }}
           DRY_RUN: ${{ inputs.dry_run }}
         working-directory: ${{ inputs.working_directory }}
@@ -262,8 +273,8 @@ jobs:
           {
             echo "### npm publish"
             echo ""
-            echo "| Package | Version | Dist-tag | Dry run | Result |"
-            echo "|---|---|---|---|---|"
+            echo "| Package | Version | Dist-tag | Dry run | Provenance | Result |"
+            echo "|---|---|---|---|---|---|"
             if [[ "$ALREADY_PUBLISHED" == "true" ]]; then result="skipped (already published)"; else result="${PUBLISH_OUTCOME:-not run}"; fi
-            echo "| \`${PACKAGE_NAME}\` | ${PACKAGE_VERSION} | ${DIST_TAG} | ${DRY_RUN} | ${result} |"
+            echo "| \`${PACKAGE_NAME}\` | ${PACKAGE_VERSION} | ${DIST_TAG} | ${DRY_RUN} | ${PROVENANCE_STATUS:-not run} | ${result} |"
           } >> "$GITHUB_STEP_SUMMARY"
