@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, releaseBodyFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy, releaseMatchesTag, selectReleaseByTag, selectOrphanDraftForTag } from './release-controller.mjs';
-import { shouldReprepareRelease } from './release-controller.mjs';
+import { createCommit, shouldReprepareRelease } from './release-controller.mjs';
 
 test('re-prepares a release with missing or failed checks only at a newer verified HEAD', async () => {
   for (const preparedState of ['missing', 'failure']) {
@@ -18,6 +18,24 @@ test('re-prepares a release with missing or failed checks only at a newer verifi
 });
 
 const policy = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
+
+test('release commit reuses the parent tree when the prepared files are already current', async () => {
+  const request = test.mock.fn(async path => {
+    if (path.endsWith('/commits/current')) return { tree: { sha: 'existing-tree' } };
+    if (path.endsWith('/git/commits')) return { sha: 'new-commit' };
+    if (path.endsWith('/git/refs/heads/main')) return {};
+    assert.fail(`Unexpected request ${path}`);
+  });
+
+  const message = 'chore(release): prepare v0.2.0';
+  assert.equal(await createCommit('org/project', 'main', 'current', [], message, request), 'new-commit');
+  assert.equal(request.mock.callCount(), 3);
+  const [, commit, advanceRef] = request.mock.calls;
+  assert.equal(commit.arguments[1].body.tree, 'existing-tree');
+  assert.deepEqual(commit.arguments[1].body.parents, ['current']);
+  assert.equal(commit.arguments[1].body.message, message);
+  assert.deepEqual(advanceRef.arguments[1], { method: 'PATCH', body: { sha: 'new-commit', force: false } });
+});
 
 test('Conventional Commit types map to the configured SemVer levels', () => {
   assert.equal(classifyConventionalCommit('feat(ui): add palette switch').level, 'minor');

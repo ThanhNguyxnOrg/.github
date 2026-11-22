@@ -696,32 +696,37 @@ async function publishReadyDrafts(repoName, rule) {
   }
 }
 
-async function createCommit(fullName, branch, headSha, changes, message) {
-  const parent = await api('/repos/' + fullName + '/git/commits/' + headSha);
-  const treeEntries = [];
-  for (const change of changes) {
-    const blob = await api('/repos/' + fullName + '/git/blobs', {
+export async function createCommit(fullName, branch, headSha, changes, message, request = api) {
+  const parent = await request('/repos/' + fullName + '/git/commits/' + headSha);
+  let treeSha = parent.tree.sha;
+  // Re-declaring an unchanged release only needs a new commit.
+  if (changes.length) {
+    const treeEntries = [];
+    for (const change of changes) {
+      const blob = await request('/repos/' + fullName + '/git/blobs', {
+        method: 'POST',
+        body: { content: change.content, encoding: 'utf-8' }
+      });
+      treeEntries.push({ path: change.path, mode: '100644', type: 'blob', sha: blob.sha });
+    }
+    const tree = await request('/repos/' + fullName + '/git/trees', {
       method: 'POST',
-      body: { content: change.content, encoding: 'utf-8' }
+      body: { base_tree: treeSha, tree: treeEntries }
     });
-    treeEntries.push({ path: change.path, mode: '100644', type: 'blob', sha: blob.sha });
+    treeSha = tree.sha;
   }
-  const tree = await api('/repos/' + fullName + '/git/trees', {
-    method: 'POST',
-    body: { base_tree: parent.tree.sha, tree: treeEntries }
-  });
   const timestamp = new Date().toISOString();
-  const commit = await api('/repos/' + fullName + '/git/commits', {
+  const commit = await request('/repos/' + fullName + '/git/commits', {
     method: 'POST',
     body: {
       message,
-      tree: tree.sha,
+      tree: treeSha,
       parents: [headSha],
       author: { name: VERSION_NAME, email: VERSION_EMAIL, date: timestamp },
       committer: { name: VERSION_NAME, email: VERSION_EMAIL, date: timestamp }
     }
   });
-  await api('/repos/' + fullName + '/git/refs/heads/' + branch, {
+  await request('/repos/' + fullName + '/git/refs/heads/' + branch, {
     method: 'PATCH',
     body: { sha: commit.sha, force: false }
   });
