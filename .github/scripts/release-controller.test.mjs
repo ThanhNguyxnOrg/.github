@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, releaseBodyFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy, releaseMatchesTag, selectReleaseByTag, selectOrphanDraftForTag } from './release-controller.mjs';
-import { createCommit, shouldReprepareRelease, releaseIntent, releasePrMarker, parseReleasePrMarker, keepReleaseCommit, releasePrDeclined, ensureReleasePr, cleanupReleaseBranch, dispatchMissingChecks, RELEASE_BRANCH } from './release-controller.mjs';
+import { createCommit, shouldReprepareRelease, releaseIntent, releasePrMarker, parseReleasePrMarker, keepReleaseCommit, releasePrDeclined, ensureReleasePr, cleanupReleaseBranch, dispatchMissingChecks, prepareReleaseChanges, RELEASE_BRANCH } from './release-controller.mjs';
 
 test('missing HEAD checks dispatch their configured workflows once per workflow', async () => {
   const requiredChecks = [
@@ -120,13 +121,90 @@ test('release PR markers round-trip and reject absent or malformed metadata', ()
 
 test('release branch stays current only with one exact HEAD parent and matching subject', () => {
   const commit = { parents: [{ sha: 'head' }], message: 'release: v1.2.0\n\nDetails' };
-  assert.equal(keepReleaseCommit(commit, 'head', 'release: v1.2.0'), true);
+  assert.equal(keepReleaseCommit(commit, 'head', 'release: v1.2.0', [], []), true);
   assert.equal(keepReleaseCommit(commit, 'new-head', 'release: v1.2.0'), false);
   assert.equal(keepReleaseCommit(commit, 'head', 'release: v1.3.0'), false);
   for (const parents of [[], [{ sha: 'head' }, { sha: 'other' }]]) {
     assert.equal(keepReleaseCommit({ ...commit, parents }, 'head', 'release: v1.2.0'), false);
   }
   assert.equal(keepReleaseCommit(undefined, 'head', 'release: v1.2.0'), false);
+});
+
+test('release commit content comparison requires the exact generated blobs and no other changed files', () => {
+  const commit = { parents: [{ sha: 'head' }], message: 'release: v1.2.0' };
+  const changes = [{ path: 'version.txt', content: 'hello\n' }];
+  const files = [{ filename: 'version.txt', status: 'modified', sha: 'ce013625030ba8dba906f756967f9e9ca394464a' }];
+  assert.equal(keepReleaseCommit(commit, 'head', commit.message, changes, files), true);
+  assert.equal(keepReleaseCommit(commit, 'head', commit.message, [{ ...changes[0], content: 'different\n' }], files), false);
+  assert.equal(keepReleaseCommit(commit, 'head', commit.message, [...changes, { path: 'new.txt', content: 'new' }], files), false);
+  assert.equal(keepReleaseCommit(commit, 'head', commit.message, changes, [...files, { filename: 'unrelated.txt' }]), false);
+  assert.equal(keepReleaseCommit(commit, 'head', commit.message, changes, [{ ...files[0], filename: 'other.txt' }]), false);
+  for (const status of ['removed', 'renamed']) {
+    assert.equal(keepReleaseCommit(commit, 'head', commit.message, changes, [{ ...files[0], status }]), false);
+  }
+  assert.equal(keepReleaseCommit(commit, 'head', commit.message, changes, undefined), false);
+});
+
+test('release PR keeps matching content and rebuilds for changed or newly configured version files', async () => {
+  const head = 'a'.repeat(40);
+  const subject = 'release: v2.0.1';
+  let pr = { number: 65, html_url: 'pr-url', title: subject, body: '' };
+  let changes = [
+    { path: '_version.py', content: '__version__ = "2.0.1"\n' },
+    { path: 'CHANGELOG.md', content: '# Changelog\n\n## [2.0.1] - 2026-01-01\n\nNotes\n' }
+  ];
+  const files = changes.map(change => ({
+    filename: change.path, status: 'modified',
+    sha: createHash('sha1').update('blob ' + Buffer.byteLength(change.content) + '\0' + change.content).digest('hex')
+  }));
+  const request = async (path, options) => {
+    if (path.includes('state=open')) return [pr];
+    if (path.includes('/git/ref/')) return { object: { sha: 'release-head' } };
+    if (path.includes('/git/commits/')) return { sha: 'release-head', message: subject, parents: [{ sha: head }] };
+    if (path.endsWith('/compare/' + head + '...release-head')) return { files };
+    if (path.endsWith('/pulls/65')) { pr = { ...pr, ...options.body }; return pr; }
+    assert.fail(path);
+  };
+  const build = test.mock.fn();
+  const prepare = test.mock.fn(async () => changes);
+  const ensure = () => ensureReleasePr('org/repo', 'main', head, '2.0.1', 'Notes', subject, build, request, prepare);
+  await ensure();
+  assert.equal(build.mock.callCount(), 0);
+  assert.equal(prepare.mock.callCount(), 1);
+  const originalChanges = changes;
+  changes = changes.map(change => change.path === '_version.py' ? { ...change, content: "__version__ = '2.0.1'\n" } : change);
+  await ensure();
+  assert.equal(build.mock.callCount(), 1);
+  assert.equal(build.mock.calls[0].arguments[0], changes);
+  changes = [...originalChanges, { path: 'package.json', content: '{"version":"2.0.1"}\n' }];
+  await ensure();
+  assert.equal(build.mock.callCount(), 2);
+  assert.equal(build.mock.calls[1].arguments[0], changes);
+  assert.equal(prepare.mock.callCount(), 3);
+});
+
+test('release changes use the HEAD commit date so repeated runs across days are identical', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-01-02T00:00:00Z') });
+  const sources = { 'package.json': '{"version":"2.0.0"}\n', 'CHANGELOG.md': '# Changelog\n' };
+  const request = async path => {
+    if (path.endsWith('/git/commits/head')) return { committer: { date: '2026-01-01T23:59:00Z' } };
+    const file = Object.keys(sources).find(name => path.includes('/contents/' + name + '?ref=head'));
+    if (!file) assert.fail(path);
+    return { encoding: 'base64', content: Buffer.from(sources[file]).toString('base64') };
+  };
+  const rule = { versionFiles: [{ path: 'package.json', kind: 'json', jsonPaths: [['version']] }] };
+  const first = await prepareReleaseChanges('org/repo', 'head', '2.0.1', 'Notes', rule, request);
+  t.mock.timers.setTime(new Date('2026-02-03T00:00:00Z').getTime());
+  assert.deepEqual(await prepareReleaseChanges('org/repo', 'head', '2.0.1', 'Notes', rule, request), first);
+  assert.equal(first[0].content, '{\n  "version": "2.0.1"\n}\n');
+  assert.match(first[1].content, /## \[2\.0\.1\] - 2026-01-01\n\nNotes/);
+  const changedNotes = await prepareReleaseChanges('org/repo', 'head', '2.0.1', 'Updated notes', rule, request);
+  assert.notEqual(changedNotes[1].content, first[1].content);
+  sources['package.json'] = first[0].content;
+  sources['CHANGELOG.md'] = first[1].content;
+  assert.deepEqual(await prepareReleaseChanges('org/repo', 'head', '2.0.1', 'Notes', rule, request), []);
+  await assert.rejects(prepareReleaseChanges('org/repo', 'head', '2.0.1', 'Notes', rule,
+    async () => { throw new Error('lookup failed'); }), /lookup failed/);
 });
 
 test('declined release uses the most recently closed unmerged PR and its base marker', async () => {
@@ -168,13 +246,14 @@ test('release PR skips declined HEAD without building or writing and retries a n
 test('release PR updates metadata only when changed and keeps an unchanged commit', async () => {
   const head = 'a'.repeat(40);
   let pr = { number: 7, title: 'old title', body: '', html_url: 'pr-url' };
-  let branchCommit = { message: 'release: v1.2.0', parents: [{ sha: head }] };
+  let branchCommit = { sha: 'release-head', message: 'release: v1.2.0', parents: [{ sha: head }] };
   const build = test.mock.fn();
   const updates = [];
   const request = async (path, options) => {
     if (path.includes('state=open')) return [pr];
     if (path.includes('/git/ref/')) return { object: { sha: 'release-head' } };
     if (path.includes('/git/commits/')) return branchCommit;
+    if (path.endsWith('/compare/' + head + '...release-head')) return { files: [] };
     if (path.endsWith('/pulls/7')) {
       assert.equal(options.method, 'PATCH');
       updates.push(options.body); pr = { ...pr, ...options.body }; return pr;

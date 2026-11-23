@@ -226,9 +226,9 @@ async function checkState(fullName, sha, repoName, changedFiles, headSha, branch
 }
 
 
-async function getFile(fullName, path, ref) {
+async function getFile(fullName, path, ref, request = api) {
   const encoded = path.split('/').map(encodeURIComponent).join('/');
-  const result = await api('/repos/' + fullName + '/contents/' + encoded + '?ref=' + encodeURIComponent(ref));
+  const result = await request('/repos/' + fullName + '/contents/' + encoded + '?ref=' + encodeURIComponent(ref));
   if (result.encoding !== 'base64') throw new Error('Unsupported encoding for ' + fullName + '/' + path);
   return Buffer.from(result.content.replace(/\n/g, ''), 'base64').toString('utf8');
 }
@@ -783,9 +783,17 @@ export function parseReleasePrMarker(body) {
   return match ? { base: match[1], version: match[2] } : null;
 }
 
-export function keepReleaseCommit(commit, headSha, subject) {
+function matchesReleaseCommit(commit, headSha, subject) {
   return commit?.parents?.length === 1 && commit.parents[0].sha === headSha &&
     String(commit.message || '').split('\n')[0] === subject;
+}
+
+export function keepReleaseCommit(commit, headSha, subject, changes, files) {
+  if (!matchesReleaseCommit(commit, headSha, subject) || !Array.isArray(files) || files.length >= 300 || files.length !== changes.length) return false;
+  const expected = new Map(changes.map(change => [change.path,
+    createHash('sha1').update('blob ' + Buffer.byteLength(change.content, 'utf8') + '\0').update(change.content, 'utf8').digest('hex')
+  ]));
+  return files.every(file => ['added', 'modified'].includes(file.status) && expected.has(file.filename) && expected.get(file.filename) === file.sha);
 }
 
 function releasePrQuery(fullName, branch, state) {
@@ -806,7 +814,7 @@ export async function releasePrDeclined(fullName, branch, headSha, request = api
   return Boolean(latest && parseReleasePrMarker(latest.body)?.base === headSha);
 }
 
-export async function ensureReleasePr(fullName, branch, headSha, version, notes, subject, buildCommit, request = api) {
+export async function ensureReleasePr(fullName, branch, headSha, version, notes, subject, buildCommit, request = api, prepareChanges = async () => []) {
   const open = await request(releasePrQuery(fullName, branch, 'open'));
   const existing = open[0];
   if (!existing && await releasePrDeclined(fullName, branch, headSha, request)) {
@@ -821,8 +829,14 @@ export async function ensureReleasePr(fullName, branch, headSha, version, notes,
   } catch (error) {
     if (error.status !== 404) throw error;
   }
-  const kept = keepReleaseCommit(current, headSha, subject);
-  if (!kept) await buildCommit();
+  const changes = await prepareChanges();
+  let files;
+  if (matchesReleaseCommit(current, headSha, subject)) {
+    const comparison = await request('/repos/' + fullName + '/compare/' + headSha + '...' + current.sha);
+    files = comparison.files;
+  }
+  const kept = keepReleaseCommit(current, headSha, subject, changes, files);
+  if (!kept) await buildCommit(changes);
   const body = notes.trim() + '\n\n' +
     'Merge to approve this release (any merge method; squash keeps the title). Close to postpone until new commits land. ThanhNguyxnAgent keeps this PR updated with new commits.' +
     '\n\n' + releasePrMarker(headSha, version);
@@ -853,41 +867,47 @@ export async function cleanupReleaseBranch(fullName, branch, request = api) {
   }
 }
 
+export async function prepareReleaseChanges(fullName, headSha, nextVersion, notes, rule, request = api) {
+  const changes = [];
+  for (const file of rule.versionFiles || []) {
+    const source = await getFile(fullName, file.path, headSha, request);
+    const updated = applyVersionFile(file, source, nextVersion);
+    if (updated !== source) changes.push({ path: file.path, content: updated });
+  }
+
+  const changelogPath = rule.changelogPath || 'CHANGELOG.md';
+  let changelog;
+  try {
+    changelog = await getFile(fullName, changelogPath, headSha, request);
+  } catch (error) {
+    if (!(error instanceof GitHubError) || error.status !== 404) throw error;
+    changelog = '# Changelog\n\n';
+  }
+  let updatedChangelog = changelog;
+  try {
+    const parent = await request('/repos/' + fullName + '/git/commits/' + headSha);
+    const date = new Date(parent.committer.date).toISOString().slice(0, 10);
+    updatedChangelog = insertChangelogSection(changelog, nextVersion, date, notes);
+  } catch (error) {
+    // A previous prepare attempt may already have written this version's
+    // section; keep it instead of failing a re-declared release.
+    if (!(error instanceof Error) || !/already contains version/.test(error.message)) throw error;
+  }
+  if (updatedChangelog !== changelog) changes.push({ path: changelogPath, content: updatedChangelog });
+
+  return changes;
+}
+
 async function prepareReleaseCommit(fullName, branch, headSha, nextVersion, notes, rule, baseLabel) {
   const commitMessage = rule.mode === 'commit'
     ? 'release: v' + nextVersion
     : 'chore(release): prepare v' + nextVersion;
-  return ensureReleasePr(fullName, branch, headSha, nextVersion, notes, commitMessage, async () => {
-    const changes = [];
-    for (const file of rule.versionFiles || []) {
-      const source = await getFile(fullName, file.path, headSha);
-      const updated = applyVersionFile(file, source, nextVersion);
-      if (updated !== source) changes.push({ path: file.path, content: updated });
-    }
-
-    const changelogPath = rule.changelogPath || 'CHANGELOG.md';
-    let changelog;
-    try {
-      changelog = await getFile(fullName, changelogPath, headSha);
-    } catch (error) {
-      if (!(error instanceof GitHubError) || error.status !== 404) throw error;
-      changelog = '# Changelog\n\n';
-    }
-    let updatedChangelog = changelog;
-    try {
-      updatedChangelog = insertChangelogSection(changelog, nextVersion, new Date().toISOString().slice(0, 10), notes);
-    } catch (error) {
-      // A previous prepare attempt may already have written this version's
-      // section; keep it instead of failing a re-declared release.
-      if (!(error instanceof Error) || !/already contains version/.test(error.message)) throw error;
-    }
-    if (updatedChangelog !== changelog) changes.push({ path: changelogPath, content: updatedChangelog });
-
+  return ensureReleasePr(fullName, branch, headSha, nextVersion, notes, commitMessage, changes => {
     const body = 'Prepared automatically from Conventional Commits since ' + baseLabel + '.\n\n' +
       'Co-authored-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>\n' +
       'Signed-off-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>';
     return createCommit(fullName, RELEASE_BRANCH, headSha, changes, commitMessage + '\n\n' + body, api, { force: true, create: true });
-  });
+  }, api, () => prepareReleaseChanges(fullName, headSha, nextVersion, notes, rule));
 }
 
 
