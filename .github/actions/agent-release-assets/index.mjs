@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { releaseBodyFromChangelog } from '../../scripts/release-changelog.mjs';
+import { notesSincePublishedRelease } from '../../scripts/release-notes.mjs';
 
 const token = process.env.GH_TOKEN;
 const repository = process.env.REPOSITORY || '';
@@ -132,6 +133,13 @@ async function request(url, options = {}) {
   return data;
 }
 
+async function draftBody(owner, repo, releaseTag, targetSha, profile) {
+  const changelogPath = profile.changelogPath || 'CHANGELOG.md';
+  const contents = await request(`${api}/repos/${owner}/${repo}/contents/${changelogPath.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(targetSha)}`);
+  releaseBodyFromChangelog(Buffer.from(contents.content, 'base64').toString('utf8'), releaseTag);
+  return notesSincePublishedRelease(`${owner}/${repo}`, releaseTag, targetSha, profile, path => request(api + path));
+}
+
 export async function publishDraftRelease(owner, repo, releaseId) {
   const published = await request(`${api}/repos/${owner}/${repo}/releases/${releaseId}`, {
     method: 'PATCH',
@@ -230,12 +238,14 @@ export async function main() {
       const targetSha = await resolveTagCommitSha(owner, repo, tag);
       const orphan = targetSha ? selectOrphanDraftRelease(releases, tag, targetSha) : null;
       if (orphan) {
+        const body = await draftBody(owner, repo, tag, targetSha, profile);
         release = await request(`${api}/repos/${owner}/${repo}/releases/${orphan.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             tag_name: tag,
             target_commitish: targetSha,
+            body,
             draft: true
           })
         });
@@ -248,9 +258,7 @@ export async function main() {
 
       if (attempt === attempts - 1) {
         if (!targetSha) fail(`Git tag ${tag} does not exist; refusing to create a release without an existing tag`);
-        const changelogPath = profile.changelogPath || 'CHANGELOG.md';
-        const contents = await request(`${api}/repos/${owner}/${repo}/contents/${changelogPath.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(targetSha)}`);
-        const body = releaseBodyFromChangelog(Buffer.from(contents.content, 'base64').toString('utf8'), tag);
+        const body = await draftBody(owner, repo, tag, targetSha, profile);
         const created = await request(`${api}/repos/${owner}/${repo}/releases`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

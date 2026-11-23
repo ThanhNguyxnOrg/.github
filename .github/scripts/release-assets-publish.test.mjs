@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { makeReleaseNotes } from './release-notes.mjs';
 
 // Fixtures: one shared asset directory. Configuration is read at import time,
 // so the environment must be set before importing the action module.
@@ -119,6 +120,12 @@ const draft = (id = 42) => ({
   upload_url: 'https://uploads.github.com/assets{?name,label}'
 });
 const sha = 'a'.repeat(40);
+const baselineSha = 'b'.repeat(40);
+const fallbackCommits = [
+  { sha: 'c'.repeat(40), commit: { message: 'fix: bundle offline runtime (#62)' } },
+  { sha: 'd'.repeat(40), commit: { message: 'Update translation chunking (#68)' } }
+];
+const fallbackNotes = makeReleaseNotes(fallbackCommits, 'ThanhNguyxnOrg/WriteCanvas');
 
 async function runLifecycle(config = {}, expectedError) {
   const calls = [];
@@ -134,7 +141,7 @@ async function runLifecycle(config = {}, expectedError) {
     });
     if (href.startsWith('https://raw.githubusercontent.com/')) {
       return json({ repositories: { WriteCanvas: {
-        requiredAssets: ['app.zip', 'checksums.txt'], changelogPath: 'docs/CHANGELOG.md'
+        requiredAssets: ['app.zip', 'checksums.txt'], changelogPath: 'docs/CHANGELOG.md', baselineSha
       } } });
     }
     if (href.includes('/releases/tags/')) {
@@ -142,6 +149,14 @@ async function runLifecycle(config = {}, expectedError) {
     }
     if (href.includes('/releases?')) {
       return json(created ? config.afterCreate || [draft()] : config.collection || []);
+    }
+    if (href.includes('/tags?')) {
+      return json([{ name: 'v1.3.0', commit: { sha: baselineSha } }, { name: 'v1.3.1', commit: { sha } }]);
+    }
+    if (href.includes('/compare/')) {
+      assert.equal(href, `https://api.github.com/repos/ThanhNguyxnOrg/WriteCanvas/compare/${baselineSha}...${sha}?per_page=100&page=1`);
+      if (config.notesError) return json({ message: 'Forbidden' }, 403);
+      return json({ status: 'ahead', total_commits: 2, commits: config.incompleteNotes ? fallbackCommits.slice(0, 1) : fallbackCommits });
     }
     if (href.includes('/git/ref/')) {
       return config.noTag ? json({ message: 'Not Found' }, 404) : json({ object: { type: 'commit', sha } });
@@ -181,7 +196,7 @@ test('creates a draft at the existing tag SHA after a short consistency wait', a
   assert.equal(posts.length, 1);
   assert.deepEqual(posts[0].body, {
     tag_name: 'v1.3.1', target_commitish: sha, name: 'WriteCanvas v1.3.1',
-    body: 'Release notes', draft: true, prerelease: false, generate_release_notes: false
+    body: fallbackNotes, draft: true, prerelease: false, generate_release_notes: false
   });
   assert.equal(calls.filter(call => call.href.includes('/releases/tags/')).length, 2);
 });
@@ -197,8 +212,22 @@ test('repairs a safely identified orphan draft before attempting creation', asyn
   }] });
   assert.equal(calls.filter(call => call.method === 'POST').length, 0);
   assert.deepEqual(calls.find(call => call.method === 'PATCH').body, {
-    tag_name: 'v1.3.1', target_commitish: sha, draft: true
+    tag_name: 'v1.3.1', target_commitish: sha, body: fallbackNotes, draft: true
   });
+});
+
+test('fallback creation and orphan repair fail closed on incomplete notes or permission errors', async () => {
+  for (const collection of [[], [{
+    ...draft(), tag_name: 'untagged-abcdef1234', name: 'WriteCanvas v1.3.1', target_commitish: sha
+  }]]) {
+    for (const [config, error] of [
+      [{ incompleteNotes: true }, /Incomplete release notes comparison/],
+      [{ notesError: true }, /GitHub API 403/]
+    ]) {
+      const calls = await runLifecycle({ lookup404: true, collection, ...config }, error);
+      assert.ok(calls.every(call => call.method === 'GET'));
+    }
+  }
 });
 
 test('missing tag fails without creating any ref or release', async () => {
