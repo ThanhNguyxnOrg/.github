@@ -24,6 +24,8 @@ A required check must exist on the commit and finish with the exact `success` co
 
 Path-scoped entries live only in this central registry and mirror the native workflow's `paths` filters. For pull requests, the controller evaluates check runs and commit statuses on the current PR head SHA; the synthetic merge SHA is only a fallback when a head SHA is unavailable. It refreshes PR metadata before CI evaluation and defers when the head changed since the initial repository listing.
 
+A required-check object may optionally set `workflow` to its member workflow filename (for example, `node.yml`). For releases, path applicability covers the release tag/baseline-to-HEAD diff. If current default-branch HEAD has missing checks and no failed/pending checks, the Release Controller dispatches mapped workflows on that branch, once per workflow and HEAD, then keeps waiting for successful evidence. The member workflow must support input-free `workflow_dispatch` and preserve the required check names; unmapped checks still hold the gate. The release token requests Actions write for dispatch; denied or unavailable dispatches never bypass checks.
+
 PR labels are routing metadata, not merge authorization. PR opened, reopened, synchronize, ready-for-review, and edited events are routed to the central controller. All non-draft PRs receive classification labels. High-risk changes, failed/missing required checks, workflow edits, sensitive paths, and major/downgrade/unknown/security dependency updates receive `needs-review` and maintainer routing. Low-risk changes stay out of the human-review queue; Dependabot patch/minor updates can enter the guarded auto-merge path only in repositories with mapped required CI checks.
 
 ## Pull request safety

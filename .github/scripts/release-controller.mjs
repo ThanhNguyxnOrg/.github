@@ -189,7 +189,31 @@ export function changedFilesForPolicy(comparison, requiredChecks = []) {
   return comparison.files.map(file => String(file.filename || '')).filter(Boolean);
 }
 
-async function checkState(fullName, sha, repoName, changedFiles = undefined) {
+export async function dispatchMissingChecks(fullName, branch, sha, headSha, result, requiredChecks, request = api) {
+  if (sha !== headSha || result.state !== 'missing' || result.failed?.length || result.pending?.length) return;
+  const missing = new Set(result.missing || []);
+  const workflows = new Set(requiredChecks
+    .filter(entry => typeof entry === 'object' && entry && missing.has(entry.name) && entry.workflow)
+    .map(entry => entry.workflow));
+  for (const workflow of workflows) {
+    const path = '/repos/' + fullName + '/actions/workflows/' + encodeURIComponent(workflow);
+    try {
+      const runs = await request(path + '/runs?head_sha=' + encodeURIComponent(sha) + '&event=workflow_dispatch&per_page=1');
+      const existing = runs.workflow_runs?.[0];
+      if (existing) {
+        console.log('[release-check-dispatch-exists]', fullName, workflow, sha, existing.html_url, existing.status);
+        continue;
+      }
+      await request(path + '/dispatches', { method: 'POST', body: { ref: branch } });
+      console.log('[release-check-dispatched]', fullName, workflow, sha);
+    } catch (error) {
+      if (![403, 404, 422].includes(error.status)) throw error;
+      console.warn('[release-check-dispatch-error]', fullName, workflow, sha, 'status=' + error.status, error.message);
+    }
+  }
+}
+
+async function checkState(fullName, sha, repoName, changedFiles, headSha, branch) {
   const [checks, statuses] = await Promise.all([
     api('/repos/' + fullName + '/commits/' + sha + '/check-runs?per_page=100'),
     api('/repos/' + fullName + '/commits/' + sha + '/status')
@@ -197,7 +221,8 @@ async function checkState(fullName, sha, repoName, changedFiles = undefined) {
   const profile = getRepositoryProfile(repoName);
   const result = evaluateRequiredChecks(checks.check_runs || [], statuses, profile?.requiredChecks || [], changedFiles);
   if (result.state !== 'success') console.warn('[release-required-checks]', fullName, sha, JSON.stringify(result));
-  return result.state;
+  await dispatchMissingChecks(fullName, branch, sha, headSha, result, profile?.requiredChecks || []);
+  return result;
 }
 
 
@@ -906,12 +931,12 @@ async function reconcileRepository(repoName, rule) {
     await cleanupReleaseBranch(fullName, branch);
     const version = releaseIntent(pending.commit.message, rule.mode);
     const tag = makeTagName(version);
-    const state = await checkState(fullName, pending.sha, repoName, changedFiles);
+    const { state } = await checkState(fullName, pending.sha, repoName, changedFiles, headSha, branch);
     if (state !== 'success') {
       // Failed or missing checks on an old prepared commit can stall releases
       // after CI changes. A fresh prepared commit must still pass its own checks.
       const reprepare = await shouldReprepareRelease(
-        state, pending.sha, headSha, () => checkState(fullName, headSha, repoName, changedFiles)
+        state, pending.sha, headSha, async () => (await checkState(fullName, headSha, repoName, changedFiles, headSha, branch)).state
       );
       if (!reprepare) {
         console.log('[release-wait]', fullName, tag, '— CI state is ' + state);
@@ -968,9 +993,11 @@ async function reconcileRepository(repoName, rule) {
     return;
   }
 
-  const checkResult = rule.requireSuccessfulChecks ? await checkState(fullName, headSha, repoName, changedFiles) : 'success';
-  if (checkResult !== 'success') {
-    console.log('[release-wait]', fullName, 'HEAD ' + headSha + ' — CI state is ' + checkResult);
+  const checkResult = rule.requireSuccessfulChecks
+    ? await checkState(fullName, headSha, repoName, changedFiles, headSha, branch)
+    : { state: 'success' };
+  if (checkResult.state !== 'success') {
+    console.log('[release-wait]', fullName, 'HEAD ' + headSha + ' — CI state is ' + checkResult.state);
     return;
   }
 
