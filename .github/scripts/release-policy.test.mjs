@@ -44,12 +44,6 @@ test('BlendOps uses the central tag-only release contract from its verified v1.0
       path: 'package-lock.json',
       kind: 'json',
       jsonPaths: [['version'], ['packages', '', 'version']]
-    },
-    {
-      path: 'scripts/install-skills.mjs',
-      kind: 'regex',
-      pattern: "(INSTALLER_VERSION\\s*=\\s*')[^']+(')",
-      replacement: '$1{{version}}$2'
     }
   ]);
   assert.equal(rule.releaseWorkflowName, undefined, 'source-only BlendOps releases do not need a binary build workflow');
