@@ -123,16 +123,19 @@ export function makeReleaseNotes(commits, fullName) {
     'Breaking Changes': [],
     Features: [],
     'Bug Fixes and Performance': [],
-    Reverts: []
+    Reverts: [],
+    'Other changes': []
   };
   for (const commit of commits) {
     const message = commit.message || commit.commit?.message || '';
     const parsed = classifyConventionalCommit(message);
-    if (!parsed) continue;
+    const subject = String(message).split('\n')[0].trim();
+    if (!parsed && (!subject || releaseIntent(message, 'tag') || releaseIntent(message, 'commit') || /^Merge (?:branch|pull request|remote-tracking branch)\b/i.test(subject))) continue;
     const sha = commit.sha || commit.id || '';
     const url = 'https://github.com/' + fullName + '/commit/' + sha;
-    const line = '- ' + parsed.subject + ' ([' + sha.slice(0, 7) + '](' + url + '))';
-    if (parsed.breaking) groups['Breaking Changes'].push(line);
+    const line = '- ' + (parsed ? parsed.subject : subject) + ' ([' + sha.slice(0, 7) + '](' + url + '))';
+    if (!parsed) groups['Other changes'].push(line);
+    else if (parsed.breaking) groups['Breaking Changes'].push(line);
     else if (parsed.type === 'feat') groups.Features.push(line);
     else if (parsed.type === 'revert') groups.Reverts.push(line);
     else groups['Bug Fixes and Performance'].push(line);
@@ -980,7 +983,8 @@ async function reconcileRepository(repoName, rule) {
         return;
       }
       const notes = 'Re-declared at ' + headSha.slice(0, 12) + ' after prepared commit ' +
-        pending.sha.slice(0, 12) + ' had required checks in state ' + state + '.';
+        pending.sha.slice(0, 12) + ' had required checks in state ' + state + '.\n\n' +
+        makeReleaseNotes(commits, fullName);
       await prepareReleaseCommit(fullName, branch, headSha, targetVersion, notes, rule, pending.sha);
       return;
     }
@@ -1021,7 +1025,7 @@ async function reconcileRepository(repoName, rule) {
     return;
   }
 
-  const notes = makeReleaseNotes(conventional, fullName);
+  const notes = makeReleaseNotes(commits, fullName);
   await prepareReleaseCommit(fullName, branch, headSha, nextVersion, notes, rule, latestTag || rule.baselineSha);
 }
 
