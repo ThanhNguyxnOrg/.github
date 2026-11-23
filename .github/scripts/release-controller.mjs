@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { evaluateRequiredChecks, getRepositoryProfile } from './check-policy.mjs';
 import { releaseBodyFromChangelog } from './release-changelog.mjs';
+import { parseSemver, compareVersions, classifyConventionalCommit, makeReleaseNotes, releaseIntent, notesSincePublishedRelease } from './release-notes.mjs';
+export { classifyConventionalCommit, makeReleaseNotes, releaseIntent } from './release-notes.mjs';
 export { releaseNotesFromChangelog, releaseBodyFromChangelog } from './release-changelog.mjs';
 
 const TOKEN = process.env.GH_TOKEN;
@@ -55,24 +57,6 @@ async function api(path, options = {}) {
   throw new Error('GitHub API retry loop ended unexpectedly for ' + path);
 }
 
-function parseSemver(value) {
-  const match = String(value || '').replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/);
-  if (!match) return null;
-  return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]), prerelease: match[4] || '' };
-}
-
-function compareVersions(a, b) {
-  const av = parseSemver(a);
-  const bv = parseSemver(b);
-  if (!av || !bv) return 0;
-  for (const key of ['major', 'minor', 'patch']) {
-    if (av[key] !== bv[key]) return av[key] - bv[key];
-  }
-  if (!av.prerelease && bv.prerelease) return 1;
-  if (av.prerelease && !bv.prerelease) return -1;
-  return av.prerelease.localeCompare(bv.prerelease);
-}
-
 export function bumpSemver(current, level) {
   const parsed = parseSemver(current);
   if (!parsed) throw new Error('Unsupported current version: ' + current);
@@ -80,32 +64,6 @@ export function bumpSemver(current, level) {
   if (level === 'minor') return parsed.major + '.' + (parsed.minor + 1) + '.0';
   if (level === 'patch') return parsed.major + '.' + parsed.minor + '.' + (parsed.patch + 1);
   throw new Error('Unsupported release level: ' + level);
-}
-
-export function classifyConventionalCommit(message) {
-  const full = String(message || '').replace(/\r/g, '');
-  const lines = full.split('\n');
-  const subject = (lines.shift() || '').trim();
-  const match = subject.match(/^([a-zA-Z][a-zA-Z0-9-]*)(?:\(([^)]+)\))?(!)?:\s+(.+)$/);
-  if (!match) return null;
-  const type = match[1].toLowerCase();
-  const scope = (match[2] || '').trim().toLowerCase();
-  const ignoredScopes = new Set([
-    'release',
-    'ci',
-    'build',
-    'docs',
-    'meta',
-    ...(config.conventionalCommitPolicy?.ignoredScopes || []),
-  ].map(value => String(value).trim().toLowerCase()));
-  if (scope && ignoredScopes.has(scope)) return null;
-  const isBreaking = Boolean(match[3]) || /^\s*BREAKING CHANGE:\s*.+/im.test(lines.join('\n')) || /^\s*BREAKING-CHANGE:\s*.+/im.test(lines.join('\n'));
-  let level = null;
-  if (isBreaking) level = 'major';
-  else if (type === 'feat') level = 'minor';
-  else if (['fix', 'perf', 'revert'].includes(type)) level = 'patch';
-  if (!level) return null;
-  return { type, scope, subject: match[4].trim(), level, breaking: isBreaking };
 }
 
 export function highestReleaseLevel(commits) {
@@ -116,34 +74,6 @@ export function highestReleaseLevel(commits) {
     if (parsed && (!best || rank[parsed.level] > rank[best])) best = parsed.level;
   }
   return best;
-}
-
-export function makeReleaseNotes(commits, fullName) {
-  const groups = {
-    'Breaking Changes': [],
-    Features: [],
-    'Bug Fixes and Performance': [],
-    Reverts: [],
-    'Other changes': []
-  };
-  for (const commit of commits) {
-    const message = commit.message || commit.commit?.message || '';
-    const parsed = classifyConventionalCommit(message);
-    const subject = String(message).split('\n')[0].trim();
-    if (!parsed && (!subject || releaseIntent(message, 'tag') || releaseIntent(message, 'commit') || /^Merge (?:branch|pull request|remote-tracking branch)\b/i.test(subject))) continue;
-    const sha = commit.sha || commit.id || '';
-    const url = 'https://github.com/' + fullName + '/commit/' + sha;
-    const line = '- ' + (parsed ? parsed.subject : subject) + ' ([' + sha.slice(0, 7) + '](' + url + '))';
-    if (!parsed) groups['Other changes'].push(line);
-    else if (parsed.breaking) groups['Breaking Changes'].push(line);
-    else if (parsed.type === 'feat') groups.Features.push(line);
-    else if (parsed.type === 'revert') groups.Reverts.push(line);
-    else groups['Bug Fixes and Performance'].push(line);
-  }
-  return Object.entries(groups)
-    .filter(([, items]) => items.length)
-    .map(([title, items]) => '### ' + title + '\n\n' + items.join('\n'))
-    .join('\n\n');
 }
 
 export function insertChangelogSection(existing, version, date, notes) {
@@ -164,15 +94,6 @@ export function insertChangelogSection(existing, version, date, notes) {
   }
   if (!source.trim()) return '# Changelog\n\n' + block;
   return source.slice(0, insertAt).replace(/\s*$/, '\n\n') + block + source.slice(insertAt);
-}
-
-export function releaseIntent(message, mode) {
-  const subject = String(message || '').split('\n')[0].trim().replace(/ \(#\d+\)$/, '');
-  const pattern = mode === 'commit'
-    ? /^release:\s*v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/i
-    : /^chore\(release\):\s*prepare\s+v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/i;
-  const match = subject.match(pattern);
-  return match ? match[1] : null;
 }
 
 function highestVersionTag(refs) {
@@ -534,9 +455,10 @@ async function ensureTagRef(fullName, tag, targetSha) {
   return expectedSha;
 }
 
-async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, rule) {
+export async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, rule) {
   const changelog = await getFile(fullName, rule.changelogPath || 'CHANGELOG.md', targetSha);
-  const body = releaseBodyFromChangelog(changelog, version);
+  releaseBodyFromChangelog(changelog, version);
+  const body = await notesSincePublishedRelease(fullName, tag, targetSha, rule, api);
 
   const prerelease = Boolean(parseSemver(version)?.prerelease);
   const name = repoName + ' ' + tag;
@@ -610,7 +532,7 @@ async function ensureDraftRelease(fullName, repoName, tag, version, targetSha, r
   return release;
 }
 
-async function repairOrphanDraftReleases(fullName, repoName, releases, rule) {
+export async function repairOrphanDraftReleases(fullName, repoName, releases, rule) {
   const prefix = repoName + ' ';
   for (const candidate of releases) {
     if (!candidate?.draft || !/^untagged-[0-9a-f]{8,}$/i.test(String(candidate.tag_name || ''))) continue;
@@ -633,7 +555,8 @@ async function repairOrphanDraftReleases(fullName, repoName, releases, rule) {
     if (!exactOrphan || exactOrphan.id !== candidate.id) continue;
 
     const changelog = await getFile(fullName, rule.changelogPath || 'CHANGELOG.md', tagSha);
-    const body = releaseBodyFromChangelog(changelog, version);
+    releaseBodyFromChangelog(changelog, version);
+    const body = await notesSincePublishedRelease(fullName, tag, tagSha, rule, api);
     const prerelease = Boolean(parseSemver(version)?.prerelease);
     const repaired = await api('/repos/' + fullName + '/releases/' + candidate.id, {
       method: 'PATCH',
@@ -657,7 +580,7 @@ async function repairOrphanDraftReleases(fullName, repoName, releases, rule) {
   }
 }
 
-async function publishReadyDrafts(repoName, rule) {
+export async function publishReadyDrafts(repoName, rule) {
   const fullName = ORG + '/' + repoName;
   const initialReleases = await api('/repos/' + fullName + '/releases?per_page=100');
   await repairOrphanDraftReleases(fullName, repoName, initialReleases, rule);
@@ -901,11 +824,12 @@ export async function prepareReleaseChanges(fullName, headSha, nextVersion, note
   return changes;
 }
 
-async function prepareReleaseCommit(fullName, branch, headSha, nextVersion, notes, rule, baseLabel) {
+export async function prepareReleaseCommit(fullName, branch, headSha, nextVersion, notes, rule, baseLabel) {
+  const publicNotes = await notesSincePublishedRelease(fullName, makeTagName(nextVersion), headSha, rule, api);
   const commitMessage = rule.mode === 'commit'
     ? 'release: v' + nextVersion
     : 'chore(release): prepare v' + nextVersion;
-  return ensureReleasePr(fullName, branch, headSha, nextVersion, notes, commitMessage, changes => {
+  return ensureReleasePr(fullName, branch, headSha, nextVersion, publicNotes, commitMessage, changes => {
     const body = 'Prepared automatically from Conventional Commits since ' + baseLabel + '.\n\n' +
       'Co-authored-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>\n' +
       'Signed-off-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>';

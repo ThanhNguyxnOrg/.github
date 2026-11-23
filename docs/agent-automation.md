@@ -63,6 +63,8 @@ The central release policy owns version files, changelog path, branch, release m
 
 After the configured HEAD checks pass, the controller maintains one release PR from `thanhnguyxnagent/release`, updating version files and CHANGELOG.md from the commits since the last tag. Conventional Commits decide whether a release is due and its SemVer level; every other commit (except release and merge commits) is still listed under "Other changes". New default-branch commits refresh the PR; unchanged HEADs do not rewrite its commit. The owner merges to approve (any merge method; keep the release title when squashing), or closes to postpone until new commits land. Only after the release commit reaches the default branch does the existing required-check, tag, draft, build and asset-publication pipeline proceed. Release PRs require human review and are not auto-merged.
 
+Release PR and GitHub draft bodies aggregate changes since the previous published stable release (excluding the target itself), falling back to the previous stable tag and then the policy baseline, while CHANGELOG sections stay per-version.
+
 Before publishing a draft, the controller verifies:
 1. the configured release workflow completed successfully for the exact tag commit;
 2. every asset in that repository's central `requiredAssets` manifest exists and is uploaded.
