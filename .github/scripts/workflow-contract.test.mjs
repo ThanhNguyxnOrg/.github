@@ -22,6 +22,12 @@ test('internal action tags are promoted when their implementations or imported r
   assert.ok(promote.includes("      - '.github/scripts/**'"));
   assert.ok(promote.includes("      - 'release-policy.json'"));
   assert.ok(promote.includes('git tag -fa agent-v1'));
+  const gate = promote.split('      - name: Run central policy regression tests\n')[1]
+    .split('\n      - name:')[0];
+  for (const suite of ['release-assets.test.mjs', 'release-assets-publish.test.mjs', 'release-notes.test.mjs']) {
+    assert.ok(gate.includes('.github/scripts/' + suite), suite);
+  }
+  assert.ok(promote.indexOf(gate) < promote.indexOf('git tag -fa agent-v1'));
   const controller = read('.github/workflows/agent-controller.yml');
   const publisher = read('.github/workflows/release-publish.yml');
   const token = 'uses: ThanhNguyxnOrg/.github/.github/actions/agent-token@agent-v1';
