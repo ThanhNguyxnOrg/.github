@@ -207,35 +207,6 @@ test('release changes use the HEAD commit date so repeated runs across days are 
     async () => { throw new Error('lookup failed'); }), /lookup failed/);
 });
 
-test('re-preparing the same version refreshes its notes while preserving other changelog sections', async () => {
-  const prefix = '# Changelog\n\n## [Unreleased]\n\nFuture work.\n\n';
-  const history = '## [2.0.0] - 2026-01-01\n\nHistorical notes.\n';
-  const oldSection = '## [2.0.1] - 2026-01-02\n\nStale notes.\n\n';
-  let source = prefix + oldSection + history;
-  const request = async path => {
-    if (path.endsWith('/git/commits/head')) return { committer: { date: '2026-01-03T12:00:00Z' } };
-    assert.ok(path.includes('/contents/CHANGELOG.md?ref=head'));
-    return { encoding: 'base64', content: Buffer.from(source).toString('base64') };
-  };
-  const notes = makeReleaseNotes([
-    { sha: 'a'.repeat(40), message: 'fix: repair runtime (#67)' },
-    { sha: 'b'.repeat(40), message: 'Fix multilingual prose detection (#68)' },
-    { sha: 'c'.repeat(40), message: 'release: v2.0.1' }
-  ], 'org/repo');
-  const changes = await prepareReleaseChanges('org/repo', 'head', '2.0.1', notes, {}, request);
-  assert.equal(changes.length, 1);
-  source = changes[0].content;
-  assert.equal(source, prefix + '## [2.0.1] - 2026-01-03\n\n' + notes + '\n\n' + history);
-  assert.equal(releaseNotesFromChangelog(source, '2.0.1'), notes);
-  assert.match(releaseBodyFromChangelog(source, '2.0.1'), /Fix multilingual prose detection \(#68\)/);
-  assert.deepEqual(await prepareReleaseChanges('org/repo', 'head', '2.0.1', notes, {}, request), []);
-  const higherVersion = await prepareReleaseChanges('org/repo', 'head', '2.1.0', notes, {}, request);
-  assert.ok(higherVersion[0].content.includes(source.slice(prefix.length)));
-  assert.throws(() => insertChangelogSection(source, '2.0.1', '2026-01-03', notes), /already contains version/);
-  const lastSection = insertChangelogSection(prefix + oldSection, '2.0.1', '2026-01-03', notes, true);
-  assert.equal(lastSection, prefix + '## [2.0.1] - 2026-01-03\n\n' + notes + '\n\n');
-});
-
 test('declined release uses the most recently closed unmerged PR and its base marker', async () => {
   const head = 'a'.repeat(40);
   const closed = [

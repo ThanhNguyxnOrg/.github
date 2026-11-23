@@ -146,18 +146,13 @@ export function makeReleaseNotes(commits, fullName) {
     .join('\n\n');
 }
 
-export function insertChangelogSection(existing, version, date, notes, replaceExisting = false) {
+export function insertChangelogSection(existing, version, date, notes) {
   const source = String(existing || '').replace(/\r/g, '');
   const escapedVersion = String(version).replace(/\./g, '\\.');
   const headingPattern = new RegExp('^##\\s+\\[?' + escapedVersion + '\\]?(?:\\s|$)', 'm');
-  const existingHeading = headingPattern.exec(source);
-  if (existingHeading && !replaceExisting) throw new Error('CHANGELOG already contains version ' + version);
+  if (headingPattern.test(source)) throw new Error('CHANGELOG already contains version ' + version);
   const block = '## [' + version + '] - ' + date + '\n\n' + notes.trim() + '\n\n';
   const headings = [...source.matchAll(/^##\s+/gm)];
-  if (existingHeading) {
-    const next = headings.find(item => item.index > existingHeading.index);
-    return source.slice(0, existingHeading.index) + block + source.slice(next ? next.index : source.length);
-  }
   const unreleased = headings.find(item => /^##\s+\[?Unreleased\]?/i.test(item[0]));
   let insertAt;
   if (unreleased) {
@@ -891,9 +886,16 @@ export async function prepareReleaseChanges(fullName, headSha, nextVersion, note
     if (!(error instanceof GitHubError) || error.status !== 404) throw error;
     changelog = '# Changelog\n\n';
   }
-  const parent = await request('/repos/' + fullName + '/git/commits/' + headSha);
-  const date = new Date(parent.committer.date).toISOString().slice(0, 10);
-  const updatedChangelog = insertChangelogSection(changelog, nextVersion, date, notes, true);
+  let updatedChangelog = changelog;
+  try {
+    const parent = await request('/repos/' + fullName + '/git/commits/' + headSha);
+    const date = new Date(parent.committer.date).toISOString().slice(0, 10);
+    updatedChangelog = insertChangelogSection(changelog, nextVersion, date, notes);
+  } catch (error) {
+    // A previous prepare attempt may already have written this version's
+    // section; keep it instead of failing a re-declared release.
+    if (!(error instanceof Error) || !/already contains version/.test(error.message)) throw error;
+  }
   if (updatedChangelog !== changelog) changes.push({ path: changelogPath, content: updatedChangelog });
 
   return changes;
