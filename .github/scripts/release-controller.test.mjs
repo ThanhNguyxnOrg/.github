@@ -352,6 +352,9 @@ test('every centrally managed version-file pattern compiles and updates its vers
     'ClipForge/CMakeLists.txt': 'project(ClipForge VERSION 0.2.0 LANGUAGES CXX)\n',
     'LayoutLingua/pyproject.toml': 'version = "2.0.0"\n',
     'LayoutLingua/layoutlingua/_version.py': '__version__ = "2.0.0"\n',
+    'LayoutLingua/README.md': '# 🚀 LayoutLingua v2.0.0 🌟\n\n<img src="https://img.shields.io/badge/Version-2.0.0-0D9488?style=for-the-badge" alt="Version 2.0.0" />\n',
+    'LayoutLingua/src/components/CreditsModal.tsx': "const APP_VERSION = '2.0.0'\n",
+    'LayoutLingua/docs/API_REFERENCE.md': '{ "status": "ok", "version": "2.1.0", "engine": "PyMuPDF" }\n',
     'PurgeKit/src-tauri/Cargo.toml': 'version = "1.3.0"\n',
     'Locsight/src-tauri/Cargo.toml': 'version = "2.2.0"\n',
     'cogmint/src-tauri/Cargo.toml': 'version = "2.0.0"\n',
@@ -382,6 +385,39 @@ test('JSON version paths preserve the project manifest while updating configured
   assert.equal(JSON.parse(packageFile).name, 'purgekit');
   assert.equal(JSON.parse(tauriFile).version, '1.4.0');
   assert.equal(JSON.parse(tauriFile).productName, 'PurgeKit');
+});
+
+test('LayoutLingua release policy keeps package, lock, README, credits and API versions aligned', () => {
+  const files = policy.repositories.LayoutLingua.versionFiles;
+  assert.equal(new Set(files.map(file => file.path)).size, files.length);
+  const fixtures = {
+    'pyproject.toml': 'version = "2.0.0"\n',
+    'layoutlingua/_version.py': '__version__ = "2.0.0"\n',
+    'package.json': '{"name":"layoutlingua","version":"2.0.0","dependencies":{"example":"2.0.0"}}',
+    'package-lock.json': '{"version":"2.0.0","packages":{"":{"name":"layoutlingua","version":"2.0.0"},"node_modules/example":{"version":"2.0.0"}}}',
+    'README.md': '# 🚀 LayoutLingua v2.0.0 🌟\n\n<img src="https://img.shields.io/badge/Version-2.0.0-0D9488?style=for-the-badge" alt="Version 2.0.0" />\n\nNode.js >= 22.0.0\n',
+    'src/components/CreditsModal.tsx': "const APP_VERSION = '2.0.0'\n",
+    'docs/API_REFERENCE.md': '{ "status": "ok", "version": "2.1.0", "engine": "PyMuPDF" }\n'
+  };
+  for (const version of ['2.0.1', '2.1.0-rc.1', '2.1.0']) {
+    for (const file of files) fixtures[file.path] = applyVersionFile(file, fixtures[file.path], version);
+    const pkg = JSON.parse(fixtures['package.json']);
+    const lock = JSON.parse(fixtures['package-lock.json']);
+    assert.equal(pkg.version, version);
+    assert.equal(pkg.dependencies.example, '2.0.0');
+    assert.equal(lock.version, version);
+    assert.equal(lock.packages[''].version, version);
+    assert.equal(lock.packages['node_modules/example'].version, '2.0.0');
+    assert.ok(fixtures['README.md'].includes('# 🚀 LayoutLingua v' + version + ' 🌟'));
+    assert.ok(fixtures['README.md'].includes('badge/Version-' + version + '-0D9488?style=for-the-badge'));
+    assert.ok(fixtures['README.md'].includes('alt="Version ' + version + '"'));
+    assert.ok(fixtures['README.md'].includes('Node.js >= 22.0.0'));
+    assert.equal(fixtures['src/components/CreditsModal.tsx'], "const APP_VERSION = '" + version + "'\n");
+    assert.equal(JSON.parse(fixtures['docs/API_REFERENCE.md']).version, version);
+  }
+  for (const file of files.filter(file => file.kind === 'regex')) {
+    assert.throws(() => applyVersionFile(file, '', '2.0.1'), /Version pattern did not match/);
+  }
 });
 
 test('only the newest unpublished draft per version is eligible for publication', () => {
