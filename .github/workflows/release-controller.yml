@@ -39,7 +39,7 @@ jobs:
 
       - name: Create organization-wide ThanhNguyxnAgent token
         id: agent
-        uses: ThanhNguyxnOrg/.github/.github/actions/agent-token@2b5c5cad571ee93fd091e16e1734ebd819191e68
+        uses: ./.github/actions/agent-token
         with:
           profile: release
           app-id: ${{ vars.BOT_APP_ID }}

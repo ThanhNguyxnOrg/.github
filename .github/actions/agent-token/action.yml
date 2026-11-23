@@ -83,6 +83,7 @@ runs:
         owner: ${{ inputs.owner }}
         repositories: ${{ inputs.repositories }}
         permission-contents: write
+        permission-pull-requests: write
         permission-workflows: write
         permission-actions: read
         permission-checks: read

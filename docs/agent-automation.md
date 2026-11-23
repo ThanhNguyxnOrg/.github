@@ -7,7 +7,7 @@ The organization uses one central GitHub App control plane in this repository. D
 The central control plane owns organization-wide policy and decisions:
 
 - `.github/workflows/agent-controller.yml`: hourly organization reconciliation, automatic PR-trigger onboarding, and missed-event recovery. PR lifecycle events enter through two managed workflows per repository: a metadata-only `pull_request_target` signal and a `workflow_run` relay to the central reusable worker. The signal uploads only a tiny JSON envelope containing repository, PR number, and head identity; the privileged worker validates it against the GitHub API before processing.
-- `.github/workflows/release-controller.yml`: Conventional Commit classification, version/changelog commits, tags, draft releases, build-result checks and asset verification (15-minute polling).
+- `.github/workflows/release-controller.yml`: Conventional Commit classification, version/changelog release PRs for owner approval, tags, draft releases, build-result checks and asset verification (15-minute polling).
 - `.github/workflows/stale.yml`: organization-wide stale issue/PR lifecycle (daily).
 - `agent-policy.json`, `ci-policy.json` and `release-policy.json`: central policy registries.
 - `.github/scripts/*-controller.mjs`: shared control-plane implementations.
@@ -58,6 +58,8 @@ The central bootstrapper first creates a short-lived organization-wide token wit
 ## Release safety
 
 The central release policy owns version files, changelog path, branch, release mode and project build-workflow identity. Each build adapter remains responsible for native tests, compilation and packaging.
+
+After the configured HEAD checks pass, the controller maintains one release PR from `thanhnguyxnagent/release`, gathering Conventional Commits since the last tag and updating version files and CHANGELOG.md. New default-branch commits refresh the PR; unchanged HEADs do not rewrite its commit. The owner merges to approve (any merge method; keep the release title when squashing), or closes to postpone until new commits land. Only after the release commit reaches the default branch does the existing required-check, tag, draft, build and asset-publication pipeline proceed. Release PRs require human review and are not auto-merged.
 
 Before publishing a draft, the controller verifies:
 1. the configured release workflow completed successfully for the exact tag commit;

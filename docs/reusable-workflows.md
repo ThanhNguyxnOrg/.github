@@ -135,6 +135,8 @@ Reusable workflow files must live directly under `.github/workflows/`; GitHub do
 
 Each project release adapter does only the project-specific work. The release controller is the sole version/tag decision-maker; a normal push does not start platform release packaging:
 
+The controller first maintains one owner-approved release PR from `thanhnguyxnagent/release`, updating version files and CHANGELOG.md as new commits land. Merge it to approve (any merge method; retain the release title for squash), or close it to postpone until new commits. After merge, the existing required-check, tag, draft, build and publication gates apply unchanged.
+
 1. Build and package on the correct OS/architecture.
 2. Place final distributables in a flat `dist/release/` directory.
 3. Upload each platform's files as a GitHub Actions artifact named `release-assets-<platform>` (for a single job, `release-assets` is also valid).

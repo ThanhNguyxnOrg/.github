@@ -2,7 +2,162 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, releaseBodyFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy, releaseMatchesTag, selectReleaseByTag, selectOrphanDraftForTag } from './release-controller.mjs';
-import { createCommit, shouldReprepareRelease } from './release-controller.mjs';
+import { createCommit, shouldReprepareRelease, releaseIntent, releasePrMarker, parseReleasePrMarker, keepReleaseCommit, releasePrDeclined, ensureReleasePr, cleanupReleaseBranch, RELEASE_BRANCH } from './release-controller.mjs';
+
+test('release intent accepts original and squash subjects for both modes', () => {
+  for (const [mode, subject] of [['tag', 'chore(release): prepare v1.2.0'], ['commit', 'release: v1.2.0']]) {
+    for (const suffix of ['', ' (#12)']) {
+      assert.equal(releaseIntent(subject + suffix + '\n\nDetails', mode), '1.2.0');
+    }
+    assert.equal(releaseIntent(subject + '-rc.1 (#3)', mode), '1.2.0-rc.1');
+    assert.equal(releaseIntent(subject + ' other text', mode), null);
+    assert.equal(releaseIntent('', mode), null);
+    assert.equal(releaseIntent('fix: repair bug', mode), null);
+  }
+  assert.equal(releaseIntent('release: v1.2.0', 'tag'), null);
+  assert.equal(releaseIntent('chore(release): prepare v1.2.0', 'commit'), null);
+});
+
+test('release PR markers round-trip and reject absent or malformed metadata', () => {
+  const base = 'a'.repeat(40);
+  const marker = releasePrMarker(base, '1.2.0-rc.1');
+  assert.equal(marker, `<!-- thanhnguyxnagent-release base=${base} version=1.2.0-rc.1 -->`);
+  assert.deepEqual(parseReleasePrMarker('Notes\n\n' + marker), { base, version: '1.2.0-rc.1' });
+  for (const body of [undefined, '', marker.replace(base, 'invalid'), marker.replace('1.2.0-rc.1', 'invalid')]) {
+    assert.equal(parseReleasePrMarker(body), null);
+  }
+});
+
+test('release branch stays current only with one exact HEAD parent and matching subject', () => {
+  const commit = { parents: [{ sha: 'head' }], message: 'release: v1.2.0\n\nDetails' };
+  assert.equal(keepReleaseCommit(commit, 'head', 'release: v1.2.0'), true);
+  assert.equal(keepReleaseCommit(commit, 'new-head', 'release: v1.2.0'), false);
+  assert.equal(keepReleaseCommit(commit, 'head', 'release: v1.3.0'), false);
+  for (const parents of [[], [{ sha: 'head' }, { sha: 'other' }]]) {
+    assert.equal(keepReleaseCommit({ ...commit, parents }, 'head', 'release: v1.2.0'), false);
+  }
+  assert.equal(keepReleaseCommit(undefined, 'head', 'release: v1.2.0'), false);
+});
+
+test('declined release uses the most recently closed unmerged PR and its base marker', async () => {
+  const head = 'a'.repeat(40);
+  const closed = [
+    { closed_at: '2026-01-03', merged_at: '2026-01-03', body: '' },
+    { closed_at: '2026-01-01', body: '' },
+    { closed_at: '2026-01-02', body: releasePrMarker(head, '1.2.0') }
+  ];
+  assert.equal(await releasePrDeclined('org/repo', 'main', head, async () => closed), true);
+  assert.equal(await releasePrDeclined('org/repo', 'main', 'b'.repeat(40), async () => closed), false);
+  assert.equal(await releasePrDeclined('org/repo', 'main', head, async () => []), false);
+  await assert.rejects(releasePrDeclined('org/repo', 'main', head, async () => { throw new Error('lookup failed'); }), /lookup failed/);
+});
+
+test('release PR skips declined HEAD without building or writing and retries a newer HEAD', async () => {
+  const head = 'a'.repeat(40);
+  const writes = [];
+  const build = test.mock.fn();
+  const request = async (path, options) => {
+    if (path.includes('state=open')) return [];
+    if (path.includes('state=closed')) return [{ body: releasePrMarker(head, '1.2.0'), closed_at: '2026-01-01' }];
+    if (path.includes('/git/ref/')) throw Object.assign(new Error('missing'), { status: 404 });
+    if (options?.method === 'POST') { writes.push(options.body); return { html_url: 'pr-url' }; }
+    assert.fail(path);
+  };
+  assert.equal(await ensureReleasePr('org/repo', 'main', head, '1.2.0', 'Notes', 'release: v1.2.0', build, request), undefined);
+  assert.equal(build.mock.callCount(), 0);
+  assert.deepEqual(writes, []);
+  const newer = 'b'.repeat(40);
+  await ensureReleasePr('org/repo', 'main', newer, '1.3.0', 'New notes', 'release: v1.3.0', build, request);
+  assert.equal(build.mock.callCount(), 1);
+  assert.deepEqual(writes[0], {
+    head: RELEASE_BRANCH, base: 'main', title: 'release: v1.3.0',
+    body: 'New notes\n\nMerge to approve this release (any merge method; squash keeps the title). Close to postpone until new commits land. ThanhNguyxnAgent keeps this PR updated with new commits.\n\n' + releasePrMarker(newer, '1.3.0')
+  });
+});
+
+test('release PR updates metadata only when changed and keeps an unchanged commit', async () => {
+  const head = 'a'.repeat(40);
+  let pr = { number: 7, title: 'old title', body: '', html_url: 'pr-url' };
+  let branchCommit = { message: 'release: v1.2.0', parents: [{ sha: head }] };
+  const build = test.mock.fn();
+  const updates = [];
+  const request = async (path, options) => {
+    if (path.includes('state=open')) return [pr];
+    if (path.includes('/git/ref/')) return { object: { sha: 'release-head' } };
+    if (path.includes('/git/commits/')) return branchCommit;
+    if (path.endsWith('/pulls/7')) {
+      assert.equal(options.method, 'PATCH');
+      updates.push(options.body); pr = { ...pr, ...options.body }; return pr;
+    }
+    assert.fail(path);
+  };
+  for (let i = 0; i < 2; i += 1) await ensureReleasePr('org/repo', 'main', head, '1.2.0', 'Notes', 'release: v1.2.0', build, request);
+  assert.equal(build.mock.callCount(), 0);
+  assert.equal(updates.length, 1);
+  assert.deepEqual(Object.keys(updates[0]), ['title', 'body']);
+  branchCommit = { ...branchCommit, parents: [{ sha: 'old-head' }] };
+  await ensureReleasePr('org/repo', 'main', head, '1.2.0', 'Notes', 'release: v1.2.0', build, request);
+  assert.equal(build.mock.callCount(), 1);
+  assert.equal(updates.length, 1);
+});
+
+test('release branch lookup errors fail closed', async () => {
+  const build = test.mock.fn();
+  await assert.rejects(ensureReleasePr('org/repo', 'main', 'head', '1.2.0', '', 'release: v1.2.0', build, async path => {
+    if (path.includes('state=open')) return [{ number: 7 }];
+    throw Object.assign(new Error('forbidden'), { status: 403 });
+  }), /forbidden/);
+  assert.equal(build.mock.callCount(), 0);
+});
+
+test('release commit creates a missing branch or force-updates the release branch only', async () => {
+  for (const missing of [false, true]) {
+    const calls = [];
+    const request = async (path, options) => {
+      calls.push({ path, options });
+      if (path.endsWith('/commits/head')) return { tree: { sha: 'tree' } };
+      if (path.endsWith('/git/blobs')) return { sha: 'blob' };
+      if (path.endsWith('/git/trees')) return { sha: 'new-tree' };
+      if (path.endsWith('/git/commits')) return { sha: 'commit' };
+      if (path.includes('/git/ref/heads/') && missing) throw Object.assign(new Error('missing'), { status: 404 });
+      return {};
+    };
+    await createCommit('org/repo', RELEASE_BRANCH, 'head', [{ path: 'CHANGELOG.md', content: 'Notes' }], 'release: v1.2.0', request, { force: true, create: true });
+    const patch = calls.find(call => call.options?.method === 'PATCH');
+    assert.equal(Boolean(patch), !missing);
+    if (!missing) {
+      assert.equal(patch.path, '/repos/org/repo/git/refs/heads/' + RELEASE_BRANCH);
+      assert.deepEqual(patch.options.body, { sha: 'commit', force: true });
+    }
+    const create = calls.find(call => call.path.endsWith('/git/refs'));
+    assert.equal(Boolean(create), missing);
+    if (missing) assert.deepEqual(create.options.body, { ref: 'refs/heads/' + RELEASE_BRANCH, sha: 'commit' });
+    const commit = calls.find(call => call.path.endsWith('/git/commits')).options.body;
+    assert.deepEqual(commit.parents, ['head']);
+    assert.equal(commit.tree, 'new-tree');
+  }
+  await assert.rejects(createCommit('org/repo', RELEASE_BRANCH, 'head', [], 'release: v1.2.0', async path => {
+    if (path.endsWith('/commits/head')) return { tree: { sha: 'tree' } };
+    if (path.endsWith('/git/commits')) return { sha: 'commit' };
+    throw Object.assign(new Error('forbidden'), { status: 403 });
+  }, { force: true, create: true }), /forbidden/);
+});
+
+test('merged release cleanup preserves any open PR and tolerates absent refs', async () => {
+  for (const status of [null, 404, 422, 403]) {
+    const request = test.mock.fn(async (path, options) => {
+      if (!options) { assert.ok(!path.includes('&base=')); return []; }
+      assert.equal(options.method, 'DELETE');
+      if (status) throw Object.assign(new Error('delete failed'), { status });
+    });
+    if (status === 403) await assert.rejects(cleanupReleaseBranch('org/repo', 'main', request), /delete failed/);
+    else await cleanupReleaseBranch('org/repo', 'main', request);
+    assert.equal(request.mock.callCount(), 2);
+  }
+  const request = test.mock.fn(async () => [{ number: 1 }]);
+  await cleanupReleaseBranch('org/repo', 'main', request);
+  assert.equal(request.mock.callCount(), 1);
+});
 
 test('re-prepares a release with missing or failed checks only at a newer verified HEAD', async () => {
   for (const preparedState of ['missing', 'failure']) {

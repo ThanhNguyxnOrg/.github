@@ -18,7 +18,7 @@ Use this note to onboard a project. Fill in the facts; the machine-readable prof
 
 | Field | Value |
 |---|---|
-| Release mode | Central tag or central release commit |
+| Release mode | `tag` or `commit` subject format; both use owner-approved release PRs |
 | Baseline commit SHA | Full 40-character SHA |
 | Initial version | SemVer |
 | Version files | Exact files and JSON paths / regex replacement |
@@ -30,7 +30,7 @@ Use this note to onboard a project. Fill in the facts; the machine-readable prof
 ## Operating contract
 
 - The central Agent applies PR policy and the central CI gate.
-- The central Release Controller creates version/changelog commits and tags as configured.
+- The central Release Controller maintains one version/changelog PR from `thanhnguyxnagent/release`, refreshed as new commits land. The owner merges to approve (any merge method; preserve the release title for squash), or closes to postpone until new commits. Tags and drafts follow only after the merged release commit passes required checks.
 - The repository adapter checks out that tag, runs native tests/build/package, and uploads assets to the matching draft release.
 - The central Release Controller publishes only after the matching build workflow succeeds and every required asset is present.
 - Missing or unconfigured checks hold automation for human review.
