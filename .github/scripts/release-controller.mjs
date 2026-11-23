@@ -11,6 +11,7 @@ const API = process.env.GITHUB_API_URL || 'https://api.github.com';
 const API_VERSION = '2022-11-28';
 const VERSION_EMAIL = '296222857+thanhnguyxnagent[bot]@users.noreply.github.com';
 const VERSION_NAME = 'ThanhNguyxnAgent[bot]';
+export const RELEASE_BRANCH = 'thanhnguyxnagent/release';
 const config = JSON.parse(fs.readFileSync(new URL('../../release-policy.json', import.meta.url), 'utf8'));
 
 class GitHubError extends Error {
@@ -162,8 +163,8 @@ export function insertChangelogSection(existing, version, date, notes) {
   return source.slice(0, insertAt).replace(/\s*$/, '\n\n') + block + source.slice(insertAt);
 }
 
-function releaseIntent(message, mode) {
-  const subject = String(message || '').split('\n')[0].trim();
+export function releaseIntent(message, mode) {
+  const subject = String(message || '').split('\n')[0].trim().replace(/ \(#\d+\)$/, '');
   const pattern = mode === 'commit'
     ? /^release:\s*v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/i
     : /^chore\(release\):\s*prepare\s+v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/i;
@@ -696,7 +697,7 @@ async function publishReadyDrafts(repoName, rule) {
   }
 }
 
-export async function createCommit(fullName, branch, headSha, changes, message, request = api) {
+export async function createCommit(fullName, branch, headSha, changes, message, request = api, options = {}) {
   const parent = await request('/repos/' + fullName + '/git/commits/' + headSha);
   let treeSha = parent.tree.sha;
   // Re-declaring an unchanged release only needs a new commit.
@@ -726,46 +727,142 @@ export async function createCommit(fullName, branch, headSha, changes, message, 
       committer: { name: VERSION_NAME, email: VERSION_EMAIL, date: timestamp }
     }
   });
-  await request('/repos/' + fullName + '/git/refs/heads/' + branch, {
-    method: 'PATCH',
-    body: { sha: commit.sha, force: false }
-  });
+  let createRef = false;
+  if (options.create) {
+    try {
+      await request('/repos/' + fullName + '/git/ref/heads/' + branch);
+    } catch (error) {
+      if (error.status !== 404) throw error;
+      createRef = true;
+    }
+  }
+  if (createRef) {
+    await request('/repos/' + fullName + '/git/refs', {
+      method: 'POST', body: { ref: 'refs/heads/' + branch, sha: commit.sha }
+    });
+  } else {
+    await request('/repos/' + fullName + '/git/refs/heads/' + branch, {
+      method: 'PATCH',
+      body: { sha: commit.sha, force: options.force === true }
+    });
+  }
   return commit.sha;
 }
 
+export function releasePrMarker(base, version) {
+  return '<!-- thanhnguyxnagent-release base=' + base + ' version=' + version + ' -->';
+}
+
+export function parseReleasePrMarker(body) {
+  const match = String(body || '').match(/<!-- thanhnguyxnagent-release base=([0-9a-f]{40}) version=(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?) -->/);
+  return match ? { base: match[1], version: match[2] } : null;
+}
+
+export function keepReleaseCommit(commit, headSha, subject) {
+  return commit?.parents?.length === 1 && commit.parents[0].sha === headSha &&
+    String(commit.message || '').split('\n')[0] === subject;
+}
+
+function releasePrQuery(fullName, branch, state) {
+  return '/repos/' + fullName + '/pulls?state=' + state +
+    '&head=' + encodeURIComponent(fullName.split('/')[0] + ':' + RELEASE_BRANCH) +
+    (branch ? '&base=' + encodeURIComponent(branch) : '') + '&sort=updated&direction=desc&per_page=100';
+}
+
+export async function releasePrDeclined(fullName, branch, headSha, request = api) {
+  const closed = [];
+  for (let page = 1; ; page += 1) {
+    const batch = await request(releasePrQuery(fullName, branch, 'closed') + '&page=' + page);
+    closed.push(...batch);
+    if (batch.length < 100) break;
+  }
+  const latest = closed.filter(pr => !pr.merged_at)
+    .sort((a, b) => String(b.closed_at).localeCompare(String(a.closed_at)))[0];
+  return Boolean(latest && parseReleasePrMarker(latest.body)?.base === headSha);
+}
+
+export async function ensureReleasePr(fullName, branch, headSha, version, notes, subject, buildCommit, request = api) {
+  const open = await request(releasePrQuery(fullName, branch, 'open'));
+  const existing = open[0];
+  if (!existing && await releasePrDeclined(fullName, branch, headSha, request)) {
+    console.log('[release-pr-declined]', fullName, 'HEAD ' + headSha);
+    return;
+  }
+
+  let current;
+  try {
+    const ref = await request('/repos/' + fullName + '/git/ref/heads/' + RELEASE_BRANCH);
+    current = await request('/repos/' + fullName + '/git/commits/' + ref.object.sha);
+  } catch (error) {
+    if (error.status !== 404) throw error;
+  }
+  const kept = keepReleaseCommit(current, headSha, subject);
+  if (!kept) await buildCommit();
+  const body = notes.trim() + '\n\n' +
+    'Merge to approve this release (any merge method; squash keeps the title). Close to postpone until new commits land. ThanhNguyxnAgent keeps this PR updated with new commits.' +
+    '\n\n' + releasePrMarker(headSha, version);
+  let pr = existing;
+  let action = kept ? 'current' : 'updated';
+  if (!existing) {
+    pr = await request('/repos/' + fullName + '/pulls', {
+      method: 'POST', body: { head: RELEASE_BRANCH, base: branch, title: subject, body }
+    });
+    action = 'opened';
+  } else if (existing.title !== subject || existing.body !== body) {
+    pr = await request('/repos/' + fullName + '/pulls/' + existing.number, {
+      method: 'PATCH', body: { title: subject, body }
+    });
+    action = 'updated';
+  }
+  console.log('[release-pr-' + action + ']', fullName, pr.html_url);
+  return pr;
+}
+
+export async function cleanupReleaseBranch(fullName, branch, request = api) {
+  const open = await request(releasePrQuery(fullName, null, 'open'));
+  if (open.length) return;
+  try {
+    await request('/repos/' + fullName + '/git/refs/heads/' + RELEASE_BRANCH, { method: 'DELETE' });
+  } catch (error) {
+    if (![404, 422].includes(error.status)) throw error;
+  }
+}
+
 async function prepareReleaseCommit(fullName, branch, headSha, nextVersion, notes, rule, baseLabel) {
-  const changes = [];
-  for (const file of rule.versionFiles || []) {
-    const source = await getFile(fullName, file.path, headSha);
-    const updated = applyVersionFile(file, source, nextVersion);
-    if (updated !== source) changes.push({ path: file.path, content: updated });
-  }
-
-  const changelogPath = rule.changelogPath || 'CHANGELOG.md';
-  let changelog;
-  try {
-    changelog = await getFile(fullName, changelogPath, headSha);
-  } catch (error) {
-    if (!(error instanceof GitHubError) || error.status !== 404) throw error;
-    changelog = '# Changelog\n\n';
-  }
-  let updatedChangelog = changelog;
-  try {
-    updatedChangelog = insertChangelogSection(changelog, nextVersion, new Date().toISOString().slice(0, 10), notes);
-  } catch (error) {
-    // A previous prepare attempt may already have written this version's
-    // section; keep it instead of failing a re-declared release.
-    if (!(error instanceof Error) || !/already contains version/.test(error.message)) throw error;
-  }
-  if (updatedChangelog !== changelog) changes.push({ path: changelogPath, content: updatedChangelog });
-
   const commitMessage = rule.mode === 'commit'
     ? 'release: v' + nextVersion
     : 'chore(release): prepare v' + nextVersion;
-  const body = 'Prepared automatically from Conventional Commits since ' + baseLabel + '.\n\n' +
-    'Co-authored-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>\n' +
-    'Signed-off-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>';
-  return createCommit(fullName, branch, headSha, changes, commitMessage + '\n\n' + body);
+  return ensureReleasePr(fullName, branch, headSha, nextVersion, notes, commitMessage, async () => {
+    const changes = [];
+    for (const file of rule.versionFiles || []) {
+      const source = await getFile(fullName, file.path, headSha);
+      const updated = applyVersionFile(file, source, nextVersion);
+      if (updated !== source) changes.push({ path: file.path, content: updated });
+    }
+
+    const changelogPath = rule.changelogPath || 'CHANGELOG.md';
+    let changelog;
+    try {
+      changelog = await getFile(fullName, changelogPath, headSha);
+    } catch (error) {
+      if (!(error instanceof GitHubError) || error.status !== 404) throw error;
+      changelog = '# Changelog\n\n';
+    }
+    let updatedChangelog = changelog;
+    try {
+      updatedChangelog = insertChangelogSection(changelog, nextVersion, new Date().toISOString().slice(0, 10), notes);
+    } catch (error) {
+      // A previous prepare attempt may already have written this version's
+      // section; keep it instead of failing a re-declared release.
+      if (!(error instanceof Error) || !/already contains version/.test(error.message)) throw error;
+    }
+    if (updatedChangelog !== changelog) changes.push({ path: changelogPath, content: updatedChangelog });
+
+    const body = 'Prepared automatically from Conventional Commits since ' + baseLabel + '.\n\n' +
+      'Co-authored-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>\n' +
+      'Signed-off-by: ' + VERSION_NAME + ' <' + VERSION_EMAIL + '>';
+    return createCommit(fullName, RELEASE_BRANCH, headSha, changes, commitMessage + '\n\n' + body, api, { force: true, create: true });
+  });
 }
 
 
@@ -806,6 +903,7 @@ async function reconcileRepository(repoName, rule) {
 
   const pending = [...commits].reverse().find(commit => releaseIntent(commit.commit?.message, rule.mode));
   if (pending) {
+    await cleanupReleaseBranch(fullName, branch);
     const version = releaseIntent(pending.commit.message, rule.mode);
     const tag = makeTagName(version);
     const state = await checkState(fullName, pending.sha, repoName, changedFiles);
@@ -838,8 +936,7 @@ async function reconcileRepository(repoName, rule) {
       }
       const notes = 'Re-declared at ' + headSha.slice(0, 12) + ' after prepared commit ' +
         pending.sha.slice(0, 12) + ' had required checks in state ' + state + '.';
-      const sha = await prepareReleaseCommit(fullName, branch, headSha, targetVersion, notes, rule, pending.sha);
-      console.log('[release-prepared]', fullName, targetTag, 'commit ' + sha, 'mode=' + rule.mode, 're-declared');
+      await prepareReleaseCommit(fullName, branch, headSha, targetVersion, notes, rule, pending.sha);
       return;
     }
     const preparedRelease = await ensureDraftRelease(fullName, repoName, tag, version, pending.sha, rule);
@@ -878,8 +975,7 @@ async function reconcileRepository(repoName, rule) {
   }
 
   const notes = makeReleaseNotes(conventional, fullName);
-  const sha = await prepareReleaseCommit(fullName, branch, headSha, nextVersion, notes, rule, latestTag || rule.baselineSha);
-  console.log('[release-prepared]', fullName, tag, 'commit ' + sha, 'mode=' + rule.mode);
+  await prepareReleaseCommit(fullName, branch, headSha, nextVersion, notes, rule, latestTag || rule.baselineSha);
 }
 
 async function run() {
