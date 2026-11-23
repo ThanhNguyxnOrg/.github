@@ -168,6 +168,47 @@
           "kind": "regex",
           "pattern": "(__version__\\s*=\\s*\")[^\"]+(\")",
           "replacement": "$1{{version}}$2"
+        },
+        {
+          "path": "package.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": "package-lock.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ],
+            [
+              "packages",
+              "",
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": "README.md",
+          "kind": "regex",
+          "pattern": "^(# [^\\r\\n]*?\\bv)\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?([\\s\\S]*?badge/Version-)\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(-[^\\r\\n]*?alt=\"Version )[^\"]+(\")",
+          "replacement": "$1{{version}}$2{{version}}$3{{version}}$4"
+        },
+        {
+          "path": "src/components/CreditsModal.tsx",
+          "kind": "regex",
+          "pattern": "^(const APP_VERSION = ')[^']+(')",
+          "replacement": "$1{{version}}$2"
+        },
+        {
+          "path": "docs/API_REFERENCE.md",
+          "kind": "regex",
+          "pattern": "(\\{ \"status\": \"ok\", \"version\": \")[^\"]+(\")",
+          "replacement": "$1{{version}}$2"
         }
       ],
       "changelogPath": "CHANGELOG.md",
