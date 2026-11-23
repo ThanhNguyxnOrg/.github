@@ -276,6 +276,10 @@
         "test (macos-latest, 3.11)",
         "test (macos-latest, 3.12)"
       ]
+    },
+    "Pixelcraft": {
+      "defaultBranch": "main",
+      "requiredChecks": []
     }
   }
 }

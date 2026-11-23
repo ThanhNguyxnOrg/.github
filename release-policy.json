@@ -403,6 +403,7 @@
     "ThanhNguyxnOrg.github.io": "Organization profile website; no product release pipeline.",
     "AFTERFRAME-THE-LAST-LOOP": "Game project is in active development and has no release packaging workflow or agreed ship targets yet. Keep automatic releases disabled until desktop/game distribution targets are defined.",
     "chess-on-glass": "Project has no verified release build or distributable artifacts yet. Keep automatic releases disabled until the repository contains a release-ready product.",
-    "chromadna": "Standalone self-managed release workflow: release.yml tags and publishes GitHub Releases directly outside the central release-publish contract."
+    "chromadna": "Standalone self-managed release workflow: release.yml tags and publishes GitHub Releases directly outside the central release-publish contract.",
+    "Pixelcraft": "Newly discovered repository; release classification not mapped yet — excluded until explicitly onboarded."
   }
 }
