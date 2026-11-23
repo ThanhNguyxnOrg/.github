@@ -11,6 +11,7 @@ Use this note to onboard a project. Fill in the facts; the machine-readable prof
 | Stack | e.g. Go, Python, CMake/C++, Electron, Tauri |
 | Pull-request CI workflow | Exact workflow filename |
 | Required checks | Exact job/check names from a successful PR run |
+| Missing release-check recovery | Optional `workflow` filename on a `ci-policy.json` required-check object, e.g. `{"name":"verify / Node (Ubuntu)","paths":["src/**"],"workflow":"node.yml"}`; caller must support input-free `workflow_dispatch` |
 | Dependency auto-merge | Yes/No; patch/minor only, after CI verification |
 | Sensitive paths | Paths that always require human review |
 
@@ -34,4 +35,5 @@ Use this note to onboard a project. Fill in the facts; the machine-readable prof
 - The repository adapter checks out that tag, runs native tests/build/package, and uploads assets to the matching draft release.
 - The central Release Controller publishes only after the matching build workflow succeeds and every required asset is present.
 - Missing or unconfigured checks hold automation for human review.
+- Missing mapped release checks on current default-branch HEAD may be dispatched once per workflow/HEAD when no checks are failed or pending; release processing still waits for success.
 - Do not create a second auto-merge, version-bump or release-publishing bot in the product repository.

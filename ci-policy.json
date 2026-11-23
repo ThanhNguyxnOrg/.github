@@ -115,6 +115,7 @@
       "requiredChecks": [
         {
           "name": "test (ubuntu-latest) / Test (ubuntu-latest)",
+          "workflow": "test.yml",
           "paths": [
             "layoutlingua/**",
             "tests/**",
@@ -125,6 +126,7 @@
         },
         {
           "name": "test (windows-latest) / Test (windows-latest)",
+          "workflow": "test.yml",
           "paths": [
             "layoutlingua/**",
             "tests/**",
@@ -135,6 +137,7 @@
         },
         {
           "name": "test (macos-latest) / Test (macos-latest)",
+          "workflow": "test.yml",
           "paths": [
             "layoutlingua/**",
             "tests/**",
@@ -145,6 +148,7 @@
         },
         {
           "name": "verify / Node (Ubuntu)",
+          "workflow": "node.yml",
           "paths": [
             "package.json",
             "package-lock.json",

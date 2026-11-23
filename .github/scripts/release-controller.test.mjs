@@ -2,7 +2,97 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, releaseBodyFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy, releaseMatchesTag, selectReleaseByTag, selectOrphanDraftForTag } from './release-controller.mjs';
-import { createCommit, shouldReprepareRelease, releaseIntent, releasePrMarker, parseReleasePrMarker, keepReleaseCommit, releasePrDeclined, ensureReleasePr, cleanupReleaseBranch, RELEASE_BRANCH } from './release-controller.mjs';
+import { createCommit, shouldReprepareRelease, releaseIntent, releasePrMarker, parseReleasePrMarker, keepReleaseCommit, releasePrDeclined, ensureReleasePr, cleanupReleaseBranch, dispatchMissingChecks, RELEASE_BRANCH } from './release-controller.mjs';
+
+test('missing HEAD checks dispatch their configured workflows once per workflow', async () => {
+  const requiredChecks = [
+    { name: 'python ubuntu', workflow: 'test.yml' },
+    { name: 'python windows', workflow: 'test.yml' },
+    { name: 'node', workflow: 'node.yml' },
+    { name: 'unmapped' },
+    { name: 'already green', workflow: 'other.yml' },
+    'string check'
+  ];
+  const result = { state: 'missing', missing: ['python ubuntu', 'python windows', 'node', 'unmapped', 'string check'], failed: [], pending: [] };
+  const request = test.mock.fn(async () => ({ workflow_runs: [] }));
+  await dispatchMissingChecks('org/project', 'main', 'head', 'head', result, requiredChecks, request);
+  assert.deepEqual(request.mock.calls.map(call => call.arguments), [
+    ['/repos/org/project/actions/workflows/test.yml/runs?head_sha=head&event=workflow_dispatch&per_page=1'],
+    ['/repos/org/project/actions/workflows/test.yml/dispatches', { method: 'POST', body: { ref: 'main' } }],
+    ['/repos/org/project/actions/workflows/node.yml/runs?head_sha=head&event=workflow_dispatch&per_page=1'],
+    ['/repos/org/project/actions/workflows/node.yml/dispatches', { method: 'POST', body: { ref: 'main' } }]
+  ]);
+});
+
+test('an existing dispatch on HEAD prevents another dispatch regardless of run state', async () => {
+  for (const status of ['queued', 'in_progress', 'completed']) {
+    const request = test.mock.fn(async () => ({ workflow_runs: [{ html_url: 'run-url', status }] }));
+    await dispatchMissingChecks('org/project', 'main', 'head', 'head',
+      { state: 'missing', missing: ['node'] }, [{ name: 'node', workflow: 'node.yml' }], request);
+    assert.equal(request.mock.callCount(), 1);
+    assert.equal(request.mock.calls[0].arguments[0], '/repos/org/project/actions/workflows/node.yml/runs?head_sha=head&event=workflow_dispatch&per_page=1');
+  }
+});
+
+test('missing checks without workflow metadata do not dispatch', async () => {
+  const request = test.mock.fn();
+  await dispatchMissingChecks('org/project', 'main', 'head', 'head',
+    { state: 'missing', missing: ['unmapped', 'string check'] },
+    [{ name: 'unmapped' }, 'string check', { name: 'other', workflow: 'other.yml' }], request);
+  assert.equal(request.mock.callCount(), 0);
+});
+
+test('dispatch recovery never runs for failed, pending, successful or non-HEAD evaluations', async () => {
+  const request = test.mock.fn();
+  const checks = [{ name: 'node', workflow: 'node.yml' }];
+  for (const state of ['failure', 'pending', 'success', 'unconfigured', 'not-applicable']) {
+    await dispatchMissingChecks('org/project', 'main', 'head', 'head', { state, missing: ['node'] }, checks, request);
+  }
+  for (const extra of [{ failed: ['other'] }, { pending: ['other'] }, { missing: [] }]) {
+    await dispatchMissingChecks('org/project', 'main', 'head', 'head', { state: 'missing', missing: ['node'], ...extra }, checks, request);
+  }
+  await dispatchMissingChecks('org/project', 'main', 'old-prepared', 'head',
+    { state: 'missing', missing: ['node'] }, checks, request);
+  assert.equal(request.mock.callCount(), 0);
+});
+
+test('dispatch lookup and write errors warn without throwing and continue other workflows', async () => {
+  for (const status of [403, 404, 422]) {
+    for (const failLookup of [true, false]) {
+      const writes = [];
+      const request = async (path, options) => {
+        if (path.includes('/node.yml/') && (failLookup || options?.method === 'POST')) {
+          throw Object.assign(new Error('dispatch denied'), { status });
+        }
+        if (options?.method === 'POST') writes.push(path);
+        return { workflow_runs: [] };
+      };
+      const result = { state: 'missing', missing: ['node', 'python'] };
+      await dispatchMissingChecks('org/project', 'main', 'head', 'head', result,
+        [{ name: 'node', workflow: 'node.yml' }, { name: 'python', workflow: 'test.yml' }], request);
+      assert.deepEqual(writes, ['/repos/org/project/actions/workflows/test.yml/dispatches']);
+      assert.equal(result.state, 'missing');
+    }
+  }
+});
+
+test('unexpected dispatch service errors remain visible', async () => {
+  await assert.rejects(dispatchMissingChecks('org/project', 'main', 'head', 'head',
+    { state: 'missing', missing: ['node'] }, [{ name: 'node', workflow: 'node.yml' }],
+    async () => { throw Object.assign(new Error('service unavailable'), { status: 500 }); }), /service unavailable/);
+});
+
+test('only LayoutLingua release checks opt into dispatch recovery', () => {
+  const ci = JSON.parse(fs.readFileSync(new URL('../../ci-policy.json', import.meta.url), 'utf8'));
+  const mapped = Object.entries(ci.repositories).flatMap(([repo, profile]) =>
+    profile.requiredChecks.filter(check => check.workflow).map(check => [repo, check.name, check.workflow]));
+  assert.deepEqual(mapped, [
+    ['LayoutLingua', 'test (ubuntu-latest) / Test (ubuntu-latest)', 'test.yml'],
+    ['LayoutLingua', 'test (windows-latest) / Test (windows-latest)', 'test.yml'],
+    ['LayoutLingua', 'test (macos-latest) / Test (macos-latest)', 'test.yml'],
+    ['LayoutLingua', 'verify / Node (Ubuntu)', 'node.yml']
+  ]);
+});
 
 test('release intent accepts original and squash subjects for both modes', () => {
   for (const [mode, subject] of [['tag', 'chore(release): prepare v1.2.0'], ['commit', 'release: v1.2.0']]) {
