@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { bumpSemver, classifyConventionalCommit, highestReleaseLevel, insertChangelogSection, applyVersionFile, releaseNotesFromChangelog, releaseBodyFromChangelog, pendingDraftReleases, missingRequiredAssets, planOrphanAssetRecovery, changedFilesForPolicy, releaseMatchesTag, selectReleaseByTag, selectOrphanDraftForTag } from './release-controller.mjs';
-import { createCommit, shouldReprepareRelease, releaseIntent, releasePrMarker, parseReleasePrMarker, keepReleaseCommit, releasePrDeclined, ensureReleasePr, cleanupReleaseBranch, dispatchMissingChecks, prepareReleaseChanges, RELEASE_BRANCH } from './release-controller.mjs';
+import { createCommit, shouldReprepareRelease, releaseIntent, releasePrMarker, parseReleasePrMarker, keepReleaseCommit, releasePrDeclined, ensureReleasePr, cleanupReleaseBranch, dispatchMissingChecks, prepareReleaseChanges, makeReleaseNotes, RELEASE_BRANCH } from './release-controller.mjs';
 
 test('missing HEAD checks dispatch their configured workflows once per workflow', async () => {
   const requiredChecks = [
@@ -375,6 +375,58 @@ test('Conventional Commit types map to the configured SemVer levels', () => {
   assert.equal(classifyConventionalCommit('feat: change auth\n\nBREAKING CHANGE: old tokens are rejected').level, 'major');
 });
 
+
+test('release notes preserve conventional sections and append other changes in input order', () => {
+  const messages = [
+    'Fix multilingual prose detection, Argos routes, and translation chunking (#68)',
+    'feat(ui): add palette (#69)',
+    'fix: repair import (#70)',
+    'chore: refresh dependencies (#71)',
+    'revert: undo regression',
+    'feat!: remove legacy API'
+  ];
+  const commits = messages.map((message, index) => ({ sha: String(index).repeat(40), commit: { message } }));
+  const entry = (subject, index) => '- ' + subject + ' ([' + String(index).repeat(7) +
+    '](https://github.com/org/project/commit/' + String(index).repeat(40) + '))';
+  const notes = makeReleaseNotes(commits, 'org/project');
+  assert.equal(notes, [
+    '### Breaking Changes\n\n' + entry('remove legacy API', 5),
+    '### Features\n\n' + entry('add palette (#69)', 1),
+    '### Bug Fixes and Performance\n\n' + entry('repair import (#70)', 2),
+    '### Reverts\n\n' + entry('undo regression', 4),
+    '### Other changes\n\n' + entry(messages[0], 0) + '\n' + entry(messages[3], 3)
+  ].join('\n\n'));
+  const changelog = insertChangelogSection('', '1.2.0', '2026-11-23', notes);
+  assert.equal(releaseNotesFromChangelog(changelog, '1.2.0'), notes);
+  assert.match(releaseBodyFromChangelog(changelog, '1.2.0'), /Fix multilingual prose detection/);
+});
+
+test('other changes exclude release intents and merge noise and omit empty sections', () => {
+  const messages = [
+    '', '  ', 'release: v1.2.0', 'release: 1.2.0-rc.1 (#12)',
+    'chore(release): prepare v1.2.0 (#13)\n\nRelease notes',
+    "Merge branch 'main'", 'Merge pull request #14 from org/topic',
+    "Merge remote-tracking branch 'origin/main'"
+  ];
+  const commits = messages.map(message => ({ message, sha: 'abcdef123456' }));
+  assert.equal(makeReleaseNotes(commits, 'org/project'), '');
+  assert.equal(makeReleaseNotes([], 'org/project'), '');
+  const fix = { message: 'fix: repair runtime', sha: '123456789abc' };
+  assert.equal(makeReleaseNotes([...commits, fix], 'org/project'),
+    '### Bug Fixes and Performance\n\n- repair runtime ([1234567](https://github.com/org/project/commit/123456789abc))');
+});
+
+test('other changes do not affect release eligibility or bump level', () => {
+  const commits = ['Improve documentation (#72)', 'chore: refresh dependencies',
+    'fix(docs): clarify setup', 'refactor: simplify parser', 'fix(release): repair publishing']
+    .map(message => ({ message, sha: 'abcdef123456' }));
+  assert.equal(highestReleaseLevel(commits), null);
+  const notes = makeReleaseNotes(commits, 'org/project');
+  assert.match(notes, /^### Other changes\n/);
+  for (const commit of commits) assert.ok(notes.includes(commit.message));
+  assert.equal(highestReleaseLevel([...commits, { message: 'fix: repair runtime' }]), 'patch');
+  assert.equal(highestReleaseLevel([...commits, { message: 'feat: add runtime' }]), 'minor');
+});
 
 test('release notes are extracted from the exact generated changelog section', () => {
   const changelog = [
