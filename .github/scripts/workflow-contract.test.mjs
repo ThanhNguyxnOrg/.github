@@ -15,6 +15,27 @@ test('managed tags are scoped to central workflows and Agent composite actions',
   }
 });
 
+test('internal action tags are promoted when their implementations or imported release helpers change', () => {
+  const promote = read('.github/workflows/agent-policy-pin-sync.yml');
+  assert.match(promote, /push:\n    branches: \[main\]/);
+  assert.ok(promote.includes("      - '.github/actions/**'"));
+  assert.ok(promote.includes("      - '.github/scripts/**'"));
+  assert.ok(promote.includes("      - 'release-policy.json'"));
+  assert.ok(promote.includes('git tag -fa agent-v1'));
+  const gate = promote.split('      - name: Run central policy regression tests\n')[1]
+    .split('\n      - name:')[0];
+  for (const suite of ['release-assets.test.mjs', 'release-assets-publish.test.mjs', 'release-notes.test.mjs']) {
+    assert.ok(gate.includes('.github/scripts/' + suite), suite);
+  }
+  assert.ok(promote.indexOf(gate) < promote.indexOf('git tag -fa agent-v1'));
+  const controller = read('.github/workflows/agent-controller.yml');
+  const publisher = read('.github/workflows/release-publish.yml');
+  const token = 'uses: ThanhNguyxnOrg/.github/.github/actions/agent-token@agent-v1';
+  assert.ok(controller.includes(token));
+  assert.ok(publisher.includes(token));
+  assert.ok(publisher.includes('uses: ThanhNguyxnOrg/.github/.github/actions/agent-release-assets@agent-v1'));
+});
+
 test('CI tag promotion tests main before atomically promoting ci-v1 and retaining snapshots', () => {
   const workflow = read('.github/workflows/ci-tag-promote.yml');
   assert.match(workflow, /push:\n    branches: \[main\]/);

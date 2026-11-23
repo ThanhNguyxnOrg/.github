@@ -5,15 +5,17 @@ name: ThanhNguyxnAgent — Promote release tag
 # every central release change — which forced one pin commit per repository —
 # this workflow moves the release-v1 tag to the tested main HEAD. Callers use
 # uses: ThanhNguyxnOrg/.github/.github/workflows/release-publish.yml@release-v1
-# and the internal agent-release-assets action ref stays a full SHA inside
-# the single central release-publish.yml file, so no fan-out is possible.
+# and the internal agent-release-assets action follows agent-v1, so neither
+# member callers nor the central publisher need action-pin update commits.
 #
 # This workflow creates NO commits and dispatches NOTHING: a tag move needs
 # no pin commit in any repository. The trigger keeps a paths filter (release
 # files only, no hourly cron), so showcase syncs and other unrelated pushes
 # never promote the tag. Each promotion also creates an immutable tag
-# release-v1-<UTC date>-<short SHA> so any promotion can be rolled back by
-# moving release-v1 back to that tag.
+# release-v1-<UTC date>-<short SHA> so the workflow can be rolled back by
+# moving release-v1 back to that tag. The asset action follows agent-v1;
+# rolling back its implementation also requires moving agent-v1 back to
+# the corresponding agent-v1 snapshot, affecting all Agent tag consumers.
 #
 # Retention: only the newest 20 immutable snapshot tags are kept. Each
 # promotion prunes older snapshots (oldest first); the moving release-v1 tag

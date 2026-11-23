@@ -2,7 +2,7 @@ name: ThanhNguyxnAgent — Promote CI tag
 
 # Replaces per-repository SHA pin updates for shared CI and npm publishing.
 # Callers follow ci-v1 instead of receiving a pin commit on every central
-# change, while internal and third-party refs stay SHA-pinned inside .github.
+# change, while third-party refs stay SHA-pinned inside .github.
 # uses: ThanhNguyxnOrg/.github/.github/workflows/ci-node.yml@ci-v1
 #
 # This workflow creates NO commits and dispatches NOTHING: a tag move needs

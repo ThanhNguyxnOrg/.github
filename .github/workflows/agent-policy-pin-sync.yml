@@ -71,7 +71,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run central policy regression tests
-        run: node --test .github/scripts/agent-controller.test.mjs .github/scripts/agent-onboard.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/stale-controller.test.mjs
+        run: node --test .github/scripts/agent-controller.test.mjs .github/scripts/agent-onboard.test.mjs .github/scripts/check-policy.test.mjs .github/scripts/stale-controller.test.mjs .github/scripts/release-assets.test.mjs .github/scripts/release-assets-publish.test.mjs .github/scripts/release-notes.test.mjs
 
       - name: Promote agent-v1 tag to HEAD
         env:
