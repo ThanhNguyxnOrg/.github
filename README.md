@@ -29,7 +29,7 @@ It keeps the public-facing profile and default documentation clean, organized, a
 - `SECURITY.md` → security reporting notes
 - `CODE_OF_CONDUCT.md` → behavior expectations
 - `PULL_REQUEST_TEMPLATE.md` → default pull request template
-- `ISSUE_TEMPLATE/` → default issue templates
+- `.github/ISSUE_TEMPLATE/` → default issue templates and chooser config (GitHub only inherits them from this path)
 - `docs/` → extra documentation about this workspace
 - `agent-policy.json`, `ci-policy.json`, and `release-policy.json` → centralized organization automation policies
 - `.github/workflows/` → central Agent, Release, Stale, and showcase-sync controllers, plus shared CI and npm publish reusable workflows
