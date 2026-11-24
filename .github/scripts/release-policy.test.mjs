@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import policy from '../../release-policy.json' with { type: 'json' };
 import organizationRepositories from '../../organization-repositories.json' with { type: 'json' };
+import { applyVersionFile, bumpSemver, highestReleaseLevel } from './release-controller.mjs';
+import { getRepositoryProfile } from './check-policy.mjs';
 
 test('every organization repository has exactly one release classification', () => {
   const active = Object.keys(policy.repositories || {});
@@ -54,6 +56,31 @@ test('BlendOps uses the central tag-only release contract from its verified v1.0
   ]);
   assert.equal(rule.releaseWorkflowName, undefined, 'source-only BlendOps releases do not need a binary build workflow');
   assert.equal(rule.requiredAssets, undefined, 'source-only BlendOps releases must not claim distributable assets');
+});
+
+test('Pixelcraft bootstraps from a feature and versions its package and native manifests together', () => {
+  const rule = policy.repositories.Pixelcraft;
+  assert.equal(policy.excluded.Pixelcraft, undefined);
+  assert.equal(rule.mode, 'tag');
+  assert.equal(rule.requireSuccessfulChecks, true);
+  assert.equal(rule.releaseWorkflowName, 'Package and Publish Pixelcraft');
+  assert.deepEqual(rule.requiredAssets, ['pixelcraft-skills.zip', 'pixelcraft-skills.tar.gz']);
+  assert.deepEqual(getRepositoryProfile('Pixelcraft').requiredChecks, [
+    { name: 'skills', workflow: 'validate.yml', appSlug: 'github-actions' }
+  ]);
+  const level = highestReleaseLevel([{ message: 'feat(distribution): enroll Pixelcraft in managed publishing' }]);
+  assert.equal(bumpSemver(rule.initialVersion, level), '0.1.0');
+  const fixtures = {
+    'package.json': { version: '0.1.0' },
+    'plugin.json': { version: '0.1.0' },
+    '.claude-plugin/marketplace.json': { plugins: [{ version: '0.1.0' }] },
+    'gemini-extension.json': { version: '0.1.0' }
+  };
+  assert.deepEqual(rule.versionFiles.map(file => file.path).sort(), Object.keys(fixtures).sort());
+  for (const file of rule.versionFiles) {
+    const updated = JSON.parse(applyVersionFile(file, JSON.stringify(fixtures[file.path]), '0.2.0'));
+    assert.equal(updated.plugins?.[0].version ?? updated.version, '0.2.0', file.path);
+  }
 });
 
 test('excluded repositories explain why automatic releases are disabled', () => {

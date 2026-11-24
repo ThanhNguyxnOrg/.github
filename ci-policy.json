@@ -279,7 +279,13 @@
     },
     "Pixelcraft": {
       "defaultBranch": "main",
-      "requiredChecks": []
+      "requiredChecks": [
+        {
+          "name": "skills",
+          "workflow": "validate.yml",
+          "appSlug": "github-actions"
+        }
+      ]
     }
   }
 }

@@ -83,7 +83,7 @@ test('unexpected dispatch service errors remain visible', async () => {
     async () => { throw Object.assign(new Error('service unavailable'), { status: 500 }); }), /service unavailable/);
 });
 
-test('only LayoutLingua release checks opt into dispatch recovery', () => {
+test('only LayoutLingua and Pixelcraft release checks opt into dispatch recovery', () => {
   const ci = JSON.parse(fs.readFileSync(new URL('../../ci-policy.json', import.meta.url), 'utf8'));
   const mapped = Object.entries(ci.repositories).flatMap(([repo, profile]) =>
     profile.requiredChecks.filter(check => check.workflow).map(check => [repo, check.name, check.workflow]));
@@ -91,7 +91,8 @@ test('only LayoutLingua release checks opt into dispatch recovery', () => {
     ['LayoutLingua', 'test (ubuntu-latest) / Test (ubuntu-latest)', 'test.yml'],
     ['LayoutLingua', 'test (windows-latest) / Test (windows-latest)', 'test.yml'],
     ['LayoutLingua', 'test (macos-latest) / Test (macos-latest)', 'test.yml'],
-    ['LayoutLingua', 'verify / Node (Ubuntu)', 'node.yml']
+    ['LayoutLingua', 'verify / Node (Ubuntu)', 'node.yml'],
+    ['Pixelcraft', 'skills', 'validate.yml']
   ]);
 });
 

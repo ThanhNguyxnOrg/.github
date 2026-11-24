@@ -17,6 +17,41 @@
     ]
   },
   "repositories": {
+    "Pixelcraft": {
+      "branch": "main",
+      "mode": "tag",
+      "baselineSha": "bf4ee2dea7164c4a50cd53d8f1e08781291c5102",
+      "initialVersion": "0.0.0",
+      "versionFiles": [
+        {
+          "path": "package.json",
+          "kind": "json",
+          "jsonPaths": [["version"]]
+        },
+        {
+          "path": "plugin.json",
+          "kind": "json",
+          "jsonPaths": [["version"]]
+        },
+        {
+          "path": ".claude-plugin/marketplace.json",
+          "kind": "json",
+          "jsonPaths": [["plugins", 0, "version"]]
+        },
+        {
+          "path": "gemini-extension.json",
+          "kind": "json",
+          "jsonPaths": [["version"]]
+        }
+      ],
+      "changelogPath": "CHANGELOG.md",
+      "requireSuccessfulChecks": true,
+      "releaseWorkflowName": "Package and Publish Pixelcraft",
+      "requiredAssets": [
+        "pixelcraft-skills.zip",
+        "pixelcraft-skills.tar.gz"
+      ]
+    },
     "judgeloom-core": {
       "branch": "master",
       "mode": "tag",
@@ -403,7 +438,6 @@
     "ThanhNguyxnOrg.github.io": "Organization profile website; no product release pipeline.",
     "AFTERFRAME-THE-LAST-LOOP": "Game project is in active development and has no release packaging workflow or agreed ship targets yet. Keep automatic releases disabled until desktop/game distribution targets are defined.",
     "chess-on-glass": "Project has no verified release build or distributable artifacts yet. Keep automatic releases disabled until the repository contains a release-ready product.",
-    "chromadna": "Standalone self-managed release workflow: release.yml tags and publishes GitHub Releases directly outside the central release-publish contract.",
-    "Pixelcraft": "Newly discovered repository; release classification not mapped yet — excluded until explicitly onboarded."
+    "chromadna": "Standalone self-managed release workflow: release.yml tags and publishes GitHub Releases directly outside the central release-publish contract."
   }
 }
