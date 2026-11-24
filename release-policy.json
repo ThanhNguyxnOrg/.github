@@ -26,22 +26,40 @@
         {
           "path": "package.json",
           "kind": "json",
-          "jsonPaths": [["version"]]
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
         },
         {
           "path": "plugin.json",
           "kind": "json",
-          "jsonPaths": [["version"]]
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
         },
         {
           "path": ".claude-plugin/marketplace.json",
           "kind": "json",
-          "jsonPaths": [["plugins", 0, "version"]]
+          "jsonPaths": [
+            [
+              "plugins",
+              0,
+              "version"
+            ]
+          ]
         },
         {
           "path": "gemini-extension.json",
           "kind": "json",
-          "jsonPaths": [["version"]]
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
         }
       ],
       "changelogPath": "CHANGELOG.md",
