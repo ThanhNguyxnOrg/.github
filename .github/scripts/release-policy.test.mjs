@@ -58,7 +58,7 @@ test('Pixelcraft bootstraps from a feature and versions its package and native m
   assert.equal(rule.mode, 'tag');
   assert.equal(rule.requireSuccessfulChecks, true);
   assert.equal(rule.releaseWorkflowName, 'Package and Publish Pixelcraft');
-  assert.deepEqual(rule.requiredAssets, ['pixelcraft-skills.zip', 'pixelcraft-skills.tar.gz']);
+  assert.deepEqual(rule.requiredAssets, ['pixelcraft-skills.zip', 'pixelcraft-skills.tar.gz', 'SHA256SUMS.txt']);
   assert.deepEqual(getRepositoryProfile('Pixelcraft').requiredChecks, [
     { name: 'skills', workflow: 'validate.yml', appSlug: 'github-actions' }
   ]);
