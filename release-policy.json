@@ -67,7 +67,8 @@
       "releaseWorkflowName": "Package and Publish Pixelcraft",
       "requiredAssets": [
         "pixelcraft-skills.zip",
-        "pixelcraft-skills.tar.gz"
+        "pixelcraft-skills.tar.gz",
+        "SHA256SUMS.txt"
       ]
     },
     "judgeloom-core": {
