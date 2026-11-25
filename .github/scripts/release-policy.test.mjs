@@ -67,13 +67,31 @@ test('Pixelcraft bootstraps from a feature and versions its package and native m
   const fixtures = {
     'package.json': { version: '0.1.0' },
     'plugin.json': { version: '0.1.0' },
+    '.claude-plugin/plugin.json': { version: '0.1.0' },
     '.claude-plugin/marketplace.json': { plugins: [{ version: '0.1.0' }] },
-    'gemini-extension.json': { version: '0.1.0' }
+    '.cursor-plugin/plugin.json': { version: '0.1.0' },
+    '.cursor-plugin/marketplace.json': { metadata: { version: '0.1.0' } },
+    '.antigravity-plugin/plugin.json': { version: '0.1.0' },
+    '.codex-plugin/plugin.json': { version: '0.1.0' },
+    '.github/plugin/marketplace.json': { metadata: { version: '0.1.0' }, plugins: [{ version: '0.1.0' }] },
+    '.devin-plugin/plugin.json': { version: '0.1.0' },
+    'gemini-extension.json': { version: '0.1.0' },
+    'website/package.json': { version: '0.1.0' },
+    'website/package-lock.json': { version: '0.1.0', packages: { '': { version: '0.1.0' } } },
+    'website/src/generated/repo-meta.json': { version: '0.1.0' }
   };
   assert.deepEqual(rule.versionFiles.map(file => file.path).sort(), Object.keys(fixtures).sort());
   for (const file of rule.versionFiles) {
     const updated = JSON.parse(applyVersionFile(file, JSON.stringify(fixtures[file.path]), '0.2.0'));
-    assert.equal(updated.plugins?.[0].version ?? updated.version, '0.2.0', file.path);
+    if (file.path === '.github/plugin/marketplace.json') {
+      assert.equal(updated.metadata.version, '0.2.0', file.path);
+      assert.equal(updated.plugins[0].version, '0.2.0', file.path);
+    } else if (file.path === 'website/package-lock.json') {
+      assert.equal(updated.version, '0.2.0', file.path);
+      assert.equal(updated.packages[''].version, '0.2.0', file.path);
+    } else {
+      assert.equal(updated.plugins?.[0].version ?? updated.metadata?.version ?? updated.version, '0.2.0', file.path);
+    }
   }
 });
 

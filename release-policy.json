@@ -42,6 +42,15 @@
           ]
         },
         {
+          "path": ".claude-plugin/plugin.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
           "path": ".claude-plugin/marketplace.json",
           "kind": "json",
           "jsonPaths": [
@@ -53,7 +62,100 @@
           ]
         },
         {
+          "path": ".cursor-plugin/plugin.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": ".cursor-plugin/marketplace.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "metadata",
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": ".antigravity-plugin/plugin.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": ".codex-plugin/plugin.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": ".github/plugin/marketplace.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "metadata",
+              "version"
+            ],
+            [
+              "plugins",
+              0,
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": ".devin-plugin/plugin.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
           "path": "gemini-extension.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": "website/package.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": "website/package-lock.json",
+          "kind": "json",
+          "jsonPaths": [
+            [
+              "version"
+            ],
+            [
+              "packages",
+              "",
+              "version"
+            ]
+          ]
+        },
+        {
+          "path": "website/src/generated/repo-meta.json",
           "kind": "json",
           "jsonPaths": [
             [
